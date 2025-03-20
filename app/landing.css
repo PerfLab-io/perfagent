@@ -1,0 +1,182 @@
+/* Pixel grid pattern */
+.bg-grid-pattern {
+  background-image:
+    linear-gradient(to right, rgba(0, 0, 0, 0.1) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.1) 1px, transparent 1px);
+  background-size: 8px 8px;
+}
+
+/* Scanlines effect */
+.bg-scanlines {
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(0, 0, 0, 0.05) 50%,
+    transparent 100%
+  );
+  background-size: 100% 4px;
+}
+
+/* Pixel font rendering */
+.pixel-text {
+  font-family: "Courier New", monospace;
+  letter-spacing: 0.5px;
+  font-smooth: never;
+  -webkit-font-smoothing: none;
+}
+
+/* Pixel font for retro text */
+.font-pixel-text {
+  font-family: "Courier New", monospace;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  image-rendering: pixelated;
+}
+
+/* Low FPS transitions - ONLY for the hero SVG */
+.hero-svg-animation {
+  transition-timing-function: steps(5, jump-none);
+}
+
+/* Regular smooth transitions for all other elements */
+.transition-all:not(.hero-svg-animation) {
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Pixel-perfect rendering - only for SVGs in the hero component */
+.abstract-data-hero svg {
+  shape-rendering: crispEdges;
+}
+
+/* Terminal-style blinking cursor */
+@keyframes blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.cursor-blink {
+  animation: blink 1s step-end infinite;
+}
+
+/* Pixelated border styles */
+.border-pixelated {
+  box-shadow:
+    2px 0 0 0 var(--peppermint-600),
+    0 2px 0 0 var(--peppermint-600),
+    2px 2px 0 0 var(--peppermint-600),
+    4px 2px 0 0 var(--peppermint-600),
+    2px 4px 0 0 var(--peppermint-600),
+    4px 4px 0 0 var(--peppermint-600);
+}
+
+.border-pixelated-dashed {
+  background-image:
+    linear-gradient(90deg, var(--peppermint-500) 50%, transparent 50%),
+    linear-gradient(90deg, var(--peppermint-500) 50%, transparent 50%),
+    linear-gradient(0deg, var(--peppermint-500) 50%, transparent 50%),
+    linear-gradient(0deg, var(--peppermint-500) 50%, transparent 50%);
+  background-position: top, bottom, left, right;
+  background-size:
+    10px 4px,
+    10px 4px,
+    4px 10px,
+    4px 10px;
+  background-repeat: repeat-x, repeat-x, repeat-y, repeat-y;
+}
+
+/* Grid texture overlay inspired by Green_Texture.png */
+.grid-texture {
+  background-image:
+    linear-gradient(0deg, var(--peppermint-600) 1px, transparent 1px),
+    linear-gradient(90deg, var(--peppermint-600) 1px, transparent 1px);
+  background-size: 8px 8px;
+  background-position: -1px -1px;
+}
+
+/* Pixelated UI elements */
+.pixelart-ui {
+  image-rendering: pixelated;
+  shape-rendering: crispEdges;
+}
+
+.pixelated-icon {
+  image-rendering: pixelated;
+  shape-rendering: crispEdges;
+  transform: scale(1.2);
+  transform-origin: center;
+}
+
+/* Animation for pixelated UI elements to subtly pulse */
+@keyframes pixel-pulse {
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.pixelart-ui {
+  animation: pixel-pulse 4s infinite ease-in-out;
+}
+
+/* Staggered animations for different UI elements */
+.pixelart-ui:nth-child(odd) {
+  animation-delay: 1s;
+}
+
+.pixelart-ui:nth-child(3n) {
+  animation-delay: 2s;
+}
+
+/* Pixelated button hover effect */
+.border-pixelated:hover {
+  transform: translate(-2px, -2px);
+  box-shadow:
+    4px 0 0 0 var(--peppermint-600),
+    0 4px 0 0 var(--peppermint-600),
+    4px 4px 0 0 var(--peppermint-600),
+    6px 4px 0 0 var(--peppermint-600),
+    4px 6px 0 0 var(--peppermint-600),
+    6px 6px 0 0 var(--peppermint-600);
+  transition:
+    transform 0.1s steps(1),
+    box-shadow 0.1s steps(1);
+}
+
+/* Pixelated overlay patterns */
+@keyframes pixel-shift {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 8px 8px;
+  }
+}
+
+.grid-texture {
+  animation: pixel-shift 20s infinite steps(8);
+}
+
+/* Fade in animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.5s ease-out forwards;
+}

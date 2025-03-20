@@ -1,0 +1,144 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Peppermint palette */
+    --peppermint-25: #f8fef8;
+    --peppermint-50: #f3fcf3;
+    --peppermint-100: #e9fbea;
+    --peppermint-200: #cbf0d0;
+    --peppermint-300: #9ce2ad;
+    --peppermint-400: #67cb87;
+    --peppermint-500: #3cb46c;
+    --peppermint-600: #2d9561;
+    --peppermint-700: #277756;
+    --peppermint-800: #255f4b;
+    --peppermint-900: #214f44;
+    --peppermint-950: #0d312d;
+
+    /* Merino palette */
+    --merino-50: #f7f2ea;
+    --merino-100: #f3ece1;
+    --merino-200: #e7d7c1;
+    --merino-300: #d7bd9a;
+    --merino-400: #c69c71;
+    --merino-500: #ba8455;
+    --merino-600: #ad7149;
+    --merino-700: #905b3e;
+    --merino-800: #744b38;
+    --merino-900: #5f3e2f;
+    --merino-950: #321f18;
+
+    /* Midnight palette */
+    --midnight-50: #eef6ff;
+    --midnight-100: #dfefff;
+    --midnight-200: #c6e0ff;
+    --midnight-300: #a3cafe;
+    --midnight-400: #7eaafb;
+    --midnight-500: #6089f4;
+    --midnight-600: #4263e9;
+    --midnight-700: #3551cd;
+    --midnight-800: #2d44a6;
+    --midnight-900: #2c3f83;
+    --midnight-950: #10162f;
+
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: var(--midnight-950);
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: var(--merino-200);
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Light mode */
+:root {
+  /* Use peppermint-25 for background */
+  --bg-color: var(--peppermint-25);
+  /* Use midnight-950 for text */
+  --text-color: var(--midnight-950);
+  /* Use merino-200 for accent */
+  --accent-color: var(--merino-200);
+  /* Use white for card background */
+  --card-bg: white;
+  /* Use midnight-950 for border */
+  --border-color: var(--midnight-950);
+}
+
+/* Dark mode */
+.dark {
+  /* Use peppermint-950 for background (dark green) */
+  --bg-color: var(--peppermint-950);
+  /* Use merino-50 for text (light cream) */
+  --text-color: var(--merino-50);
+  /* Use merino-600 for accent (darker tan) */
+  --accent-color: var(--merino-600);
+  /* Use peppermint-50 for card background (light green) instead of midnight */
+  --card-bg: var(--peppermint-50);
+  /* Use merino-200 for border (light tan) */
+  --border-color: var(--merino-200);
+}
