@@ -96,15 +96,16 @@ export const SignupEmail = ({
                   You're receiving this email because you signed up for
                   PerfAgent waitlist.
                 </Text>
-                {/* <Text className="text-[#c3e6d4] font-mono text-xs text-center m-0 mt-2">
+                <Text className="text-[#c3e6d4] font-mono text-xs text-center m-0 mt-2">
                   <Link href="#" className="text-[#67cb87] underline">
                     Unsubscribe
-                  </Link>{" "}
+                  </Link>
+                  {/* {" "}
                   or{" "}
                   <Link href="#" className="text-[#67cb87] underline">
                     manage preferences
-                  </Link>
-                </Text> */}
+                  </Link> */}
+                </Text>
               </Section>
             </Section>
           </Container>
