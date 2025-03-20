@@ -164,7 +164,13 @@ export async function subscribeToNewsletter(formData: FormData) {
 
     // Add the email to the waitlist audience first
     try {
-      await addToWaitlist(email);
+      const result = await addToWaitlist(email);
+      if (!result.success) {
+        return {
+          success: false,
+          error: "Failed to add to waitlist. Please try again.",
+        };
+      }
     } catch (error) {
       // If the error is "Email already in waitlist", return it as a user-friendly error
       if (
