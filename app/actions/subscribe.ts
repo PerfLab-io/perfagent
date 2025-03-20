@@ -2,6 +2,7 @@
 
 import { Resend } from "resend";
 import { emailSchema } from "@/lib/validations/email";
+import { SignupEmail } from "@/components/emails/signup-confirmation";
 import { z } from "zod";
 
 // Initialize Resend with your API key
@@ -50,12 +51,7 @@ export async function subscribeToNewsletter(formData: FormData) {
       from: "no-reply@yourdomain.com", // Update with your verified domain
       to: email,
       subject: "Welcome to PerfAgent!",
-      html: `
-        <div>
-          <h1>Thanks for subscribing!</h1>
-          <p>You'll be the first to know when PerfAgent launches.</p>
-        </div>
-      `,
+      react: SignupEmail({ email }),
     });
 
     if (error) {

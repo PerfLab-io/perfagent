@@ -41,7 +41,7 @@ export function SignupNotification() {
         reset();
       } else {
         setServerError(
-          result.error || "Something went wrong. Please try again."
+          result.error || "Something went wrong. Please try again.",
         );
       }
     });
