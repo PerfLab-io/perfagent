@@ -11,6 +11,102 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 // Check if we're in a local/development environment
 const isLocalEnvironment = process.env.NODE_ENV === "development";
 
+// Waitlist audience ID for your users
+const WAITLIST_AUDIENCE_NAME = "PerfAgent Waitlist";
+let WAITLIST_AUDIENCE_ID: string | null = null;
+
+/**
+ * Ensures the waitlist audience exists, creating it if necessary
+ */
+async function ensureWaitlistAudience() {
+  if (isLocalEnvironment) {
+    return "local-audience-id";
+  }
+
+  try {
+    // If we already have the audience ID cached, return it
+    if (WAITLIST_AUDIENCE_ID) {
+      return WAITLIST_AUDIENCE_ID;
+    }
+
+    // Get all audiences to find ours
+    const { data: audiences, error: audiencesError } =
+      await resend.audiences.list();
+
+    if (audiencesError || !audiences) {
+      console.error("Error listing audiences:", audiencesError);
+      throw new Error("Failed to list audiences");
+    }
+
+    // Check if our waitlist audience already exists
+    const waitlistAudience = audiences.data.find(
+      (audience) => audience.name === WAITLIST_AUDIENCE_NAME
+    );
+
+    if (waitlistAudience) {
+      WAITLIST_AUDIENCE_ID = waitlistAudience.id;
+      return waitlistAudience.id;
+    }
+
+    // Create a new waitlist audience if it doesn't exist
+    const { data: newAudience, error: createError } =
+      await resend.audiences.create({
+        name: WAITLIST_AUDIENCE_NAME,
+      });
+
+    if (createError || !newAudience) {
+      console.error("Error creating audience:", createError);
+      throw new Error("Failed to create waitlist audience");
+    }
+
+    WAITLIST_AUDIENCE_ID = newAudience.id;
+    return newAudience.id;
+  } catch (error) {
+    console.error("Error ensuring waitlist audience:", error);
+    throw new Error("Failed to ensure waitlist audience exists");
+  }
+}
+
+/**
+ * Adds an email to the waitlist audience
+ */
+async function addToWaitlist(email: string) {
+  if (isLocalEnvironment) {
+    console.log(
+      `🔷 Local environment - Would add ${email} to waitlist audience`
+    );
+    return { success: true };
+  }
+
+  try {
+    const audienceId = await ensureWaitlistAudience();
+
+    // Add the contact to the audience
+    const { data, error } = await resend.contacts.create({
+      email,
+      audienceId,
+      firstName: email.split("@")[0],
+      unsubscribed: false,
+    });
+
+    if (error) {
+      // If it's already subscribed, that's fine - check for 409 Conflict status
+      if (error.message?.includes("already exists")) {
+        console.log(`Email ${email} already in waitlist`);
+        throw new Error("Email already in waitlist");
+      }
+
+      console.error("Error adding to waitlist:", error);
+      throw new Error("Failed to add to waitlist");
+    }
+
+    return { success: true, contactId: data?.id };
+  } catch (error) {
+    console.error("Add to waitlist error:", error);
+    throw error;
+  }
+}
+
 export async function subscribeToNewsletter(formData: FormData) {
   try {
     // Extract email from form data
@@ -45,11 +141,26 @@ export async function subscribeToNewsletter(formData: FormData) {
         `,
       });
 
+      // adding to waitlist
+      await addToWaitlist(email);
+
       // Return success for local environment
       return { success: true };
     }
 
-    // For production, send confirmation email using Resend
+    // Add the email to the waitlist audience first
+    try {
+      await addToWaitlist(email);
+    } catch (error) {
+      console.error("Failed to add to waitlist:", error);
+      return {
+        success: false,
+        // @ts-ignore
+        error: error.message,
+      };
+    }
+
+    // Then send the confirmation email
     const { data, error } = await resend.emails.send({
       from: "no-reply@perflab.io", // Update with your verified domain
       to: email,

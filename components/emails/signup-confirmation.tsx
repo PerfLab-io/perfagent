@@ -18,6 +18,10 @@ interface SignupEmailProps {
 export const SignupEmail = ({
   email = "user@example.com",
 }: SignupEmailProps) => {
+  // Create unsubscribe URL using environment variables
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const unsubscribeUrl = `${baseUrl}/unsubscribe?email=${encodeURIComponent(email)}`;
+
   return (
     <Html>
       <Head />
@@ -89,22 +93,20 @@ export const SignupEmail = ({
               {/* Footer */}
               <Section className="bg-[#0d312d] border-t border-dotted border-[#67cb87] p-4">
                 <Text className="text-[#67cb87] font-mono text-xs text-center m-0">
-                  &copy; 2023 PerfAgent is a product of Perflab. All rights
-                  reserved.
+                  &copy; {new Date().getFullYear()} PerfAgent is a product of
+                  Perflab. All rights reserved.
                 </Text>
                 <Text className="text-[#c3e6d4] font-mono text-xs text-center m-0 mt-2">
                   You're receiving this email because you signed up for
                   PerfAgent waitlist.
                 </Text>
                 <Text className="text-[#c3e6d4] font-mono text-xs text-center m-0 mt-2">
-                  <Link href="#" className="text-[#67cb87] underline">
+                  <Link
+                    href={unsubscribeUrl}
+                    className="text-[#67cb87] underline"
+                  >
                     Unsubscribe
                   </Link>
-                  {/* {" "}
-                  or{" "}
-                  <Link href="#" className="text-[#67cb87] underline">
-                    manage preferences
-                  </Link> */}
                 </Text>
               </Section>
             </Section>
