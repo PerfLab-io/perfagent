@@ -25,7 +25,7 @@ export const AnimationUtils = {
     element: HTMLElement,
     text: string,
     index: number,
-    callback?: () => void,
+    callback?: () => void
   ) => {
     if (index < text.length) {
       element.textContent += text.charAt(index);
@@ -34,7 +34,7 @@ export const AnimationUtils = {
         () => {
           AnimationUtils.typeText(element, text, index + 1, callback);
         },
-        30 + Math.random() * 70,
+        30 + Math.random() * 70
       );
     } else {
       element.classList.add("typed");
@@ -90,7 +90,7 @@ export const AnimationUtils = {
           line.style.transition = "transform 100ms steps(3)";
           line.style.transform = "scaleX(1)";
         },
-        100 + i * 15,
+        100 + i * 15
       );
     }
 
@@ -180,7 +180,7 @@ export function LowFpsPerformanceViz() {
         const handleElementHover = (e: Event) => {
           // Only highlight connected elements with the same data-connected attribute as this element's data-id
           const connectedElements = document.querySelectorAll(
-            `[data-connected="${dataId}"]`,
+            `[data-connected="${dataId}"]`
           );
           connectedElements.forEach((connectedEl) => {
             if (
@@ -338,7 +338,7 @@ export function LowFpsPerformanceViz() {
     // Add the optimization target as the very last element
     setTimeout(() => {
       const targetElement = document.querySelector(
-        '[data-anim="final-target"]',
+        '[data-anim="final-target"]'
       );
       if (targetElement instanceof HTMLElement) {
         targetElement.style.opacity = "1";
@@ -353,19 +353,19 @@ export function LowFpsPerformanceViz() {
   const startTerminalTyping = () => {
     // Get all metrics lines first
     const terminalLines = document.querySelectorAll(
-      "[data-terminal-line]:not([data-command-line])",
+      "[data-terminal-line]:not([data-command-line])"
     );
     const vitalMetrics = document.querySelectorAll("[data-vital-metric]");
     const vitalScores = document.querySelectorAll("[data-vital-score]");
     const sectionHeaders = document.querySelectorAll("[data-section-header]");
     const commandLine = document.querySelector("[data-command-line]");
     const optimizationTarget = document.querySelector(
-      '[data-anim="final"][class*="bottom-4"]',
+      '[data-anim="final"][class*="bottom-4"]'
     );
 
     // Show the PERFORMANCE.METRICS header first
     const metricsHeader = document.querySelector(
-      '[data-section-header="metrics"]',
+      '[data-section-header="metrics"]'
     );
     if (metricsHeader instanceof HTMLElement) {
       metricsHeader.style.opacity = "1";
@@ -433,7 +433,7 @@ export function LowFpsPerformanceViz() {
   const animateMetricLine = (
     line: HTMLElement,
     text: string,
-    callback: () => void,
+    callback: () => void
   ) => {
     // Split at the colon to separate the metric name from the value
     const parts = text.split(":");
@@ -471,7 +471,7 @@ export function LowFpsPerformanceViz() {
    */
   const showVitalsHeader = () => {
     const vitalsHeader = document.querySelector(
-      '[data-section-header="vitals"]',
+      '[data-section-header="vitals"]'
     );
     if (vitalsHeader instanceof HTMLElement) {
       vitalsHeader.style.opacity = "1";
@@ -588,7 +588,7 @@ export function LowFpsPerformanceViz() {
    */
   const showChatModeSection = () => {
     const commandHeader = document.querySelector(
-      '[data-section-header="chat"]',
+      '[data-section-header="chat"]'
     );
     if (commandHeader instanceof HTMLElement) {
       commandHeader.style.opacity = "1";
@@ -628,10 +628,10 @@ export function LowFpsPerformanceViz() {
    */
   const showYesNoLine = () => {
     const yesNoLine = document.querySelector(
-      ".terminal-line.flex.items-center",
+      ".terminal-line.flex.items-center"
     );
     const optimizationTarget = document.querySelector(
-      '[data-anim="final"][class*="bottom-4"]',
+      '[data-anim="final"][class*="bottom-4"]'
     );
 
     if (yesNoLine instanceof HTMLElement) {
@@ -668,7 +668,7 @@ export function LowFpsPerformanceViz() {
 
         <div className="relative w-full h-[550px] overflow-hidden flex">
           {/* Left sidebar - Terminal */}
-          <div className="w-1/4 h-full bg-peppermint-950 border-r border-dotted border-peppermint-700 p-3 font-mono text-xs overflow-hidden">
+          <div className="w-2/3 md:w-1/4 lg:w-1/4 h-full bg-peppermint-950 border-r border-dotted border-peppermint-700 p-3 font-mono text-xs overflow-hidden">
             <div
               className="text-peppermint-400 mb-2 font-bold"
               data-section-header="metrics"
