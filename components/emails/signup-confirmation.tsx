@@ -74,7 +74,7 @@ export const SignupEmail = ({
                   </Section>
 
                   <Text className="text-[#c3e6d4] font-mono text-sm">
-                    If you have any questions, feel free to reach out to us at
+                    If you have any questions, feel free to reach out to us at{" "}
                     <Link
                       href="mailto:support@perflab.io"
                       className="text-[#67cb87] underline"
