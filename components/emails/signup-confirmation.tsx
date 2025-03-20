@@ -21,9 +21,7 @@ export const SignupEmail = ({
   return (
     <Html>
       <Head />
-      <Preview>
-        Welcome to PerfAgent - Your Performance Optimization Platform
-      </Preview>
+      <Preview>Welcome to PerfAgent!</Preview>
       <Tailwind>
         <Body className="bg-[#0a2824] font-sans">
           <Container className="mx-auto py-8 px-4">
@@ -33,7 +31,7 @@ export const SignupEmail = ({
                 <div className="flex items-center">
                   <div className="w-3 h-3 rounded-full bg-[#67cb87] mr-2"></div>
                   <Text className="text-[#67cb87] font-mono text-xs uppercase tracking-wider m-0">
-                    PERFAGENT - SIGNUP CONFIRMATION
+                    PERFAGENT WAITLIST - SIGNUP CONFIRMATION
                   </Text>
                 </div>
               </Section>
@@ -45,12 +43,12 @@ export const SignupEmail = ({
 
                 <div className="relative">
                   <Heading className="text-[#67cb87] font-mono text-2xl mb-6 font-bold">
-                    &gt; Welcome to PerfAgent
+                    &gt; Welcome to PerfAgent Waitlist!
                   </Heading>
 
                   <Text className="text-[#c3e6d4] mb-6 font-mono">
-                    Thank you for signing up to our performance optimization
-                    platform. We've added your email ({email}) to our waitlist.
+                    Thank you for signing up to our waitlist. We've added your
+                    email ({email}) and we'll be in touch very soon!
                   </Text>
 
                   <Text className="text-[#c3e6d4] mb-6 font-mono">
@@ -63,9 +61,9 @@ export const SignupEmail = ({
                       &gt; What's Next?
                     </Text>
                     <Text className="text-[#c3e6d4] font-mono m-0 mt-2">
-                      We're working hard to finalize our platform. You'll
-                      receive an email with your exclusive access link as soon
-                      as we launch.
+                      We're working hard to finalize our agent, you'll receive
+                      an email with your exclusive access link as soon as we
+                      launch.
                     </Text>
                   </Section>
 
@@ -85,13 +83,14 @@ export const SignupEmail = ({
               {/* Footer */}
               <Section className="bg-[#0d312d] border-t border-dotted border-[#67cb87] p-4">
                 <Text className="text-[#67cb87] font-mono text-xs text-center m-0">
-                  &copy; 2023 PerfAgent. All rights reserved.
+                  &copy; 2023 PerfAgent is a product of Perflab. All rights
+                  reserved.
                 </Text>
                 <Text className="text-[#c3e6d4] font-mono text-xs text-center m-0 mt-2">
                   You're receiving this email because you signed up for
-                  PerfAgent updates.
+                  PerfAgent waitlist.
                 </Text>
-                <Text className="text-[#c3e6d4] font-mono text-xs text-center m-0 mt-2">
+                {/* <Text className="text-[#c3e6d4] font-mono text-xs text-center m-0 mt-2">
                   <Link href="#" className="text-[#67cb87] underline">
                     Unsubscribe
                   </Link>{" "}
@@ -99,7 +98,7 @@ export const SignupEmail = ({
                   <Link href="#" className="text-[#67cb87] underline">
                     manage preferences
                   </Link>
-                </Text>
+                </Text> */}
               </Section>
             </Section>
           </Container>
