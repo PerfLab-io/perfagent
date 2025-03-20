@@ -48,7 +48,7 @@ export async function subscribeToNewsletter(formData: FormData) {
 
     // For production, send confirmation email using Resend
     const { data, error } = await resend.emails.send({
-      from: "no-reply@yourdomain.com", // Update with your verified domain
+      from: "no-reply@perflab.io", // Update with your verified domain
       to: email,
       subject: "Welcome to PerfAgent!",
       react: SignupEmail({ email }),
