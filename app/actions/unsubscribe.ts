@@ -39,7 +39,7 @@ async function getWaitlistAudienceId() {
 
     // Check if our waitlist audience already exists
     const waitlistAudience = audiences.data.find(
-      (audience) => audience.name === WAITLIST_AUDIENCE_NAME
+      (audience) => audience.name === WAITLIST_AUDIENCE_NAME,
     );
 
     if (waitlistAudience) {
@@ -62,7 +62,7 @@ async function getWaitlistAudienceId() {
 async function removeFromWaitlist(email: string) {
   if (isLocalEnvironment) {
     console.log(
-      `🔷 Local environment - Would remove ${email} from waitlist audience`
+      `🔷 Local environment - Would remove ${email} from waitlist audience`,
     );
     return { success: true };
   }
@@ -87,7 +87,7 @@ async function removeFromWaitlist(email: string) {
 
     // Filter for the specific email we want to unsubscribe
     const contactToRemove = contacts.data.find(
-      (contact) => contact.email === email
+      (contact) => contact.email === email,
     );
 
     // If contact not found, it's already unsubscribed

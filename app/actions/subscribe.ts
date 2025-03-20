@@ -72,10 +72,16 @@ async function ensureWaitlistAudience() {
  */
 async function addToWaitlist(email: string) {
   if (isLocalEnvironment) {
+    console.log(email);
+    // Simulate "Email already in waitlist" error for test@test.com
+    if (email === "test@test.com") {
+      throw new Error("Email already in waitlist");
+    }
     console.log(
-      `🔷 Local environment - Would add ${email} to waitlist audience`
+      `🔷 Local environmentasd - Would add ${email} to waitlist audience`
     );
-    return { success: true };
+
+    return { success: true, contactId: "123" };
   }
 
   try {
@@ -124,6 +130,28 @@ export async function subscribeToNewsletter(formData: FormData) {
       };
     }
 
+    // Add the email to the waitlist audience first
+    try {
+      await addToWaitlist(email);
+    } catch (error) {
+      // If the error is "Email already in waitlist", return it as a user-friendly error
+      if (
+        error instanceof Error &&
+        error.message === "Email already in waitlist"
+      ) {
+        return {
+          success: false,
+          error: "You're already subscribed to our waitlist!",
+        };
+      }
+
+      console.error("Failed to add to waitlist:", error);
+      return {
+        success: false,
+        error: "Failed to add to waitlist. Please try again.",
+      };
+    }
+
     // In local environment, log to console instead of sending emails
     if (isLocalEnvironment) {
       const unsubscribeUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/unsubscribe?email=${encodeURIComponent(email)}`;
@@ -140,24 +168,6 @@ export async function subscribeToNewsletter(formData: FormData) {
           </div>
         `,
       });
-
-      // adding to waitlist
-      await addToWaitlist(email);
-
-      // Return success for local environment
-      return { success: true };
-    }
-
-    // Add the email to the waitlist audience first
-    try {
-      await addToWaitlist(email);
-    } catch (error) {
-      console.error("Failed to add to waitlist:", error);
-      return {
-        success: false,
-        // @ts-ignore
-        error: error.message,
-      };
     }
 
     // Then send the confirmation email
