@@ -94,56 +94,49 @@ export default function UnsubscribePage() {
                 below. You can always resubscribe later if you change your mind.
               </p>
 
-              <form onSubmit={handleSubmit} className="flex w-full gap-3 mb-8">
-                <div className="relative flex-1">
-                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-peppermint-500 dark:text-peppermint-700">
-                    <span className="font-mono">{">"}</span>
-                  </div>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => {
-                      setEmail(e.target.value);
-                      if (error) setError(undefined);
-                    }}
-                    placeholder="Confirm your email address"
-                    className={`w-full h-12 bg-peppermint-900/50 dark:bg-peppermint-200/50 border ${
-                      error
-                        ? "border-red-500 dark:border-red-400"
-                        : "border-peppermint-700 dark:border-peppermint-400"
-                    } text-peppermint-600 dark:text-peppermint-500 px-8 py-3 rounded-md focus:outline-none focus:ring-2 ${
-                      error
-                        ? "focus:ring-red-500 dark:focus:ring-red-400"
-                        : "focus:ring-peppermint-500 dark:focus:ring-peppermint-700"
-                    } placeholder:text-peppermint-600 dark:placeholder:text-peppermint-500`}
-                    required
-                    aria-invalid={error ? "true" : "false"}
-                    aria-describedby={error ? "email-error" : undefined}
-                  />
-                  {error && (
-                    <div
-                      id="email-error"
-                      className="flex items-center mt-2 text-red-500 dark:text-red-400 text-sm"
-                    >
-                      <AlertCircle size={14} className="mr-1" />
-                      {error}
+              <form onSubmit={handleSubmit}>
+                <div className="flex w-full flex-col sm:flex-row gap-3">
+                  <div className="relative flex-1">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-peppermint-500 dark:text-peppermint-700">
+                      <span className="font-mono">{">"}</span>
                     </div>
-                  )}
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        if (error) setError(undefined);
+                      }}
+                      placeholder="Confirm your email address"
+                      className="w-full h-12 bg-peppermint-900/50 dark:bg-peppermint-200/50 border border-peppermint-700 dark:border-peppermint-400 text-peppermint-600 dark:text-peppermint-500 px-8 py-3 rounded-md focus:outline-none focus:ring-2 focus:ring-peppermint-500 dark:focus:ring-peppermint-700 placeholder:text-peppermint-600 dark:placeholder:text-peppermint-500"
+                      required
+                      aria-invalid={error ? "true" : "false"}
+                      aria-describedby={error ? "email-error" : undefined}
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    disabled={isPending}
+                    className="h-12 bg-peppermint-500 hover:bg-peppermint-600 dark:bg-peppermint-700 dark:hover:bg-peppermint-800 text-peppermint-950 dark:text-peppermint-50 font-medium px-6 rounded-md transition-all flex items-center justify-center gap-2"
+                  >
+                    {isPending ? (
+                      <span className="flex items-center gap-2">
+                        Processing
+                        <span className="inline-block w-4 h-4 border-2 border-peppermint-950 border-t-transparent rounded-full animate-spin"></span>
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-2">
+                        Unsubscribe
+                      </span>
+                    )}
+                  </Button>
                 </div>
-                <Button
-                  type="submit"
-                  disabled={isPending}
-                  className="h-12 bg-peppermint-500 hover:bg-peppermint-600 dark:bg-peppermint-700 dark:hover:bg-peppermint-800 text-peppermint-950 dark:text-peppermint-50 font-medium px-6 rounded-md transition-all flex items-center justify-center gap-2"
-                >
-                  {isPending ? (
-                    <span className="flex items-center gap-2">
-                      Processing
-                      <span className="inline-block w-4 h-4 border-2 border-peppermint-950 border-t-transparent rounded-full animate-spin"></span>
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-2">Unsubscribe</span>
-                  )}
-                </Button>
+                {error && (
+                  <div className="mt-2 flex items-start gap-2 text-red-500">
+                    <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                    <span className="text-sm">{error}</span>
+                  </div>
+                )}
               </form>
             </>
           ) : (

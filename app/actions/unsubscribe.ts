@@ -39,7 +39,7 @@ async function getWaitlistAudienceId() {
 
     // Check if our waitlist audience already exists
     const waitlistAudience = audiences.data.find(
-      (audience) => audience.name === WAITLIST_AUDIENCE_NAME,
+      (audience) => audience.name === WAITLIST_AUDIENCE_NAME
     );
 
     if (waitlistAudience) {
@@ -62,8 +62,14 @@ async function getWaitlistAudienceId() {
 async function removeFromWaitlist(email: string) {
   if (isLocalEnvironment) {
     console.log(
-      `🔷 Local environment - Would remove ${email} from waitlist audience`,
+      `🔷 Local environment - Would remove ${email} from waitlist audience`
     );
+
+    // Simulate "Email not found in waitlist" error for test@test.com
+    if (email === "test@test.com") {
+      throw new Error("Email not found in waitlist");
+    }
+
     return { success: true };
   }
 
@@ -86,46 +92,27 @@ async function removeFromWaitlist(email: string) {
     }
 
     // Filter for the specific email we want to unsubscribe
-    const contactToRemove = contacts.data.find(
-      (contact) => contact.email === email,
+    const contactToUpdate = contacts.data.find(
+      (contact) => contact.email === email
     );
 
-    // If contact not found, it's already unsubscribed
-    if (!contactToRemove) {
+    // If contact not found, return an error
+    if (!contactToUpdate) {
       console.log(`Email ${email} not found in waitlist`);
-      return { success: true };
+      throw new Error("Email not found in waitlist");
     }
 
-    // Remove contact from audience
-    const contactId = contactToRemove.id;
-
-    // We have two options:
-    // 1. Delete the contact completely
-    // 2. Mark as unsubscribed
-
-    // Option 1: Delete contact completely
-    const { error: deleteError } = await resend.contacts.remove({
-      audienceId,
-      id: contactId,
-    });
-
-    if (deleteError) {
-      console.error("Error removing from waitlist:", deleteError);
-      throw new Error("Failed to remove from waitlist");
-    }
-
-    /* Option 2: Mark as unsubscribed (uncomment to use this approach instead)
+    // Update contact to mark as unsubscribed
     const { error: updateError } = await resend.contacts.update({
       audienceId,
-      id: contactId,
+      id: contactToUpdate.id,
       unsubscribed: true,
     });
-    
+
     if (updateError) {
       console.error("Error unsubscribing from waitlist:", updateError);
       throw new Error("Failed to unsubscribe from waitlist");
     }
-    */
 
     return { success: true };
   } catch (error) {
@@ -149,25 +136,29 @@ export async function unsubscribeFromWaitlist(formData: FormData) {
       };
     }
 
-    // In local environment, just log to console
-    if (isLocalEnvironment) {
-      console.log(`🔷 Local environment - Would remove ${email} from waitlist`);
-      return { success: true };
-    }
-
     // For production, remove from the waitlist audience
     try {
       await removeFromWaitlist(email);
     } catch (error) {
       console.error("Failed to remove from waitlist:", error);
+      // If the error is "Email not found in waitlist", return a user-friendly error
+      if (
+        error instanceof Error &&
+        error.message === "Email not found in waitlist"
+      ) {
+        return {
+          success: false,
+          error: "This email is not subscribed to our waitlist.",
+        };
+      }
       return {
         success: false,
         error: "Failed to remove you from our waitlist. Please try again.",
       };
     }
 
-    // We successfully removed the user from the waitlist
-    console.log(`Removed ${email} from waitlist`);
+    // We successfully unsubscribed the user from the waitlist
+    console.log(`Unsubscribed ${email} from waitlist`);
 
     return {
       success: true,
