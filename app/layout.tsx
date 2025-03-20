@@ -68,7 +68,37 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head />
+      <head>
+        <meta name="application-name" content="PerfAgent" />
+        <meta name="theme-color" content="#4ade80" />
+
+        {/* Schema.org markup for Google */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "SoftwareApplication",
+              name: "PerfAgent",
+              applicationCategory: "WebApplication",
+              operatingSystem: "Web",
+              offers: {
+                "@type": "Offer",
+                price: "0",
+                priceCurrency: "USD",
+              },
+              description:
+                "AI-powered web performance analysis and Core Web Vitals optimization assistant.",
+              creator: {
+                "@type": "Organization",
+                name: "PerfLab",
+                logo: "/images/logo.svg",
+                url: "https://agent.perflab.io",
+              },
+            }),
+          }}
+        />
+      </head>
       <body>
         <ThemeProvider
           attribute="class"
