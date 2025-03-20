@@ -97,16 +97,35 @@ async function addToWaitlist(email: string) {
       throw new Error("Failed to check existing contacts");
     }
 
-    // If contact exists and is in our audience, throw already subscribed error
-    if (
-      contacts?.data &&
-      contacts.data.some((contact) => contact.email === email)
-    ) {
-      console.log(`Email ${email} already in waitlist`);
-      throw new Error("Email already in waitlist");
+    // Find the existing contact if any
+    const existingContact = contacts?.data.find(
+      (contact) => contact.email === email
+    );
+
+    if (existingContact) {
+      // If contact exists and is already subscribed, throw error
+      if (!existingContact.unsubscribed) {
+        console.log(`Email ${email} already in waitlist`);
+        throw new Error("Email already in waitlist");
+      }
+
+      // If contact exists but is unsubscribed, resubscribe them
+      console.log(`Resubscribing ${email} to waitlist`);
+      const { error: updateError } = await resend.contacts.update({
+        audienceId,
+        id: existingContact.id,
+        unsubscribed: false,
+      });
+
+      if (updateError) {
+        console.error("Error resubscribing to waitlist:", updateError);
+        throw new Error("Failed to resubscribe to waitlist");
+      }
+
+      return { success: true, contactId: existingContact.id };
     }
 
-    // Add the contact to the audience
+    // Add new contact to the audience
     const { data, error } = await resend.contacts.create({
       email,
       audienceId,
