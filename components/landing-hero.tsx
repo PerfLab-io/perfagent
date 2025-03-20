@@ -271,8 +271,17 @@ export function LowFpsPerformanceViz() {
               // Handle case where element might already be removed
             }
 
-            // Continue with the remaining animations
-            startRemainingAnimations();
+            // Show the SVG visualization after a short delay
+            setTimeout(() => {
+              const svg = svgRef.current;
+              if (svg) {
+                svg.style.opacity = "1";
+                svg.style.transition = "opacity 0.3s ease-in-out";
+              }
+
+              // Continue with the remaining animations
+              startRemainingAnimations();
+            }, 200);
           }, 200); // Fade out duration
         }, 600); // Boot up visible duration
       } else {
@@ -354,14 +363,13 @@ export function LowFpsPerformanceViz() {
       '[data-anim="final"][class*="bottom-4"]'
     );
 
-    // Initialize element visibility states
-    initializeElementStates(
-      vitalMetrics,
-      vitalScores,
-      sectionHeaders,
-      commandLine,
-      optimizationTarget
+    // Show the PERFORMANCE.METRICS header first
+    const metricsHeader = document.querySelector(
+      '[data-section-header="metrics"]'
     );
+    if (metricsHeader instanceof HTMLElement) {
+      metricsHeader.style.opacity = "1";
+    }
 
     let currentLineIndex = 0;
 
@@ -375,6 +383,7 @@ export function LowFpsPerformanceViz() {
 
       const line = terminalLines[currentLineIndex];
       if (line instanceof HTMLElement) {
+        line.style.opacity = "1"; // Show the line before animating
         animateTerminalLine(line, () => {
           currentLineIndex++;
           setTimeout(animateNextLine, 300);
@@ -384,55 +393,6 @@ export function LowFpsPerformanceViz() {
 
     // Start the animation sequence after a small delay
     setTimeout(animateNextLine, 1000);
-  };
-
-  /**
-   * Initializes visibility states for terminal elements
-   */
-  const initializeElementStates = (
-    vitalMetrics: NodeListOf<Element>,
-    vitalScores: NodeListOf<Element>,
-    sectionHeaders: NodeListOf<Element>,
-    commandLine: Element | null,
-    optimizationTarget: Element | null
-  ) => {
-    // Hide all vitals
-    vitalMetrics.forEach((el) => {
-      if (el instanceof HTMLElement) {
-        el.style.opacity = "0";
-      }
-    });
-
-    vitalScores.forEach((el) => {
-      if (el instanceof HTMLElement) {
-        el.style.opacity = "0";
-      }
-    });
-
-    // Hide section headers except the first one
-    sectionHeaders.forEach((el, index) => {
-      if (el instanceof HTMLElement && index > 0) {
-        el.style.opacity = "0";
-      }
-    });
-
-    // Hide command line
-    if (commandLine instanceof HTMLElement) {
-      commandLine.style.opacity = "0";
-    }
-
-    // Hide the YES/NO line initially
-    const yesNoLine = document.querySelector(
-      ".terminal-line.flex.items-center"
-    );
-    if (yesNoLine instanceof HTMLElement) {
-      yesNoLine.style.opacity = "0";
-    }
-
-    // Hide optimization target
-    if (optimizationTarget instanceof HTMLElement) {
-      optimizationTarget.style.opacity = "0";
-    }
   };
 
   /**
@@ -704,6 +664,7 @@ export function LowFpsPerformanceViz() {
             <div
               className="text-peppermint-400 mb-2 font-bold"
               data-section-header="metrics"
+              style={{ opacity: 0 }}
             >
               PERFORMANCE.METRICS
             </div>
@@ -712,69 +673,92 @@ export function LowFpsPerformanceViz() {
               className="terminal-line text-peppermint-300"
               data-terminal-line
               data-text=">> Analyzing page load..."
+              style={{ opacity: 0 }}
             ></div>
             <div
               className="terminal-line text-peppermint-300 mt-1"
               data-terminal-line
               data-text=">> Measuring LCP: 2.4s"
+              style={{ opacity: 0 }}
             ></div>
             <div
               className="terminal-line text-peppermint-300 mt-1"
               data-terminal-line
               data-text=">> Measuring INP: 550ms"
+              style={{ opacity: 0 }}
             ></div>
             <div
               className="terminal-line text-peppermint-300 mt-1"
               data-terminal-line
               data-text=">> Measuring CLS: 0.12"
+              style={{ opacity: 0 }}
             ></div>
             <div
               className="terminal-line text-peppermint-300 mt-1"
               data-terminal-line
               data-text=">> Measuring TTFB: 0.7s"
+              style={{ opacity: 0 }}
             ></div>
             <div
               className="terminal-line text-peppermint-300 mt-1"
               data-terminal-line
               data-text=">> Measuring FCP: 1.2s"
+              style={{ opacity: 0 }}
             ></div>
             <div
               className="terminal-line text-peppermint-300 mt-1"
               data-terminal-line
               data-text=">> Analysis complete."
+              style={{ opacity: 0 }}
             ></div>
 
             <div
               className="mt-4 text-peppermint-400 font-bold"
               data-section-header="vitals"
+              style={{ opacity: 0 }}
             >
               CORE.WEB.VITALS
             </div>
             <div className="grid grid-cols-2 gap-1 mt-2">
               <div className="text-peppermint-300 vital-container">
-                <span data-vital-metric>LCP:</span>
+                <span data-vital-metric style={{ opacity: 0 }}>
+                  LCP:
+                </span>
               </div>
               <div className="vital-container">
                 <span
                   data-vital-score
                   className="text-peppermint-400 font-bold"
+                  style={{ opacity: 0 }}
                 >
                   Good
                 </span>
               </div>
               <div className="text-peppermint-300 vital-container">
-                <span data-vital-metric>INP:</span>
+                <span data-vital-metric style={{ opacity: 0 }}>
+                  INP:
+                </span>
               </div>
               <div className="vital-container">
-                <span data-vital-score className="text-rose-500 font-bold">
+                <span
+                  data-vital-score
+                  className="text-rose-500 font-bold"
+                  style={{ opacity: 0 }}
+                >
                   Poor
                 </span>
               </div>
               <div className="text-peppermint-300 vital-container">
-                <span data-vital-metric>CLS:</span>
+                <span data-vital-metric style={{ opacity: 0 }}>
+                  CLS:
+                </span>
               </div>
               <div className="vital-container">
-                <span data-vital-score className="text-merino-500 font-bold">
+                <span
+                  data-vital-score
+                  className="text-merino-500 font-bold"
+                  style={{ opacity: 0 }}
+                >
                   Needs Improvement
                 </span>
               </div>
@@ -783,6 +767,7 @@ export function LowFpsPerformanceViz() {
             <div
               className="mt-4 text-peppermint-400 font-bold"
               data-section-header="chat"
+              style={{ opacity: 0 }}
             >
               CHAT.MODE
             </div>
@@ -791,14 +776,19 @@ export function LowFpsPerformanceViz() {
               data-terminal-line
               data-command-line
               data-text=">> Optimizations identified..."
+              style={{ opacity: 0 }}
             ></div>
             <div
               className="terminal-line text-peppermint-300 mt-1"
               data-terminal-line
               data-command-line
               data-text=">> Proceed?"
+              style={{ opacity: 0 }}
             ></div>
-            <div className="terminal-line text-peppermint-300 mt-1 flex items-center">
+            <div
+              className="terminal-line text-peppermint-300 mt-1 flex items-center"
+              style={{ opacity: 0 }}
+            >
               <span className="mr-1">&gt;&gt;</span>
               <span className="inline-block px-2 py-0.5 bg-peppermint-900 border border-peppermint-500 text-peppermint-300 cursor-blink">
                 YES
@@ -828,6 +818,7 @@ export function LowFpsPerformanceViz() {
               className="absolute inset-0 w-full h-full"
               viewBox="0 0 600 550"
               xmlns="http://www.w3.org/2000/svg"
+              style={{ opacity: 0 }}
             >
               <defs>
                 {/* Dot patterns */}
