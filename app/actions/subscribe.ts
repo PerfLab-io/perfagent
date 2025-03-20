@@ -72,20 +72,39 @@ async function ensureWaitlistAudience() {
  */
 async function addToWaitlist(email: string) {
   if (isLocalEnvironment) {
-    console.log(email);
+    console.log(
+      `🔷 Local environment - Would add ${email} to waitlist audience`
+    );
+
     // Simulate "Email already in waitlist" error for test@test.com
     if (email === "test@test.com") {
       throw new Error("Email already in waitlist");
     }
-    console.log(
-      `🔷 Local environmentasd - Would add ${email} to waitlist audience`
-    );
 
     return { success: true, contactId: "123" };
   }
 
   try {
     const audienceId = await ensureWaitlistAudience();
+
+    // First, check if the contact exists in our audience
+    const { data: contacts, error: listError } = await resend.contacts.list({
+      audienceId,
+    });
+
+    if (listError) {
+      console.error("Error listing contacts:", listError);
+      throw new Error("Failed to check existing contacts");
+    }
+
+    // If contact exists and is in our audience, throw already subscribed error
+    if (
+      contacts?.data &&
+      contacts.data.some((contact) => contact.email === email)
+    ) {
+      console.log(`Email ${email} already in waitlist`);
+      throw new Error("Email already in waitlist");
+    }
 
     // Add the contact to the audience
     const { data, error } = await resend.contacts.create({
@@ -96,12 +115,6 @@ async function addToWaitlist(email: string) {
     });
 
     if (error) {
-      // If it's already subscribed, that's fine - check for 409 Conflict status
-      if (error.message?.includes("already exists")) {
-        console.log(`Email ${email} already in waitlist`);
-        throw new Error("Email already in waitlist");
-      }
-
       console.error("Error adding to waitlist:", error);
       throw new Error("Failed to add to waitlist");
     }
