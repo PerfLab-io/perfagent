@@ -102,6 +102,12 @@ async function removeFromWaitlist(email: string) {
       throw new Error("Email not found in waitlist");
     }
 
+    // If contact is already unsubscribed, return an error
+    if (contactToUpdate.unsubscribed) {
+      console.log(`Email ${email} is already unsubscribed`);
+      throw new Error("No such email with active subscription found");
+    }
+
     // Update contact to mark as unsubscribed
     const { error: updateError } = await resend.contacts.update({
       audienceId,
@@ -141,15 +147,20 @@ export async function unsubscribeFromWaitlist(formData: FormData) {
       await removeFromWaitlist(email);
     } catch (error) {
       console.error("Failed to remove from waitlist:", error);
-      // If the error is "Email not found in waitlist", return a user-friendly error
-      if (
-        error instanceof Error &&
-        error.message === "Email not found in waitlist"
-      ) {
-        return {
-          success: false,
-          error: "This email is not subscribed to our waitlist.",
-        };
+      // Handle different error cases with user-friendly messages
+      if (error instanceof Error) {
+        if (error.message === "Email not found in waitlist") {
+          return {
+            success: false,
+            error: "This email is not subscribed to our waitlist.",
+          };
+        }
+        if (error.message === "No such email with active subscription found") {
+          return {
+            success: false,
+            error: "This email is already unsubscribed from our waitlist.",
+          };
+        }
       }
       return {
         success: false,
