@@ -498,34 +498,42 @@ export function LowFpsPerformanceViz() {
       // First show the metric name
       const metricEl = vitalMetrics[vitalIndex];
       if (metricEl instanceof HTMLElement) {
-        metricEl.style.opacity = "1";
+        requestAnimationFrame(() => {
+          metricEl.style.opacity = "1";
 
-        // Get the metric name to identify which vital we're animating
-        const metricName = metricEl.textContent
-          ?.replace(":", "")
-          .toLowerCase()
-          .trim();
+          requestAnimationFrame(() => {
+            setTimeout(() => {
+              // Get the metric name to identify which vital we're animating
+              const metricName = metricEl.textContent
+                ?.replace(":", "")
+                .toLowerCase()
+                .trim();
 
-        // Then show thinking animation in the score area
-        const scoreEl = vitalScores[vitalIndex];
-        if (scoreEl instanceof HTMLElement) {
-          const scoreContainer = scoreEl.parentElement;
-          if (scoreContainer instanceof HTMLElement) {
-            AnimationUtils.showThinkingAnimation(scoreContainer, () => {
-              // Clear the thinking animation and show the score
-              scoreContainer.textContent = "";
-              scoreContainer.appendChild(scoreEl);
-              scoreEl.style.opacity = "1";
+              // Then show thinking animation in the score area
+              const scoreEl = vitalScores[vitalIndex];
+              if (scoreEl instanceof HTMLElement) {
+                const scoreContainer = scoreEl.parentElement;
+                if (scoreContainer instanceof HTMLElement) {
+                  requestAnimationFrame(() => {
+                    AnimationUtils.showThinkingAnimation(scoreContainer, () => {
+                      // Clear the thinking animation and show the score
+                      scoreContainer.textContent = "";
+                      scoreContainer.appendChild(scoreEl);
+                      scoreEl.style.opacity = "1";
 
-              // Update node colors based on which vital is being revealed
-              updateNodeColors(metricName);
+                      // Update node colors based on which vital is being revealed
+                      updateNodeColors(metricName);
 
-              // Move to next vital after a delay
-              vitalIndex++;
-              setTimeout(animateNextVital, 500);
-            });
-          }
-        }
+                      // Move to next vital after a delay
+                      vitalIndex++;
+                      setTimeout(animateNextVital, 500);
+                    });
+                  });
+                }
+              }
+            }, 250);
+          });
+        });
       }
     };
 
