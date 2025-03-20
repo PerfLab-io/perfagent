@@ -68,7 +68,7 @@ export function SignupNotification() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Enter your email address"
-                  className="w-full h-12 bg-peppermint-900/50 dark:bg-peppermint-200/50 border border-peppermint-700 dark:border-peppermint-400 text-peppermint-50 dark:text-peppermint-950 px-8 py-3 rounded-md focus:outline-none focus:ring-2 focus:ring-peppermint-500 dark:focus:ring-peppermint-700 placeholder:text-peppermint-600 dark:placeholder:text-peppermint-500"
+                  className="w-full h-12 bg-peppermint-900/50 dark:bg-peppermint-200/50 border border-peppermint-700 dark:border-peppermint-400 text-peppermint-600 dark:text-peppermint-500 px-8 py-3 rounded-md focus:outline-none focus:ring-2 focus:ring-peppermint-500 dark:focus:ring-peppermint-700 placeholder:text-peppermint-600 dark:placeholder:text-peppermint-500"
                   required
                 />
               </div>
