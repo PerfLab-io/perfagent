@@ -28,7 +28,7 @@ export const SignupEmail = ({
             <Section className="border-2 border-dotted border-[#67cb87] bg-[#0a2824] rounded-lg overflow-hidden shadow-xl max-w-[600px] mx-auto">
               {/* Header */}
               <Section className="bg-[#0d312d] border-b border-dotted border-[#67cb87] p-4">
-                <div className="flex items-center">
+                <div style={{ alignItems: "center", display: "flex" }}>
                   <div className="w-3 h-3 rounded-full bg-[#67cb87] mr-2"></div>
                   <Text className="text-[#67cb87] font-mono text-xs uppercase tracking-wider m-0">
                     PERFAGENT WAITLIST - SIGNUP CONFIRMATION
@@ -48,7 +48,8 @@ export const SignupEmail = ({
 
                   <Text className="text-[#c3e6d4] mb-6 font-mono">
                     Thank you for signing up to our waitlist. We've added your
-                    email ({email}) and we'll be in touch very soon!
+                    email (<span className="text-[#67cb87]">{email}</span>) to
+                    the waitlist and we'll be in touch very soon!
                   </Text>
 
                   <Text className="text-[#c3e6d4] mb-6 font-mono">
