@@ -2,25 +2,49 @@
 
 import type React from "react";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Bell, CheckCircle } from "lucide-react";
+import { ArrowRight, Bell, CheckCircle, AlertCircle } from "lucide-react";
+import { emailSchema, type EmailFormValues } from "@/lib/validations/email";
+import { subscribeToNewsletter } from "@/app/actions/subscribe";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
 
 export function SignupNotification() {
-  const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const [serverError, setServerError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email) return;
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset,
+  } = useForm<EmailFormValues>({
+    resolver: zodResolver(emailSchema),
+    defaultValues: {
+      email: "",
+    },
+  });
 
-    setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      setSubmitted(true);
-      setLoading(false);
-    }, 1500);
+  const onSubmit = async (data: EmailFormValues) => {
+    setServerError(null);
+
+    const formData = new FormData();
+    formData.append("email", data.email);
+
+    startTransition(async () => {
+      const result = await subscribeToNewsletter(formData);
+
+      if (result.success) {
+        setSubmitted(true);
+        reset();
+      } else {
+        setServerError(
+          result.error || "Something went wrong. Please try again."
+        );
+      }
+    });
   };
 
   return (
@@ -55,39 +79,46 @@ export function SignupNotification() {
           </p>
 
           {!submitted ? (
-            <form
-              onSubmit={handleSubmit}
-              className="flex flex-col sm:flex-row gap-3 mb-8"
-            >
-              <div className="flex-1 relative">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-peppermint-500 dark:text-peppermint-700">
-                  <span className="font-mono">{">"}</span>
+            <form onSubmit={handleSubmit(onSubmit)} className="mb-8">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex-1 relative">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-peppermint-500 dark:text-peppermint-700">
+                    <span className="font-mono">{">"}</span>
+                  </div>
+                  <input
+                    type="email"
+                    {...register("email")}
+                    placeholder="Enter your email address"
+                    className="w-full h-12 bg-peppermint-900/50 dark:bg-peppermint-200/50 border border-peppermint-700 dark:border-peppermint-400 text-peppermint-600 dark:text-peppermint-500 px-8 py-3 rounded-md focus:outline-none focus:ring-2 focus:ring-peppermint-500 dark:focus:ring-peppermint-700 placeholder:text-peppermint-600 dark:placeholder:text-peppermint-500"
+                  />
                 </div>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email address"
-                  className="w-full h-12 bg-peppermint-900/50 dark:bg-peppermint-200/50 border border-peppermint-700 dark:border-peppermint-400 text-peppermint-600 dark:text-peppermint-500 px-8 py-3 rounded-md focus:outline-none focus:ring-2 focus:ring-peppermint-500 dark:focus:ring-peppermint-700 placeholder:text-peppermint-600 dark:placeholder:text-peppermint-500"
-                  required
-                />
+                <Button
+                  type="submit"
+                  disabled={isPending}
+                  className="h-12 bg-peppermint-500 hover:bg-peppermint-600 dark:bg-peppermint-700 dark:hover:bg-peppermint-800 text-peppermint-950 dark:text-peppermint-50 font-medium px-6 rounded-md transition-all flex items-center justify-center gap-2 min-w-[180px]"
+                >
+                  {isPending ? (
+                    <span className="flex items-center gap-2">
+                      Processing
+                      <span className="inline-block w-4 h-4 border-2 border-peppermint-950 border-t-transparent rounded-full animate-spin"></span>
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      Notify Me <ArrowRight size={16} />
+                    </span>
+                  )}
+                </Button>
               </div>
-              <Button
-                type="submit"
-                disabled={loading}
-                className="h-12 bg-peppermint-500 hover:bg-peppermint-600 dark:bg-peppermint-700 dark:hover:bg-peppermint-800 text-peppermint-950 dark:text-peppermint-50 font-medium px-6 rounded-md transition-all flex items-center justify-center gap-2 min-w-[180px]"
-              >
-                {loading ? (
-                  <span className="flex items-center gap-2">
-                    Processing
-                    <span className="inline-block w-4 h-4 border-2 border-peppermint-950 border-t-transparent rounded-full animate-spin"></span>
+
+              {/* Error messages */}
+              {(errors.email || serverError) && (
+                <div className="mt-2 flex items-start gap-2 text-red-500">
+                  <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                  <span className="text-sm">
+                    {errors.email?.message || serverError}
                   </span>
-                ) : (
-                  <span className="flex items-center gap-2">
-                    Notify Me <ArrowRight size={16} />
-                  </span>
-                )}
-              </Button>
+                </div>
+              )}
             </form>
           ) : (
             <div className="bg-peppermint-900/30 dark:bg-peppermint-200/30 border border-peppermint-700 dark:border-peppermint-400 rounded-md p-6 mb-8 flex items-center gap-4 animate-fadeIn">
