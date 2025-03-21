@@ -2,6 +2,7 @@ import type React from "react";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Metadata } from "next";
+import { Analytics } from "@vercel/analytics/react";
 
 export const metadata: Metadata = {
   title: "PerfAgent - AI-Powered Web Performance Analysis | PerfLab",
@@ -107,6 +108,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           {children}
+          <Analytics />
         </ThemeProvider>
       </body>
     </html>
