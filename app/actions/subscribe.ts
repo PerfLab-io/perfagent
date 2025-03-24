@@ -40,7 +40,7 @@ async function ensureWaitlistAudience() {
 
     // Check if our waitlist audience already exists
     const waitlistAudience = audiences.data.find(
-      (audience) => audience.name === WAITLIST_AUDIENCE_NAME
+      (audience) => audience.name === WAITLIST_AUDIENCE_NAME,
     );
 
     if (waitlistAudience) {
@@ -73,7 +73,7 @@ async function ensureWaitlistAudience() {
 async function addToWaitlist(email: string) {
   if (isLocalEnvironment) {
     console.log(
-      `🔷 Local environment - Would add ${email} to waitlist audience`
+      `🔷 Local environment - Would add ${email} to waitlist audience`,
     );
 
     // Simulate "Email already in waitlist" error for test@test.com
@@ -99,7 +99,7 @@ async function addToWaitlist(email: string) {
 
     // Find the existing contact if any
     const existingContact = contacts?.data.find(
-      (contact) => contact.email === email
+      (contact) => contact.email === email,
     );
 
     if (existingContact) {
