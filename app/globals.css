@@ -153,10 +153,10 @@
 @keyframes pulse-border {
   0%,
   100% {
-    border-color: var(--peppermint-300);
+    border-color: hsl(var(--peppermint-300));
   }
   50% {
-    border-color: var(--peppermint-500);
+    border-color: hsl(var(--peppermint-500));
   }
 }
 

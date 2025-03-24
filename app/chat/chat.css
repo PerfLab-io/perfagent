@@ -1,0 +1,460 @@
+/* Typing indicator animation - updated to match blog card style */
+.typing-indicator {
+  display: flex;
+  align-items: center;
+  column-gap: 6px;
+  padding: 12px 16px;
+  background-color: hsl(var(--bg-color));
+  border: 1px solid hsl(var(--border-color));
+  border-radius: 8px;
+  width: fit-content;
+  margin-top: 8px;
+  margin-bottom: 8px;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.typing-indicator:hover {
+  transform: translate(4px, -4px);
+  box-shadow: -4px 4px 0 hsl(var(--border-color));
+}
+
+.typing-indicator span {
+  height: 8px;
+  width: 8px;
+  background-color: hsl(var(--text-color));
+  opacity: 0.8; /* Increased opacity for better visibility */
+  border-radius: 50%;
+  display: inline-block;
+  animation: typing 1.5s infinite ease-in-out;
+}
+
+.typing-indicator span:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.typing-indicator span:nth-child(2) {
+  animation-delay: 0.3s;
+}
+
+.typing-indicator span:nth-child(3) {
+  animation-delay: 0.6s;
+}
+
+@keyframes typing {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translateY(-5px);
+    opacity: 1;
+  }
+}
+
+/* Blinking animation for new messages */
+@keyframes blink-fade-in {
+  0%,
+  50% {
+    opacity: 0;
+  }
+  60%,
+  70% {
+    opacity: 0.4;
+  }
+  80%,
+  90% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.message-new {
+  animation: blink-fade-in 0.8s ease-in-out;
+}
+
+/* Messages container animations */
+.messages-container-initial {
+  opacity: 0;
+  transform: translateY(50px);
+  max-height: 0;
+  margin-bottom: 0;
+  overflow: hidden;
+  transform-origin: center bottom;
+}
+
+.messages-container-active {
+  opacity: 1;
+  transform: translateY(0);
+  height: auto;
+  margin-bottom: 80px; /* Add consistent bottom margin for input area */
+  animation: slide-up-fade-in 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: center bottom;
+}
+
+@keyframes slide-up-fade-in {
+  0% {
+    opacity: 0;
+    transform: translateY(50px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Input container animations */
+.input-container-initial {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  transform: translate(25%, -50%);
+  width: 70%;
+  transform-origin: center bottom;
+  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 10;
+}
+
+.input-container-active {
+  position: absolute;
+  width: 100%;
+  transform: none;
+  bottom: 0;
+  left: auto;
+  transform-origin: center bottom;
+  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Add a new animation for the input container transition */
+@keyframes slide-down-expand {
+  0% {
+    top: 20%;
+    width: 70%;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    top: auto;
+    bottom: 0;
+    width: 100%;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes slide-up-contract {
+  0% {
+    top: auto;
+    bottom: 0;
+    width: 100%;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    top: 20%;
+    width: 70%;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Dropzone animations */
+@keyframes pulse-border {
+  0%,
+  100% {
+    border-color: hsl(var(--peppermint-300));
+  }
+  50% {
+    border-color: hsl(var(--peppermint-500));
+  }
+}
+
+@keyframes bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* Side panel transition animations */
+@keyframes blinkFadeIn {
+  0% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes slideLeft {
+  0% {
+    grid-template-columns: 1fr 0fr;
+  }
+  100% {
+    grid-template-columns: 0.3fr 0.7fr;
+  }
+}
+
+@keyframes slideRight {
+  0% {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes expandRight {
+  0% {
+    grid-template-columns: 0.3fr 0.7fr;
+  }
+  100% {
+    grid-template-columns: 1fr 0fr;
+  }
+}
+
+@keyframes fadeOut {
+  0% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+}
+
+@keyframes growUp {
+  0% {
+    height: 0;
+  }
+  100% {
+    height: 100%;
+  }
+}
+
+@keyframes growRight {
+  0% {
+    width: 0;
+  }
+  100% {
+    width: 100%;
+  }
+}
+
+@keyframes drawLine {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes fadeIn {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fillCircle {
+  0% {
+    stroke-dashoffset: 283;
+  }
+  100% {
+    stroke-dashoffset: 70;
+  }
+}
+
+@keyframes fillProgress {
+  0% {
+    stroke-dasharray: "0 100";
+  }
+}
+
+/* Dual panel layout */
+.dual-panel-container {
+  display: grid;
+  grid-template-columns: 1fr 0fr;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dual-panel-container.panel-active {
+  animation: slideLeft 0.3s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+}
+
+.dual-panel-container.panel-inactive {
+  animation: expandRight 0.3s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+}
+
+.panel-left {
+  min-width: 0;
+  width: 100%;
+  transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+.panel-right {
+  overflow-y: auto;
+  max-height: 100%;
+  min-width: 0;
+  width: 100%;
+  grid-column: 2;
+}
+
+.panel-right-exit {
+  animation: fadeOut 0.25s ease-out forwards;
+}
+
+/* Markdown report styling */
+.prose h1 {
+  color: var(--text-color);
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin-top: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.prose h2 {
+  color: var(--text-color);
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-top: 1.25rem;
+  margin-bottom: 0.875rem;
+}
+
+.prose h3 {
+  color: var(--text-color);
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-top: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.prose p {
+  color: var(--text-color);
+  margin-bottom: 0.75rem;
+  line-height: 1.6;
+}
+
+.prose code {
+  font-family: monospace;
+  background: var(--accent-color);
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  color: var(--text-color); /* Ensure code text has good contrast */
+}
+
+.prose ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.prose ol {
+  list-style-type: decimal;
+  padding-left: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.prose li {
+  margin-bottom: 0.5rem;
+}
+
+.prose pre {
+  background: var(--accent-color);
+  padding: 1rem;
+  border-radius: 0.375rem;
+  overflow-x: auto;
+  margin-bottom: 1rem;
+}
+
+/* Animation for typing effect */
+.typing-effect {
+  display: inline-block;
+  overflow: hidden;
+  border-right: 0.15em solid var(--text-color);
+  white-space: nowrap;
+  animation: typing 2s steps(40, end) infinite;
+}
+
+/* Streaming cursor animation */
+.streaming-cursor {
+  display: inline-block;
+  width: 0.5em;
+  height: 1.2em;
+  background-color: var(--text-color);
+  animation: blink-cursor 0.8s infinite;
+  margin-left: 1px;
+  vertical-align: middle;
+  opacity: 0.9; /* Increased opacity for better visibility */
+}
+
+/* Code block styling for the markdown report */
+.markdown-code {
+  background-color: hsl(var(--accent-color));
+  border-radius: 0.375rem;
+  padding: 1rem;
+  margin: 1rem 0;
+  overflow-x: auto;
+  font-family: monospace;
+  font-size: 0.9em;
+  line-height: 1.5;
+  color: hsl(var(--text-color)); /* Ensure code text has good contrast */
+}
+
+.markdown-code-inline {
+  background-color: hsl(var(--accent-color));
+  border-radius: 0.25rem;
+  padding: 0.125rem 0.25rem;
+  font-family: monospace;
+  font-size: 0.9em;
+  color: hsl(var(--text-color)); /* Ensure code text has good contrast */
+}
+
+/* Character-by-character typing animation */
+@keyframes typing-char {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+.typing-text {
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  animation: typing-char 3s steps(40, end);
+}
+
+/* Add this new class for when file section is visible */
+.messages-with-files {
+  padding-bottom: 180px; /* Increase padding when file section is visible */
+}
+
+/* Add this new class for file section transitions */
+.file-section {
+  transition:
+    max-height 0.3s ease-out,
+    opacity 0.3s ease-out,
+    padding 0.3s ease-out;
+  overflow: hidden;
+}
+
+/* Report card styling */
+.panel-active .report-card {
+  background-color: hsl(var(--merino-50));
+  border-color: hsl(var(--merino-200));
+}
+
+.dark .panel-active .report-card {
+  background-color: hsl(var(--merino-950));
+  border-color: hsl(var(--merino-800));
+}

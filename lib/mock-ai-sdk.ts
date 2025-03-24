@@ -180,7 +180,7 @@ export function streamText(options: {
     // If no specific tool matched, use a default response
     if (!matchedTool) {
       const defaultResponse =
-        "That's a great question about Go! The language was designed at Google to be efficient, readable, and easy to use. Is there a specific aspect of Go you'd like to explore further?";
+        "That's a great question about web performance! Web Vitals are essential metrics that measure user experience, including Core Web Vitals like LCP (Largest Contentful Paint), FID (First Input Delay), and CLS (Cumulative Layout Shift). Would you like to explore any specific aspect of web performance optimization?";
 
       // Stream the text character by character
       for (let i = 0; i < defaultResponse.length; i++) {
@@ -572,16 +572,16 @@ export function createDataStreamResponse(options: {
 function getIntroText(toolName: string, trigger: string): string {
   switch (toolName) {
     case "generateReport":
-      return "I'm generating a comprehensive report on Go programming for you. You can view it in the panel on the right.";
+      return "I'm generating a comprehensive report on web performance metrics for you. You can view it in the panel on the right.";
     case "openSidePanel":
-      return "I've opened the side panel with your Go learning analytics. You can view various metrics about your progress in learning Go, including topic performance, learning trends, and more.";
+      return "I've opened the side panel with your web performance analytics. You can view various metrics about your site's performance, including Core Web Vitals, page load times, and more.";
     case "generateBreakdown":
-      return "Here's the breakdown of our Go programming courses by difficulty level. As you can see, we offer several beginner-friendly courses to help you get started, along with intermediate and advanced courses as you progress.";
+      return "Here's the breakdown of web performance optimization techniques by impact level. As you can see, we cover everything from basic optimizations to advanced techniques for achieving optimal Core Web Vitals scores.";
     case "performResearch":
-      return "I've conducted in-depth research on concurrency patterns in Go. Here are the key findings from academic and web sources that explain how Go's concurrency model works and best practices for implementation.";
-    case "generateSuggestions":
-      return "Based on the files you've uploaded, here are some suggested questions you might want to ask.";
+      return "I've conducted in-depth research on modern web performance optimization strategies. Here are the key findings about improving LCP, FID, and CLS metrics, along with best practices for implementation.";
+    case "generateSuggestionsTool":
+      return "Based on your web performance data, I'll suggest some optimization opportunities...";
     default:
-      return "I'm processing your request about Go programming...";
+      return "I'm processing your request about web performance optimization...";
   }
 }

@@ -3,18 +3,19 @@ import type { DataStream } from "../mock-ai-sdk";
 
 export const generateBreakdownTool = registerTool({
   name: "generateBreakdown",
-  description: "Generates a breakdown of Go courses by difficulty level",
+  description:
+    "Generates a breakdown of web performance metrics and optimization techniques",
   execute: async (params: { query: string }) => {
-    // Mock data for Go course breakdown
-    const courseData = {
-      beginner: 8,
-      intermediate: 5,
-      advanced: 3,
+    // Mock data for web performance metrics breakdown
+    const performanceData = {
+      coreWebVitals: 5,
+      userExperience: 4,
+      resourceOptimization: 3,
     };
 
     return {
       type: "breakdown",
-      data: courseData,
+      data: performanceData,
     };
   },
   // Add streaming support similar to the research tool
@@ -34,8 +35,8 @@ export const generateBreakdownTool = registerTool({
           id: "breakdown-start",
           type: "progress",
           status: "running",
-          title: "Course Breakdown",
-          message: "Analyzing course data...",
+          title: "Performance Metrics Breakdown",
+          message: "Analyzing performance data...",
           timestamp: Date.now(),
           progress: 0,
         },
@@ -53,7 +54,7 @@ export const generateBreakdownTool = registerTool({
           id: "breakdown-progress",
           type: "progress",
           status: "running",
-          message: "Processing course levels...",
+          message: "Processing Core Web Vitals...",
           timestamp: Date.now(),
           progress: 25,
         },
@@ -70,7 +71,7 @@ export const generateBreakdownTool = registerTool({
           id: "breakdown-progress",
           type: "progress",
           status: "running",
-          message: "Analyzing difficulty distribution...",
+          message: "Analyzing performance metrics distribution...",
           timestamp: Date.now(),
           progress: 50,
         },
@@ -87,7 +88,7 @@ export const generateBreakdownTool = registerTool({
           id: "breakdown-progress",
           type: "progress",
           status: "running",
-          message: "Finalizing course breakdown...",
+          message: "Finalizing performance breakdown...",
           timestamp: Date.now(),
           progress: 75,
         },
@@ -97,11 +98,11 @@ export const generateBreakdownTool = registerTool({
     // Final delay before completion
     await new Promise((resolve) => setTimeout(resolve, 2500));
 
-    // Mock data for Go course breakdown
-    const courseData = {
-      beginner: 8,
-      intermediate: 5,
-      advanced: 3,
+    // Mock data for web performance metrics breakdown
+    const performanceData = {
+      coreWebVitals: 5,
+      userExperience: 4,
+      resourceOptimization: 3,
     };
 
     // Send completion annotation
@@ -112,7 +113,7 @@ export const generateBreakdownTool = registerTool({
           id: "breakdown-complete",
           type: "progress",
           status: "completed",
-          message: "Course breakdown complete",
+          message: "Performance metrics breakdown complete",
           timestamp: Date.now(),
           progress: 100,
           isComplete: true,
@@ -123,7 +124,7 @@ export const generateBreakdownTool = registerTool({
     // Return the final result
     yield {
       type: "breakdown",
-      data: courseData,
+      data: performanceData,
       toolCallId,
     };
   },

@@ -2,7 +2,8 @@ import { registerTool } from "../mock-ai-sdk";
 
 export const openSidePanelTool = registerTool({
   name: "openSidePanel",
-  description: "Opens the side panel with learning analytics",
+  description:
+    "Opens the side panel with web performance analytics and Core Web Vitals metrics",
   execute: async (params: { query: string }) => {
     // Return data for the side panel
     return {

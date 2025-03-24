@@ -67,20 +67,20 @@
 /* Pixelated border styles */
 .border-pixelated {
   box-shadow:
-    2px 0 0 0 var(--peppermint-600),
-    0 2px 0 0 var(--peppermint-600),
-    2px 2px 0 0 var(--peppermint-600),
-    4px 2px 0 0 var(--peppermint-600),
-    2px 4px 0 0 var(--peppermint-600),
-    4px 4px 0 0 var(--peppermint-600);
+    2px 0 0 0 hsl(var(--peppermint-600)),
+    0 2px 0 0 hsl(var(--peppermint-600)),
+    2px 2px 0 0 hsl(var(--peppermint-600)),
+    4px 2px 0 0 hsl(var(--peppermint-600)),
+    2px 4px 0 0 hsl(var(--peppermint-600)),
+    4px 4px 0 0 hsl(var(--peppermint-600));
 }
 
 .border-pixelated-dashed {
   background-image:
-    linear-gradient(90deg, var(--peppermint-500) 50%, transparent 50%),
-    linear-gradient(90deg, var(--peppermint-500) 50%, transparent 50%),
-    linear-gradient(0deg, var(--peppermint-500) 50%, transparent 50%),
-    linear-gradient(0deg, var(--peppermint-500) 50%, transparent 50%);
+    linear-gradient(90deg, hsl(var(--peppermint-500)) 50%, transparent 50%),
+    linear-gradient(90deg, hsl(var(--peppermint-500)) 50%, transparent 50%),
+    linear-gradient(0deg, hsl(var(--peppermint-500)) 50%, transparent 50%),
+    linear-gradient(0deg, hsl(var(--peppermint-500)) 50%, transparent 50%);
   background-position: top, bottom, left, right;
   background-size:
     10px 4px,
@@ -93,8 +93,8 @@
 /* Grid texture overlay inspired by Green_Texture.png */
 .grid-texture {
   background-image:
-    linear-gradient(0deg, var(--peppermint-600) 1px, transparent 1px),
-    linear-gradient(90deg, var(--peppermint-600) 1px, transparent 1px);
+    linear-gradient(0deg, hsl(var(--peppermint-600)) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--peppermint-600)) 1px, transparent 1px);
   background-size: 8px 8px;
   background-position: -1px -1px;
 }
@@ -140,12 +140,12 @@
 .border-pixelated:hover {
   transform: translate(-2px, -2px);
   box-shadow:
-    4px 0 0 0 var(--peppermint-600),
-    0 4px 0 0 var(--peppermint-600),
-    4px 4px 0 0 var(--peppermint-600),
-    6px 4px 0 0 var(--peppermint-600),
-    4px 6px 0 0 var(--peppermint-600),
-    6px 6px 0 0 var(--peppermint-600);
+    4px 0 0 0 hsl(var(--peppermint-600)),
+    0 4px 0 0 hsl(var(--peppermint-600)),
+    4px 4px 0 0 hsl(var(--peppermint-600)),
+    6px 4px 0 0 hsl(var(--peppermint-600)),
+    4px 6px 0 0 hsl(var(--peppermint-600)),
+    6px 6px 0 0 hsl(var(--peppermint-600));
   transition:
     transform 0.1s steps(1),
     box-shadow 0.1s steps(1);

@@ -1,48 +1,48 @@
 import { registerTool } from "../mock-ai-sdk";
 import type { DataStream } from "../mock-ai-sdk";
 
-// Mock research results for Go concurrency patterns
+// Mock research results for web performance patterns
 const mockResults = [
   {
     id: "1",
-    title: "Concurrency Patterns in Go: Goroutines and Channels",
+    title: "Core Web Vitals: Essential Metrics for Modern Web Performance",
     snippet:
-      "Go's approach to concurrency is based on CSP (Communicating Sequential Processes). Goroutines are lightweight threads managed by the Go runtime, while channels provide a way for goroutines to communicate with each other and synchronize their execution.",
+      "Core Web Vitals are Google's initiative to provide unified guidance for quality signals. They focus on three aspects of user experience—loading performance (LCP), interactivity (FID), and visual stability (CLS). Understanding and optimizing these metrics is crucial for delivering a great user experience.",
     source: "web",
     sourceIcon: "Globe",
-    url: "https://go.dev/blog/concurrency-patterns",
+    url: "https://web.dev/vitals/",
   },
   {
     id: "2",
-    title: "Advanced Concurrency Patterns: Context and Cancellation",
+    title: "Advanced Performance Optimization: Resource Loading and Rendering",
     snippet:
-      "The context package in Go provides a way to carry deadlines, cancellation signals, and other request-scoped values across API boundaries and between processes. This is particularly useful for controlling concurrent operations.",
+      "Modern web performance optimization involves strategic resource loading, efficient JavaScript execution, and optimized rendering paths. Techniques like code splitting, tree shaking, and critical CSS extraction can significantly improve loading times and user experience.",
     source: "academic",
     sourceIcon: "BookOpen",
-    url: "https://pkg.go.dev/context",
+    url: "https://developer.mozilla.org/en-US/docs/Web/Performance",
   },
   {
     id: "3",
-    title: "Concurrency Pattern Analysis: Worker Pools",
+    title: "Performance Monitoring and Analysis Patterns",
     snippet:
-      "Worker pools are a common concurrency pattern in Go where a fixed number of worker goroutines process tasks from a shared channel. This pattern helps limit resource usage while maximizing throughput for concurrent operations.",
+      "Real User Monitoring (RUM) combined with synthetic testing provides comprehensive performance insights. Using tools like the Performance API, Lighthouse, and WebPageTest helps identify bottlenecks and optimization opportunities.",
     source: "analysis",
     sourceIcon: "BarChart",
   },
   {
     id: "4",
-    title: "Mutex vs. Channels: Choosing the Right Concurrency Primitive",
+    title: "Client-Side vs. Server-Side Optimization Strategies",
     snippet:
-      "Go offers both traditional synchronization primitives (mutexes) and CSP-style concurrency (channels). Understanding when to use each approach is crucial for writing efficient concurrent programs. The general guideline is 'Share memory by communicating; don't communicate by sharing memory.'",
+      "A holistic approach to web performance involves both client-side and server-side optimizations. This includes techniques like server-side rendering, edge caching, image optimization, and efficient data loading patterns.",
     source: "academic",
     sourceIcon: "BookOpen",
-    url: "https://pkg.go.dev/context",
+    url: "https://web.dev/performance-optimizing-content-efficiency/",
   },
   {
     id: "5",
-    title: "Error Handling in Concurrent Go Programs",
+    title: "Error Handling and Performance Recovery",
     snippet:
-      "Proper error handling in concurrent Go programs requires careful consideration. Common patterns include using error channels, the errgroup package, or context cancellation to propagate errors between goroutines.",
+      "Implementing robust error handling and recovery mechanisms is crucial for maintaining performance under adverse conditions. This includes graceful degradation, offline capabilities, and strategic error boundaries.",
     source: "web",
     sourceIcon: "Globe",
   },
@@ -172,12 +172,12 @@ const researchPhases = [
 
 export const performResearchTool = registerTool({
   name: "performResearch",
-  description: "Performs research on Go programming topics",
+  description: "Performs research on web performance optimization topics",
   execute: async (params: { query: string; toolCallId?: string }) => {
     // Determine the research query
-    const researchQuery = params.query.toLowerCase().includes("concurrency")
-      ? "concurrency patterns in Go"
-      : "Go programming concepts";
+    const researchQuery = params.query.toLowerCase().includes("performance")
+      ? "web performance optimization"
+      : "web performance concepts";
 
     // Create the initial research state
     const initialState = {
@@ -205,9 +205,9 @@ export const performResearchTool = registerTool({
     params: { query: string; toolCallId?: string },
     dataStream?: DataStream,
   ) {
-    const researchQuery = params.query.toLowerCase().includes("concurrency")
-      ? "concurrency patterns in Go"
-      : "Go programming concepts";
+    const researchQuery = params.query.toLowerCase().includes("performance")
+      ? "web performance optimization"
+      : "web performance concepts";
 
     // Initial state
     const steps = initialSteps(researchQuery);

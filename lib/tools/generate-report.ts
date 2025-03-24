@@ -3,331 +3,185 @@ import { getAnimationUrlForTopic } from "../utils/gif-generator";
 
 // Mock report content based on topics
 const reportContent = {
-  "go-overview": {
-    title: "Go Programming Language Overview",
+  "web-performance-overview": {
+    title: "Web Performance Overview",
     sections: [
       {
-        title: "Introduction to Go",
-        content: `# Go Programming Language
+        title: "Introduction to Web Performance",
+        content: `# Web Performance and Core Web Vitals
 
-![Go Programming Language Visualization](${getAnimationUrlForTopic("go-overview")})
+![Web Performance Visualization](${getAnimationUrlForTopic("web-performance-overview")})
 
-Go (or Golang) is an open-source programming language created at Google in 2007 by Robert Griesemer, Rob Pike, and Ken Thompson. It was designed to be efficient, readable, and suitable for modern computing environments.
+Web performance is a critical aspect of modern web development that directly impacts user experience, conversion rates, and SEO rankings. Core Web Vitals are Google's initiative to provide unified guidance for quality signals that are essential to delivering a great user experience on the web.
 
-## Key Features
+## Key Metrics
 
-- **Simplicity**: Go emphasizes simplicity and readability
-- **Concurrency**: Built-in support for concurrent programming
-- **Compilation**: Compiles to machine code for fast execution
-- **Garbage Collection**: Automatic memory management
-- **Static Typing**: Type safety with minimal type declaration syntax
+- **Loading Performance**: Measured by LCP (Largest Contentful Paint)
+- **Interactivity**: Measured by FID (First Input Delay)
+- **Visual Stability**: Measured by CLS (Cumulative Layout Shift)
+- **Additional Metrics**: TTFB, FCP, TTI, and TBT
 
-Go combines the efficiency of a compiled language with the ease of programming of a dynamic language, making it an excellent choice for modern software development.`,
+Web Vitals combine real-world user experience metrics with clear thresholds, making it easier to understand and optimize website performance.`,
       },
       {
-        title: "Getting Started with Go",
-        content: `## Installation and Setup
+        title: "Getting Started with Web Performance",
+        content: `## Measuring Web Performance
 
-![Getting Started with Go](${getAnimationUrlForTopic("go-overview")})
+![Getting Started with Web Performance](${getAnimationUrlForTopic("web-performance-overview")})
 
-Getting started with Go is straightforward:
+Getting started with web performance optimization:
 
-1. Download the installer from [golang.org/dl/](https://golang.org/dl/)
-2. Follow the installation instructions for your platform
-3. Verify installation by running \`go version\` in your terminal
+1. Use Lighthouse for lab testing
+2. Implement Real User Monitoring (RUM)
+3. Monitor Core Web Vitals in Search Console
+4. Set up Performance Budgets
 
-## Your First Go Program
+## Basic Performance Optimization
 
-Create a file named \`hello.go\` with the following content:
+Here's a simple performance checklist:
 
-\`\`\`go
-package main
+\`\`\`javascript
+// Image optimization
+const img = new Image();
+img.loading = "lazy"; // Use lazy loading
+img.srcset = "image-400.jpg 400w, image-800.jpg 800w"; // Responsive images
 
-import "fmt"
-
-func main() {
-  fmt.Println("Hello, Go!")
-}
+// Resource hints
+<link rel="preconnect" href="https://example.com">
+<link rel="preload" as="style" href="critical.css">
 \`\`\`
 
-Run it with:
-
-\`\`\`
-go run hello.go
-\`\`\`
-
-This simple program demonstrates the basic structure of a Go application.`,
+These optimizations form the foundation of a fast-loading website.`,
       },
       {
-        title: "Go Core Concepts",
-        content: `## Core Concepts
+        title: "Core Web Vitals Deep Dive",
+        content: `## Core Web Vitals
 
-![Go Core Concepts](${getAnimationUrlForTopic("go-overview")})
+![Core Web Vitals](${getAnimationUrlForTopic("web-performance-overview")})
 
-### Packages
+### Largest Contentful Paint (LCP)
 
-Go programs are organized into packages. Every Go program starts with the \`package main\` declaration.
+LCP measures loading performance. To provide a good user experience, sites should strive for LCP within 2.5 seconds.
 
-### Variables and Types
+### First Input Delay (FID)
 
-Go has several basic types:
+FID measures interactivity. A good FID score is under 100 milliseconds.
 
-- \`bool\`: Boolean values
-- \`string\`: UTF-8 encoded text
-- Numeric types: \`int\`, \`int8\`, \`int16\`, \`int32\`, \`int64\`, \`uint\`, \`uint8\`, etc.
-- \`float32\`, \`float64\`: Floating-point numbers
-- \`complex64\`, \`complex128\`: Complex numbers
+### Cumulative Layout Shift (CLS)
 
-### Functions
-
-Functions in Go are defined with the \`func\` keyword:
-
-\`\`\`go
-func add(x int, y int) int {
-  return x + y
-}
-\`\`\`
-
-### Control Structures
-
-Go supports standard control structures like \`if\`, \`for\`, and \`switch\`.`,
+CLS measures visual stability. A good CLS score is less than 0.1.`,
       },
       {
-        title: "Learning Resources",
-        content: `## Learning Resources
+        title: "Performance Resources",
+        content: `## Performance Resources
 
-![Go Learning Resources](${getAnimationUrlForTopic("go-overview")})
+![Web Performance Resources](${getAnimationUrlForTopic("web-performance-overview")})
 
-To continue your Go journey, check out these resources:
+To improve your web performance:
 
-- [Go Tour](https://tour.golang.org/): An interactive introduction to Go
-- [Go Documentation](https://golang.org/doc/): Official documentation
-- [Effective Go](https://golang.org/doc/effective_go): Best practices for writing Go code
-- [Go by Example](https://gobyexample.com/): Example-based learning
-
+- [web.dev](https://web.dev/): Official Google resource for web performance
+- [PageSpeed Insights](https://pagespeed.web.dev/): Performance analysis tool
+- [Core Web Vitals Report](https://support.google.com/webmasters/answer/9205520): Monitor real-world performance
+- [WebPageTest](https://www.webpagetest.org/): Detailed performance testing
 
 ## Next Steps
 
-Ready to dive deeper? Explore these topics:
-- Structs and Interfaces
-- Concurrency with Goroutines and Channels
-- Error Handling
-- Testing in Go`,
+Ready to optimize further? Focus on:
+- JavaScript optimization
+- Critical rendering path
+- Resource prioritization
+- Performance monitoring`,
       },
     ],
   },
-  concurrency: {
-    title: "Concurrency in Go",
+  "performance-optimization": {
+    title: "Performance Optimization Techniques",
     sections: [
       {
-        title: "Understanding Go's Concurrency Model",
-        content: `# Concurrency in Go
+        title: "Understanding Performance Optimization",
+        content: `# Web Performance Optimization
 
-![Concurrency Visualization](${getAnimationUrlForTopic("concurrency")})
+![Performance Optimization](${getAnimationUrlForTopic("performance-optimization")})
 
-Go's approach to concurrency is one of its most powerful features, based on the Communicating Sequential Processes (CSP) paradigm.
+Performance optimization is crucial for delivering fast, responsive web experiences. It encompasses various techniques from code optimization to resource delivery strategies.
 
-## Goroutines: Lightweight Concurrency
+## Key Areas
 
-A goroutine is a lightweight thread managed by the Go runtime. Starting a goroutine is as simple as using the \`go\` keyword:
-
-\`\`\`go
-go function()
-\`\`\`
-
-### Goroutine Example
-
-\`\`\`go
-package main
-
-import (
-  "fmt"
-  "time"
-)
-
-func say(s string) {
-  for i := 0; i < 5; i++ {
-    time.Sleep(100 * time.Millisecond)
-    fmt.Println(s)
-  }
-}
-
-func main() {
-  go say("world")
-  say("hello")
-}
-\`\`\`
-
-This executes two functions concurrently: one in the background and one in the foreground.`,
+- **Resource Loading**: Optimize how assets are loaded and delivered
+- **Runtime Performance**: Improve JavaScript execution and rendering
+- **Network Optimization**: Reduce latency and payload size
+- **Caching Strategies**: Implement effective caching mechanisms`,
       },
       {
-        title: "Channels: Communication Between Goroutines",
-        content: `## Channels
+        title: "Advanced Optimization Techniques",
+        content: `## Advanced Techniques
 
-![Channels Visualization](${getAnimationUrlForTopic("concurrency")})
+![Advanced Optimization](${getAnimationUrlForTopic("performance-optimization")})
 
-Channels are Go's mechanism for communicating between goroutines. They allow you to pass values between goroutines safely.
+### Code Splitting and Lazy Loading
 
-### Basic Channel Usage
+\`\`\`javascript
+// Dynamic imports for route-based code splitting
+const Dashboard = React.lazy(() => import('./Dashboard'));
 
-\`\`\`go
-package main
-
-import "fmt"
-
-func sum(s []int, c chan int) {
-  sum := 0
-  for _, v := range s {
-    sum += v
-  }
-  c <- sum // send sum to c
-}
-
-func main() {
-  s := []int{7, 2, 8, -9, 4, 0}
-
-  c := make(chan int)
-  go sum(s[:len(s)/2], c)
-  go sum(s[len(s)/2:], c)
-  x, y := <-c, <-c // receive from c
-
-  fmt.Println(x, y, x+y)
+// Lazy loading components
+function MyComponent() {
+  return (
+    <Suspense fallback={<Loading />}>
+      <Dashboard />
+    </Suspense>
+  );
 }
 \`\`\`
 
-### Channel Buffering
+### Resource Hints and Preloading
 
-Channels can be buffered, meaning they can hold a specified number of values:
+\`\`\`html
+<!-- Preconnect to critical origins -->
+<link rel="preconnect" href="https://api.example.com">
 
-\`\`\`go
-ch := make(chan int, 100)
-\`\`\`
-
-### Channel Direction
-
-Channels can be restricted to only sending or only receiving:
-
-\`\`\`go
-func send(ch chan<- int)  // can only send to ch
-func recv(ch <-chan int)  // can only receive from ch
-\`\`\``,
-      },
-      {
-        title: "Concurrency Patterns",
-        content: `## Common Concurrency Patterns
-
-![Concurrency Patterns](${getAnimationUrlForTopic("concurrency")})
-
-### Worker Pools
-
-A worker pool is a common pattern for parallelizing work:
-
-\`\`\`go
-package main
-
-import (
-  "fmt"
-  "time"
-)
-
-func worker(id int, jobs <-chan int, results chan<- int) {
-  for j := range jobs {
-    fmt.Println("worker", id, "started  job", j)
-    time.Sleep(time.Second)
-    fmt.Println("worker", id, "finished job", j)
-    results <- j * 2
-  }
-}
-
-func main() {
-  const numJobs = 5
-  jobs := make(chan int, numJobs)
-  results := make(chan int, numJobs)
-
-  // Start 3 workers
-  for w := 1; w <= 3; w++ {
-    go worker(w, jobs, results)
-  }
-
-  // Send jobs
-  for j := 1; j <= numJobs; j++ {
-    jobs <- j
-  }
-  close(jobs)
-
-  // Collect results
-  for a := 1; a <= numJobs; a++ {
-    <-results
-  }
-}
+<!-- Preload critical resources -->
+<link rel="preload" href="critical.js" as="script">
+<link rel="preload" href="hero.jpg" as="image">
 \`\`\``,
       },
     ],
   },
-  "error-handling": {
-    title: "Error Handling in Go",
+  "error-monitoring": {
+    title: "Performance Error Monitoring",
     sections: [
       {
-        title: "Go's Approach to Error Handling",
-        content: `# Error Handling in Go
+        title: "Performance Monitoring Setup",
+        content: `## Performance Monitoring
 
-![Error Handling Visualization](${getAnimationUrlForTopic("error-handling")})
+![Performance Monitoring](${getAnimationUrlForTopic("error-monitoring")})
 
-Go takes a straightforward approach to error handling that differs from many other languages. Instead of using exceptions, Go functions return error values.
+### Real User Monitoring (RUM)
 
-## Basic Error Handling
+\`\`\`javascript
+// Performance monitoring setup
+const observer = new PerformanceObserver((list) => {
+  for (const entry of list.getEntries()) {
+    // Report performance metrics
+    console.log(entry.name, entry.startTime, entry.duration);
+  }
+});
 
-In Go, functions that can fail typically return an error as the last return value:
-
-\`\`\`go
-func OpenFile(name string) (*File, error) {
-  // ...
-}
-
-f, err := OpenFile("filename.txt")
-if err != nil {
-  // handle the error
-  return
-}
-// continue with f
+observer.observe({ entryTypes: ['largest-contentful-paint', 'first-input', 'layout-shift'] });
 \`\`\`
 
-This explicit error checking encourages developers to handle errors deliberately at each step.`,
-      },
-      {
-        title: "Creating and Working with Errors",
-        content: `## Working with Errors
+### Error Tracking
 
-![Creating Errors Visualization](${getAnimationUrlForTopic("error-handling")})
-
-### Creating Simple Errors
-
-The \`errors\` package provides a simple way to create error values:
-
-\`\`\`go
-import "errors"
-
-func validateAge(age int) error {
-  if age < 0 {
-    return errors.New("age cannot be negative")
-  }
-  return nil
-}
-\`\`\`
-
-### Formatting Errors
-
-For more detailed errors, use \`fmt.Errorf\`:
-
-\`\`\`go
-import "fmt"
-
-func validateAge(age int) error {
-  if age < 0 {
-    return fmt.Errorf("invalid age %d: cannot be negative", age)
-  }
-  return nil
-}
+\`\`\`javascript
+// Track performance errors
+window.addEventListener('error', (event) => {
+  // Report error with performance context
+  console.error('Performance error:', {
+    message: event.message,
+    filename: event.filename,
+    performance: performance.now()
+  });
+});
 \`\`\``,
       },
     ],
@@ -349,12 +203,12 @@ export const generateReportTool = registerTool({
     console.log("Generate report query:", query);
 
     // Determine which report to generate based on the query
-    let reportType = "go-overview";
+    let reportType = "web-performance-overview";
 
-    if (query.includes("concurrency")) {
-      reportType = "concurrency";
-    } else if (query.includes("error handling")) {
-      reportType = "error-handling";
+    if (query.includes("performance optimization")) {
+      reportType = "performance-optimization";
+    } else if (query.includes("error monitoring")) {
+      reportType = "error-monitoring";
     }
 
     // Return the complete report data
@@ -382,12 +236,12 @@ export const generateReportTool = registerTool({
       `report-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
     // Determine which report to generate based on the query
-    let reportType = "go-overview";
+    let reportType = "web-performance-overview";
 
-    if (query.includes("concurrency")) {
-      reportType = "concurrency";
-    } else if (query.includes("error handling")) {
-      reportType = "error-handling";
+    if (query.includes("performance optimization")) {
+      reportType = "performance-optimization";
+    } else if (query.includes("error monitoring")) {
+      reportType = "error-monitoring";
     }
 
     // Get the report content
