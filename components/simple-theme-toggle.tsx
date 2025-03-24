@@ -30,7 +30,7 @@ export function SimpleThemeToggle() {
     <Button
       variant="outline"
       size="icon"
-      className="rounded-full w-10 h-10 border-white/80 text-white/80"
+      className="rounded-full w-10 h-10 border-white/80 text-white/80 bg-transparent"
       onClick={toggleTheme}
     >
       {theme === "dark" ? (
