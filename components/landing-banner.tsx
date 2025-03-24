@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export function LandingBanner() {
   return (
-    <div className="relative w-full overflow-hidden bg-background text-foreground">
+    <div className="relative w-full overflow-hidden bg-peppermint-50 dark:bg-background text-foreground">
       {/* Dotted background pattern */}
       <svg
         className="absolute inset-0 w-full h-full text-foreground"
