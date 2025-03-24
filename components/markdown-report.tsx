@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
 	XCircle,
 	FileText,
@@ -14,6 +14,29 @@ import { Badge } from '@/components/ui/badge';
 import { MarkdownRenderer } from './markdown-renderer';
 import { FeedbackButtons } from '@/components/feedback-buttons';
 
+/**
+ * Types and Interfaces
+ */
+
+/**
+ * Report section interface
+ */
+interface ReportSection {
+	title: string;
+	content: string;
+}
+
+/**
+ * Report data interface
+ */
+interface ReportData {
+	title: string;
+	sections: ReportSection[];
+}
+
+/**
+ * MarkdownReport component props
+ */
 interface MarkdownReportProps {
 	visible: boolean;
 	onClose: () => void;
@@ -22,10 +45,14 @@ interface MarkdownReportProps {
 	topic: string;
 	onComplete: () => void;
 	onAbort?: () => void;
-	reportData?: any;
+	reportData?: ReportData;
 	reportId?: string | null;
 }
 
+/**
+ * MarkdownReport Component
+ * Displays a report with markdown content in a sliding panel
+ */
 export function MarkdownReport({
 	visible,
 	onClose,
@@ -41,13 +68,49 @@ export function MarkdownReport({
 	const [isCopied, setIsCopied] = useState(false);
 	const reportRef = useRef<HTMLDivElement>(null);
 
-	// Use the report data from props or fallback to a loading state
-	const report = reportData || {
-		title: 'Loading Report...',
-		sections: [{ title: 'Preparing Content', content: 'Loading content...' }],
-	};
+	/**
+	 * Default report data when loading or no data is available
+	 */
+	const defaultReportData: ReportData = useMemo(
+		() => ({
+			title: 'Loading Report...',
+			sections: [{ title: 'Preparing Content', content: 'Loading content...' }],
+		}),
+		[],
+	);
 
-	// Animation effect
+	/**
+	 * Use the report data from props or fallback to default
+	 */
+	const report = useMemo(
+		() => reportData || defaultReportData,
+		[reportData, defaultReportData],
+	);
+
+	/**
+	 * Check if the report is complete and ready to display
+	 */
+	const isReportComplete = useMemo(
+		() =>
+			!isGenerating &&
+			reportData &&
+			reportData.sections &&
+			reportData.sections.length > 0,
+		[isGenerating, reportData],
+	);
+
+	/**
+	 * Generate a unique ID for the report for feedback
+	 */
+	const reportFeedbackId = useMemo(
+		() =>
+			`report-${reportId || report.title.replace(/\s+/g, '-').toLowerCase()}`,
+		[reportId, report.title],
+	);
+
+	/**
+	 * Animation effect
+	 */
 	useEffect(() => {
 		if (visible) {
 			const timer = setTimeout(() => {
@@ -59,30 +122,40 @@ export function MarkdownReport({
 		}
 	}, [visible]);
 
-	// Call onComplete when reportData is available and not empty
+	/**
+	 * Call onComplete when reportData is available and not empty
+	 */
 	useEffect(() => {
 		if (reportData && reportData.sections && reportData.sections.length > 0) {
 			onComplete();
 		}
 	}, [reportData, onComplete]);
 
-	const scrollToBottom = () => {
+	/**
+	 * Scroll to bottom of the report
+	 */
+	const scrollToBottom = useCallback(() => {
 		if (reportRef.current) {
 			reportRef.current.scrollTo({
 				top: reportRef.current.scrollHeight,
 				behavior: 'smooth',
 			});
 		}
-	};
+	}, []);
 
-	// Scroll to bottom when new sections are added
+	/**
+	 * Scroll to bottom when new sections are added
+	 */
 	useEffect(() => {
 		if (reportData && reportData.sections) {
 			scrollToBottom();
 		}
-	}, [reportData]);
+	}, [reportData, scrollToBottom]);
 
-	const copyToClipboard = () => {
+	/**
+	 * Copy report content to clipboard
+	 */
+	const copyToClipboard = useCallback(() => {
 		// Create a string of all the report content
 		const fullContent = report.sections
 			.map((section) => `${section.title}\n\n${section.content}`)
@@ -95,9 +168,12 @@ export function MarkdownReport({
 
 		setIsCopied(true);
 		setTimeout(() => setIsCopied(false), 2000);
-	};
+	}, [report.sections]);
 
-	const downloadReport = () => {
+	/**
+	 * Download report as markdown file
+	 */
+	const downloadReport = useCallback(() => {
 		// Create a string of all the report content with proper markdown formatting
 		const fullContent =
 			`# ${report.title}\n\n` +
@@ -112,7 +188,9 @@ export function MarkdownReport({
 		const url = URL.createObjectURL(blob);
 
 		// Create a filename with reportId to make it unique
-		const filename = `${report.title.toLowerCase().replace(/\s+/g, '-')}${reportId ? `-${reportId.substring(0, 8)}` : ''}.md`;
+		const filename = `${report.title.toLowerCase().replace(/\s+/g, '-')}${
+			reportId ? `-${reportId.substring(0, 8)}` : ''
+		}.md`;
 
 		// Create a temporary anchor element to trigger the download
 		const a = document.createElement('a');
@@ -124,30 +202,40 @@ export function MarkdownReport({
 		// Clean up
 		document.body.removeChild(a);
 		URL.revokeObjectURL(url);
-	};
+	}, [report.title, report.sections, reportId]);
 
-	if (!visible) return null;
+	/**
+	 * Animation styles
+	 */
+	const animationStyles = useMemo(
+		() => ({
+			animationName: animate && !exiting ? 'slideRight' : 'none',
+			animationDuration: '250ms',
+			animationTimingFunction: 'cubic-bezier(0.25, 0.1, 0.25, 1)',
+			animationFillMode: 'forwards',
+		}),
+		[animate, exiting],
+	);
 
-	const isStreamComplete =
-		!isGenerating &&
-		reportData &&
-		reportData.sections &&
-		reportData.sections.length > 0;
-
-	return (
-		<div
-			className={cn(
+	/**
+	 * Panel container classes
+	 */
+	const containerClasses = useMemo(
+		() =>
+			cn(
 				'panel-right flex flex-col overflow-hidden bg-background p-6 transition-all duration-300',
 				animate ? 'opacity-100' : 'opacity-0',
 				exiting && 'panel-right-exit',
-			)}
-			style={{
-				animationName: animate && !exiting ? 'slideRight' : 'none',
-				animationDuration: '250ms',
-				animationTimingFunction: 'cubic-bezier(0.25, 0.1, 0.25, 1)',
-				animationFillMode: 'forwards',
-			}}
-		>
+			),
+		[animate, exiting],
+	);
+
+	// Don't render anything if not visible
+	if (!visible) return null;
+
+	return (
+		<div className={containerClasses} style={animationStyles}>
+			{/* Header area with title and actions */}
 			<div className="sticky top-0 z-10 mb-4 flex items-center justify-between border-b border-border bg-background pb-2">
 				<div className="flex items-center gap-2">
 					<FileText className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
@@ -160,28 +248,21 @@ export function MarkdownReport({
 						)}
 					</h2>
 				</div>
-				<div className="flex items-center gap-2">
-					{/* Only show feedback buttons when complete */}
-					{!isGenerating &&
-						reportData &&
-						reportData.sections &&
-						reportData.sections.length > 0 && (
-							<FeedbackButtons
-								messageId={`report-${reportId || report.title.replace(/\s+/g, '-').toLowerCase()}`}
-								source="report"
-							/>
-						)}
 
+				<div className="flex items-center gap-2">
+					{/* Feedback buttons - only shown when report is complete */}
+					{isReportComplete && (
+						<FeedbackButtons messageId={reportFeedbackId} source="report" />
+					)}
+
+					{/* Copy button */}
 					<Button
 						variant="ghost"
 						size="sm"
 						onClick={copyToClipboard}
-						disabled={
-							!reportData ||
-							!reportData.sections ||
-							reportData.sections.length === 0
-						}
+						disabled={!isReportComplete}
 						className="flex items-center gap-1"
+						aria-label={isCopied ? 'Copied to clipboard' : 'Copy to clipboard'}
 					>
 						{isCopied ? (
 							<>
@@ -198,52 +279,55 @@ export function MarkdownReport({
 						)}
 					</Button>
 
+					{/* Download button */}
 					<Button
 						variant="ghost"
 						size="sm"
 						onClick={downloadReport}
-						disabled={
-							!reportData ||
-							!reportData.sections ||
-							reportData.sections.length === 0
-						}
+						disabled={!isReportComplete}
 						className="flex items-center gap-1"
+						aria-label="Download report as markdown"
 					>
 						<Download className="h-4 w-4" />
 						<span>Download</span>
 					</Button>
 
-					{/* Always show abort button while generating */}
+					{/* Abort button - only shown while generating */}
 					{isGenerating && onAbort && (
 						<Button
 							variant="ghost"
 							size="sm"
 							onClick={onAbort}
 							className="flex items-center gap-1 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+							aria-label="Stop report generation"
 						>
 							<XCircle className="h-4 w-4" />
 							<span>Stop</span>
 						</Button>
 					)}
 
+					{/* Close button */}
 					<Button
 						variant="ghost"
 						size="icon"
 						onClick={onClose}
 						className="h-8 w-8 rounded-full"
+						aria-label="Close report"
 					>
 						<XCircle className="h-5 w-5" />
 					</Button>
 				</div>
 			</div>
 
+			{/* Content area with report sections */}
 			<div
 				ref={reportRef}
 				className="max-h-full flex-grow overflow-y-auto pr-1"
+				aria-live="polite"
 			>
 				{isGenerating && !reportData ? (
 					<div className="flex h-32 items-center justify-center">
-						<div className="typing-indicator">
+						<div className="typing-indicator" aria-label="Generating report">
 							<span></span>
 							<span></span>
 							<span></span>

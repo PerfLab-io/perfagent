@@ -1,7 +1,6 @@
 'use client';
 
 import type React from 'react';
-
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Header } from '@/components/header';
 import { Button } from '@/components/ui/button';
@@ -16,6 +15,19 @@ import { cn } from '@/lib/utils';
 import { ResearchProvider } from '@/components/research-card';
 import { useChat } from '@/lib/hooks/use-chat';
 
+/**
+ * Type definition for the report data structure
+ */
+type Report = {
+	data: any;
+	topic: string;
+	toolCallId: string;
+};
+
+/**
+ * AiChatPage - Main chat interface component with file handling, messaging,
+ * and side panel functionality for data visualization and reports
+ */
 export default function AiChatPage() {
 	const {
 		messages,
@@ -31,32 +43,142 @@ export default function AiChatPage() {
 		removeFile,
 		suggestionsLoading,
 		suggestions,
-		setSuggestions,
 	} = useChat();
 
-	const [showFileSection, setShowFileSection] = useState(true);
+	// UI state management
 	const [chatStarted, setChatStarted] = useState(false);
+	const [messagesVisible, setMessagesVisible] = useState(false);
+	const [showFileSection, setShowFileSection] = useState(false);
+
+	// Side panel state management
 	const [showSidePanel, setShowSidePanel] = useState<boolean | null>(null);
 	const [panelAnimationComplete, setPanelAnimationComplete] = useState(false);
 	const [panelExiting, setPanelExiting] = useState(false);
-	const fileInputRef = useRef<HTMLInputElement>(null);
-	const messagesEndRef = useRef<HTMLDivElement>(null);
-	const textareaRef = useRef<HTMLTextAreaElement>(null);
-	const [messagesVisible, setMessagesVisible] = useState(false);
 	const [panelContentType, setPanelContentType] = useState<'data' | 'report'>(
 		'data',
 	);
+
+	// Report state management
 	const [isGeneratingReport, setIsGeneratingReport] = useState(false);
 	const [reportTopic, setReportTopic] = useState('');
 	const [reportData, setReportData] = useState(null);
 	const [toolCallId, setToolCallId] = useState<string | undefined>(undefined);
 	const [activeReportId, setActiveReportId] = useState<string | null>(null);
-	const [reportsMap, setReportsMap] = useState<Record<string, any>>({});
+	const [reportsMap, setReportsMap] = useState<Record<string, Report>>({});
 
-	const scrollToBottom = () => {
+	// Refs
+	const fileInputRef = useRef<HTMLInputElement>(null);
+	const messagesEndRef = useRef<HTMLDivElement>(null);
+	const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+	/**
+	 * Smoothly scrolls to the bottom of the chat messages
+	 */
+	const scrollToBottom = useCallback(() => {
 		messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-	};
+	}, []);
 
+	/**
+	 * Handles submission of chat messages
+	 */
+	const handleSubmit = useCallback(
+		(e: React.FormEvent) => {
+			// Only proceed if there's input text or files attached
+			if (input.trim() || attachedFiles.length > 0) {
+				originalHandleSubmit(e as any);
+				// Hide file section after submission
+				setShowFileSection(false);
+			} else {
+				e.preventDefault();
+			}
+		},
+		[input, attachedFiles.length, originalHandleSubmit],
+	);
+
+	/**
+	 * Handles keyboard shortcuts for message submission
+	 */
+	const handleKeyDown = useCallback(
+		(event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+			if (event.key === 'Enter' && !event.shiftKey) {
+				event.preventDefault();
+				originalHandleSubmit(event as any);
+			}
+		},
+		[originalHandleSubmit],
+	);
+
+	/**
+	 * Toggles the visibility of the side panel
+	 */
+	const toggleSidePanel = useCallback(() => {
+		setShowSidePanel((prev) => !prev);
+	}, []);
+
+	/**
+	 * Marks a report as complete
+	 */
+	const handleReportComplete = useCallback(() => {
+		setIsGeneratingReport(false);
+	}, []);
+
+	/**
+	 * Aborts the current report generation
+	 */
+	const handleAbortReport = useCallback(() => {
+		// Stop the current message stream
+		stop(toolCallId);
+
+		// Update UI state
+		setShowSidePanel(false);
+		setPanelExiting(true);
+		setReportData(null);
+		setIsGeneratingReport(false);
+
+		// Reset the report state after the exit animation completes
+		setTimeout(() => {
+			setPanelExiting(false);
+		}, 300);
+	}, [stop, toolCallId]);
+
+	/**
+	 * Aborts ongoing research
+	 */
+	const handleAbortResearch = useCallback(
+		(callId?: string) => {
+			stop(callId);
+		},
+		[stop],
+	);
+
+	/**
+	 * Opens a specific report in the side panel
+	 */
+	const openReport = useCallback(
+		(reportId: string) => {
+			const report = reportsMap[reportId];
+			if (report) {
+				setActiveReportId(reportId);
+				setShowSidePanel(true);
+				setPanelContentType('report');
+				setIsGeneratingReport(false);
+				setReportTopic(report.topic);
+				setReportData(report.data);
+				setToolCallId(report.toolCallId);
+			}
+		},
+		[reportsMap],
+	);
+
+	/**
+	 * Closes the current report panel
+	 */
+	const closeReport = useCallback(() => {
+		setShowSidePanel(false);
+		setActiveReportId(null);
+	}, []);
+
+	// Effect: Initialize chat and handle message visibility
 	useEffect(() => {
 		if (messages.length > 0) {
 			if (!chatStarted) {
@@ -65,30 +187,20 @@ export default function AiChatPage() {
 				setTimeout(() => {
 					setMessagesVisible(true);
 					setTimeout(scrollToBottom, 100);
-				}, 500); // Increased from 300ms to 500ms to match animation duration
+				}, 500);
 			} else {
 				scrollToBottom();
 			}
 		}
-	}, [messages, chatStarted]);
+	}, [messages, chatStarted, scrollToBottom]);
 
-	// Update the useEffect for handling file section visibility
+	// Effect: Handle file section visibility based on attached files
 	useEffect(() => {
-		if (attachedFiles.length > 0) {
-			// Show the file section immediately when files are added
-			setShowFileSection(true);
-		} else {
-			// Only hide if there are no files and not loading
-			if (!isLoading) {
-				setShowFileSection(false);
-			}
-		}
+		setShowFileSection(attachedFiles.length > 0);
 	}, [attachedFiles, isLoading]);
 
-	// Add a new effect to handle height adjustment
+	// Effect: Adjust layout when file section visibility changes
 	useEffect(() => {
-		// Force a layout recalculation when showing/hiding file section
-		// This helps prevent the content from shifting unexpectedly
 		if (showFileSection) {
 			document.body.style.overflowAnchor = 'none';
 			setTimeout(() => {
@@ -96,36 +208,32 @@ export default function AiChatPage() {
 				scrollToBottom();
 			}, 50);
 		}
-	}, [showFileSection]);
+	}, [showFileSection, scrollToBottom]);
 
-	// Focus textarea when chat starts
+	// Effect: Auto-focus textarea when chat starts
 	useEffect(() => {
 		if (chatStarted && textareaRef.current) {
 			setTimeout(() => {
 				textareaRef.current?.focus();
-			}, 500); // Wait for animation to complete
+			}, 500);
 		}
 	}, [chatStarted]);
 
-	// Handle panel animation sequencing
+	// Effect: Handle side panel animation sequencing
 	useEffect(() => {
 		if (showSidePanel) {
 			setPanelExiting(false);
-			// Allow time for the left panel animation to complete first
 			const timer = setTimeout(() => {
 				setPanelAnimationComplete(true);
-			}, 300); // Reduced from 500ms to 300ms
+			}, 300);
 			return () => clearTimeout(timer);
 		} else {
 			if (panelAnimationComplete) {
-				// Start exit animation for the right panel
 				setPanelExiting(true);
-
-				// After exit animation completes, hide the panel completely
 				const timer = setTimeout(() => {
 					setPanelAnimationComplete(false);
 					setPanelExiting(false);
-				}, 250); // Reduced from 350ms to 250ms
+				}, 250);
 				return () => clearTimeout(timer);
 			} else {
 				setPanelAnimationComplete(false);
@@ -133,21 +241,19 @@ export default function AiChatPage() {
 		}
 	}, [showSidePanel, panelAnimationComplete]);
 
-	// Check for tool calls that should open the side panel
+	// Effect: Check for tool calls that should open the side panel
 	useEffect(() => {
-		// Check the latest message for tool calls that should open the side panel
 		const latestMessage = messages[messages.length - 1];
 		if (latestMessage?.toolCall) {
 			if (latestMessage.toolCall.id) {
 				setToolCallId(latestMessage.toolCall.id);
 			}
+
 			if (latestMessage.toolCall.type === 'report') {
-				// Store the report data in the reportsMap
 				if (
 					latestMessage.toolCall.data &&
 					latestMessage.toolCall.data.reportData
 				) {
-					// Generate a unique report ID instead of using the message ID
 					const reportId = latestMessage.id;
 					setReportsMap((prev) => ({
 						...prev,
@@ -173,96 +279,17 @@ export default function AiChatPage() {
 		}
 	}, [messages]);
 
-	const toggleSidePanel = () => {
-		setShowSidePanel(!showSidePanel);
-	};
-
-	const handleReportComplete = () => {
-		setIsGeneratingReport(false);
-	};
-
-	// Reset file section visibility after message is sent
+	// Effect: Ensure proper scroll behavior when file section visibility changes
 	useEffect(() => {
-		if (!isLoading && messages.length > 0) {
-			setShowFileSection(false);
-		}
-	}, [isLoading, messages.length]);
-
-	const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-		if (event.key === 'Enter' && !event.shiftKey) {
-			event.preventDefault();
-			originalHandleSubmit(event as any);
-		}
-	};
-
-	// Add this useEffect after the existing effects in the component
-	useEffect(() => {
-		// Ensure proper scroll behavior when file section visibility changes
 		if (messagesEndRef.current && messages.length > 0) {
-			setTimeout(() => {
-				scrollToBottom();
-			}, 300); // Wait for transition
+			setTimeout(scrollToBottom, 300);
 		}
-	}, [showFileSection, attachedFiles.length]);
+	}, [showFileSection, attachedFiles.length, messages.length, scrollToBottom]);
 
-	// Add a new useEffect to handle smooth transitions when file section changes
-	useEffect(() => {
-		// When file section visibility changes, ensure smooth transition
-		if (showFileSection && attachedFiles.length > 0) {
-			// Add a small delay to allow the DOM to update
-			setTimeout(() => {
-				scrollToBottom();
-			}, 50);
-		}
-	}, [showFileSection, attachedFiles.length]);
+	// Common height classes for both panels
+	const panelHeightClasses =
+		'min-h-[calc(70vh-200px)] max-h-[calc(90vh-200px)]';
 
-	// Update the handleAbortReport function to use the stop function from useChat
-	const handleAbortReport = () => {
-		// Stop the current message stream
-		stop(toolCallId);
-
-		// Update UI state
-		setShowSidePanel(false);
-		setPanelExiting(true);
-		setReportData(null);
-		setIsGeneratingReport(false);
-
-		// Reset the report state after the exit animation completes
-		setTimeout(() => {
-			setPanelExiting(false);
-		}, 300);
-	};
-
-	// Update the handleAbortResearch function to use the stop function from useChat
-	const handleAbortResearch = (toolCallId?: string) => {
-		// Stop the current message stream with the specific toolCallId
-		stop(toolCallId);
-	};
-
-	const openReport = useCallback(
-		(reportId: string) => {
-			const report = reportsMap[reportId];
-			if (report) {
-				setActiveReportId(reportId);
-				setShowSidePanel(true);
-				setPanelContentType('report');
-				setIsGeneratingReport(false);
-				setReportTopic(report.topic);
-				setReportData(report.data);
-				setToolCallId(report.toolCallId);
-			}
-		},
-		[reportsMap],
-	);
-
-	// Add a function to close the report panel
-	const closeReport = useCallback(() => {
-		setShowSidePanel(false);
-		setActiveReportId(null);
-	}, []);
-
-	// Update the ResearchProvider to include the ResearchCard with the onAbort prop
-	// Replace the existing ResearchProvider with this updated version
 	return (
 		<ResearchProvider onAbort={handleAbortResearch}>
 			<div className="flex min-h-screen flex-col bg-background">
@@ -277,7 +304,7 @@ export default function AiChatPage() {
 							'dual-panel-container relative flex-1',
 							showSidePanel
 								? 'panel-active'
-								: showSidePanel == null
+								: showSidePanel === null
 									? ''
 									: 'panel-inactive',
 						)}
@@ -286,14 +313,13 @@ export default function AiChatPage() {
 						<div
 							className={cn(
 								'panel-left relative flex flex-col overflow-hidden',
-								'min-h-[calc(70vh-200px)]', // Use viewport height minus header space
-								'max-h-[calc(90vh-200px)]', // Limit maximum height to avoid overflowing
+								panelHeightClasses,
 							)}
 						>
-							{/* Outter main container with dropzone */}
+							{/* Outer main container with dropzone */}
 							<FileDropzone
 								onFilesDrop={handleFilesDrop}
-								className="relative flex h-full flex-1 flex-col" // Updated to h-full
+								className="relative flex h-full flex-1 flex-col"
 								disabled={isLoading}
 							>
 								{/* Chat messages container */}
@@ -301,13 +327,11 @@ export default function AiChatPage() {
 									className={cn(
 										'flex-1 overflow-y-auto rounded-lg border border-border bg-card shadow-sm',
 										'transition-all duration-500 ease-in-out',
-										'h-[calc(100%-80px)] pb-20', // Fixed height calculation
+										'h-[calc(100%-80px)] pb-20',
 										messagesVisible
 											? 'messages-container-active'
 											: 'messages-container-initial',
-										showFileSection && attachedFiles.length > 0
-											? 'messages-with-files'
-											: '', // Add extra padding when files are shown
+										showFileSection ? 'messages-with-files' : '',
 									)}
 								>
 									<div className="space-y-4 p-4">
@@ -315,7 +339,7 @@ export default function AiChatPage() {
 											<ChatMessage
 												key={message.id}
 												message={message}
-												onAbort={stop} // Pass the stop function directly
+												onAbort={stop}
 												openReport={openReport}
 												closeReport={closeReport}
 												isActiveReport={activeReportId === message.id}
@@ -327,7 +351,7 @@ export default function AiChatPage() {
 									</div>
 								</div>
 
-								{/* Input area container - groups file previews, suggestions, and input together */}
+								{/* Input area container */}
 								<div
 									className={cn(
 										'rounded-lg border border-border bg-card shadow-sm',
@@ -336,15 +360,13 @@ export default function AiChatPage() {
 											? 'input-container-active'
 											: 'input-container-initial',
 									)}
-									style={{
-										transformOrigin: 'center bottom',
-									}}
+									style={{ transformOrigin: 'center bottom' }}
 								>
 									{/* File previews */}
 									{attachedFiles.length > 0 && (
 										<div
 											className={cn(
-												'file-section rounded-t-lg border-b bg-peppermint-100 px-4 py-2 dark:bg-peppermint-900', // Add the new file-section class
+												'file-section rounded-t-lg border-b bg-peppermint-100 px-4 py-2 dark:bg-peppermint-900',
 												showFileSection
 													? 'max-h-[500px] opacity-100'
 													: 'max-h-0 py-0 opacity-0',
@@ -361,9 +383,7 @@ export default function AiChatPage() {
 											</div>
 											<SuggestedMessages
 												files={attachedFiles}
-												onSelectSuggestion={(suggestion) =>
-													setInput(suggestion)
-												}
+												onSelectSuggestion={setInput}
 												isLoading={suggestionsLoading}
 												suggestions={suggestions}
 											/>
@@ -371,19 +391,7 @@ export default function AiChatPage() {
 									)}
 
 									{/* Textarea and buttons */}
-									<form
-										onSubmit={(e) => {
-											// Only proceed if there's input text or files attached
-											if (input.trim() || attachedFiles.length > 0) {
-												originalHandleSubmit(e);
-												// Hide file section after submission
-												setShowFileSection(false);
-											} else {
-												e.preventDefault();
-											}
-										}}
-										className="p-4"
-									>
+									<form onSubmit={handleSubmit} className="p-4">
 										<div className="relative">
 											<textarea
 												ref={textareaRef}
@@ -425,18 +433,20 @@ export default function AiChatPage() {
 
 												{isLoading ? (
 													<Button
-														onClick={stop} // Use the stop function directly
+														onClick={stop}
 														variant="destructive"
 														title="Cancel"
 														size="icon"
-														disabled={false}
 													>
 														<X className="h-5 w-5" />
 													</Button>
 												) : (
 													<Button
 														type="submit"
-														disabled={isLoading || !input.trim()}
+														disabled={
+															isLoading ||
+															(!input.trim() && attachedFiles.length === 0)
+														}
 														variant="default"
 														title="Send message"
 														size="icon"
@@ -451,13 +461,8 @@ export default function AiChatPage() {
 							</FileDropzone>
 						</div>
 
-						<div
-							className={cn(
-								'min-h-[calc(70vh-200px)]', // Use viewport height minus header space
-								'max-h-[calc(90vh-200px)]', // Limit maximum height to avoid overflowing
-							)}
-						>
-							{/* Right panel with data visualization or markdown report */}
+						{/* Right panel container */}
+						<div className={panelHeightClasses}>
 							{panelContentType === 'data' ? (
 								<DataPanel
 									visible={showSidePanel && panelAnimationComplete}
@@ -476,7 +481,7 @@ export default function AiChatPage() {
 									topic={reportTopic}
 									onComplete={handleReportComplete}
 									reportData={reportData}
-									onAbort={handleAbortReport} // Pass the updated abort handler
+									onAbort={handleAbortReport}
 									reportId={activeReportId}
 								/>
 							)}

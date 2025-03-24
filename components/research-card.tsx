@@ -1,7 +1,13 @@
 'use client';
 
-import React from 'react';
-import { useState, useEffect, useRef, useCallback, useContext } from 'react';
+import React, {
+	useState,
+	useEffect,
+	useRef,
+	useCallback,
+	useContext,
+	useMemo,
+} from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import {
@@ -21,23 +27,88 @@ import { Button } from '@/components/ui/button';
 import type { MessageAnnotation } from '@/lib/hooks/use-chat';
 import { FeedbackButtons } from '@/components/feedback-buttons';
 
-// Create a context to store research data per instance
+/**
+ * Types and Interfaces
+ */
+
+/**
+ * Research context state structure
+ */
 interface ResearchContextState {
-	[key: string]: {
-		results: ResearchResult[];
-		steps: ResearchStep[];
-		visibleSteps: string[];
-		activeStep: string | null;
-		phase: 'planning' | 'searching' | 'analyzing' | 'complete';
-		progress: number;
-		showResults: boolean;
-		completed: boolean;
-		toolCallId: string | null;
-		isCancelled: boolean;
-	};
+	[key: string]: ResearchInstance;
 }
 
-// Update the ResearchContext to include toolCallId for tracking specific streams
+/**
+ * Structure for a single research instance
+ */
+interface ResearchInstance {
+	results: ResearchResult[];
+	steps: ResearchStep[];
+	visibleSteps: string[];
+	activeStep: string | null;
+	phase: ResearchPhase;
+	progress: number;
+	showResults: boolean;
+	completed: boolean;
+	toolCallId: string | null;
+	isCancelled: boolean;
+}
+
+/**
+ * Type for research phases
+ */
+type ResearchPhase = 'planning' | 'searching' | 'analyzing' | 'complete';
+
+/**
+ * Structure for a research result
+ */
+interface ResearchResult {
+	id: string;
+	title: string;
+	snippet: string;
+	source: 'web' | 'academic' | 'analysis';
+	sourceIcon: string | React.ReactNode;
+	url?: string;
+}
+
+/**
+ * Structure for a research step
+ */
+interface ResearchStep {
+	id: string;
+	title: string;
+	subtitle: string;
+	icon: string | React.ReactNode;
+	status: 'complete' | 'in-progress' | 'pending';
+	expanded?: boolean;
+}
+
+/**
+ * Props for ResearchCard component
+ */
+interface ResearchCardProps {
+	query: string;
+	triggerAnimation: boolean;
+	preserveData?: boolean;
+	researchId: string;
+	toolCallId?: string | null;
+	onAbort?: (toolCallId?: string) => void;
+	streamedData?: {
+		phase?: ResearchPhase;
+		progress?: number;
+		steps?: ResearchStep[];
+		visibleSteps?: string[];
+		activeStep?: string | null;
+		results?: ResearchResult[];
+		showResults?: boolean;
+		completed?: boolean;
+	};
+	annotations?: MessageAnnotation[];
+}
+
+/**
+ * Context for sharing research data across components
+ */
 const ResearchContext = React.createContext<{
 	state: ResearchContextState;
 	setState: React.Dispatch<React.SetStateAction<ResearchContextState>>;
@@ -48,7 +119,9 @@ const ResearchContext = React.createContext<{
 	onAbort: undefined,
 });
 
-// Update the ResearchProvider to pass toolCallId to onAbort
+/**
+ * Research context provider component
+ */
 export function ResearchProvider({
 	children,
 	onAbort,
@@ -71,27 +144,18 @@ export function ResearchProvider({
 	);
 }
 
-// Update the useResearch hook to include toolCallId
+/**
+ * Custom hook for accessing and updating research state
+ */
 function useResearch(id: string) {
 	const { state, setState, onAbort } = useContext(ResearchContext);
 
 	const updateState = useCallback(
-		(update: Partial<ResearchContextState[string]>) => {
+		(update: Partial<ResearchInstance>) => {
 			setState((prevState) => ({
 				...prevState,
 				[id]: {
-					...(prevState[id] || {
-						results: [],
-						steps: [],
-						visibleSteps: [],
-						activeStep: null,
-						phase: 'planning',
-						progress: 0,
-						showResults: false,
-						completed: false,
-						toolCallId: null,
-						isCancelled: false,
-					}),
+					...(prevState[id] || getInitialResearchState()),
 					...update,
 				},
 			}));
@@ -100,80 +164,135 @@ function useResearch(id: string) {
 	);
 
 	return {
-		data: state[id] || {
-			results: [],
-			steps: [],
-			visibleSteps: [],
-			activeStep: null,
-			phase: 'planning',
-			progress: 0,
-			showResults: false,
-			completed: false,
-			toolCallId: null,
-			isCancelled: false,
-		},
+		data: state[id] || getInitialResearchState(),
 		updateState,
 		onAbort,
 	};
 }
 
-interface ResearchCardProps {
-	query: string;
-	triggerAnimation: boolean;
-	preserveData?: boolean;
-	researchId: string;
-	toolCallId?: string | null;
-	onAbort?: (toolCallId?: string) => void;
-	// Add new props for receiving streamed data
-	streamedData?: {
-		phase?: 'planning' | 'searching' | 'analyzing' | 'complete';
-		progress?: number;
-		steps?: ResearchStep[];
-		visibleSteps?: string[];
-		activeStep?: string | null;
-		results?: ResearchResult[];
-		showResults?: boolean;
-		completed?: boolean;
+/**
+ * Helper function to get initial research state
+ */
+function getInitialResearchState(): ResearchInstance {
+	return {
+		results: [],
+		steps: [],
+		visibleSteps: [],
+		activeStep: null,
+		phase: 'planning',
+		progress: 0,
+		showResults: false,
+		completed: false,
+		toolCallId: null,
+		isCancelled: false,
 	};
-	// Add new prop for annotations
-	annotations?: MessageAnnotation[];
 }
 
-interface ResearchResult {
-	id: string;
-	title: string;
-	snippet: string;
-	source: 'web' | 'academic' | 'analysis';
-	sourceIcon: string | React.ReactNode;
-	url?: string;
-}
-
-interface ResearchStep {
-	id: string;
-	title: string;
-	subtitle: string;
-	icon: string | React.ReactNode;
-	status: 'complete' | 'in-progress' | 'pending';
-	expanded?: boolean;
-}
-
-// Helper function to convert string icon names to React components
+/**
+ * Helper function to convert string icon names to React components
+ */
 const getIconComponent = (iconName: string) => {
-	switch (iconName) {
-		case 'Search':
-			return <Search className="h-5 w-5" />;
-		case 'Globe':
-			return <Globe className="h-5 w-5" />;
-		case 'BookOpen':
-			return <BookOpen className="h-5 w-5" />;
-		case 'BarChart':
-			return <BarChart className="h-5 w-5" />;
-		default:
-			return <Search className="h-5 w-5" />;
-	}
+	const iconMap = {
+		Search: <Search className="h-5 w-5" />,
+		Globe: <Globe className="h-5 w-5" />,
+		BookOpen: <BookOpen className="h-5 w-5" />,
+		BarChart: <BarChart className="h-5 w-5" />,
+	};
+
+	return iconMap[iconName as keyof typeof iconMap] || iconMap.Search;
 };
 
-// Update the ResearchCard component to handle annotations
+/**
+ * Style utility functions
+ */
+const styleUtils = {
+	getPhaseText: (phase: ResearchPhase, isCancelled: boolean): string => {
+		if (isCancelled) return 'Research cancelled';
+
+		const phaseTexts = {
+			planning: 'Planning research',
+			searching: 'Searching sources',
+			analyzing: 'Analyzing results',
+			complete: 'Research complete',
+		};
+
+		return phaseTexts[phase];
+	},
+
+	getPhaseBadgeStyle: (phase: ResearchPhase, isCancelled: boolean): string => {
+		if (isCancelled) {
+			return 'bg-destructive/10 text-destructive dark:bg-destructive/20 dark:text-destructive-foreground';
+		}
+
+		return phase === 'complete'
+			? 'bg-peppermint-100 text-peppermint-800 dark:bg-peppermint-800 dark:text-peppermint-100'
+			: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-800 dark:text-indigo-100';
+	},
+
+	getStatusColor: (status: 'complete' | 'in-progress' | 'pending'): string => {
+		const statusColors = {
+			complete: 'text-peppermint-600 dark:text-peppermint-300',
+			'in-progress': 'text-indigo-600 dark:text-indigo-200',
+			pending: 'text-foreground/50 dark:text-foreground/70',
+		};
+
+		return statusColors[status];
+	},
+
+	getSourceColor: (source: string): string => {
+		const sourceColors = {
+			web: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-800 dark:text-indigo-100',
+			academic:
+				'bg-peppermint-100 text-peppermint-800 dark:bg-peppermint-800 dark:text-peppermint-100',
+			analysis:
+				'bg-merino-100 text-merino-800 dark:bg-merino-800 dark:text-merino-100',
+			default: 'bg-muted text-muted-foreground',
+		};
+
+		return (
+			sourceColors[source as keyof typeof sourceColors] || sourceColors.default
+		);
+	},
+
+	getStepContainerStyle: (
+		step: ResearchStep,
+		visibleSteps: string[],
+	): string => {
+		return cn(
+			'rounded-lg border border-border/20 p-3',
+			'transition-all duration-300 ease-in-out',
+			!visibleSteps.includes(step.id) && 'hidden',
+			step.status === 'in-progress' &&
+				'-translate-y-1 translate-x-1 bg-accent/10 shadow-[-4px_4px_0_hsl(var(--border-color))]',
+			step.status === 'complete' && 'bg-background',
+		);
+	},
+
+	getStepIconStyle: (
+		status: 'complete' | 'in-progress' | 'pending',
+	): string => {
+		return cn(
+			'rounded-full p-2 transition-colors duration-300',
+			status === 'complete'
+				? 'bg-peppermint-100 text-peppermint-800 dark:bg-peppermint-800 dark:text-peppermint-100'
+				: status === 'in-progress'
+					? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200'
+					: 'bg-muted text-muted-foreground dark:bg-muted/80 dark:text-muted-foreground/90',
+		);
+	},
+
+	getResultContainerStyle: (isExpanded: boolean): string => {
+		return cn(
+			'rounded-lg border border-border/20 p-3 transition-all duration-200',
+			isExpanded ? 'bg-accent' : 'bg-background hover:bg-accent/10',
+		);
+	},
+};
+
+/**
+ * Research Card Component
+ * Displays research progress, steps, and results
+ */
 export function ResearchCard({
 	query,
 	triggerAnimation,
@@ -184,19 +303,24 @@ export function ResearchCard({
 	streamedData,
 	annotations,
 }: ResearchCardProps) {
+	// Context and state management
 	const {
 		data,
 		updateState,
 		onAbort: contextOnAbort,
 	} = useResearch(researchId);
-	const [isLoading, setIsLoading] = useState(!preserveData);
-	const [searchPhase, setSearchPhase] = useState<
-		'planning' | 'searching' | 'analyzing' | 'complete'
-	>(preserveData && data.completed ? 'complete' : 'planning');
+
+	// UI state
+	const [isCardExpanded, setIsCardExpanded] = useState(true);
+	const [expandedResult, setExpandedResult] = useState<string | null>(null);
+
+	// Research state (using derived state from context where possible)
+	const [searchPhase, setSearchPhase] = useState<ResearchPhase>(
+		preserveData && data.completed ? 'complete' : 'planning',
+	);
 	const [progress, setProgress] = useState(
 		preserveData && data.completed ? 100 : 0,
 	);
-	const [expandedResult, setExpandedResult] = useState<string | null>(null);
 	const [results, setResults] = useState<ResearchResult[]>(
 		preserveData && data.results.length > 0 ? data.results : [],
 	);
@@ -210,29 +334,38 @@ export function ResearchCard({
 	const [showResults, setShowResults] = useState(
 		preserveData && data.showResults,
 	);
-	const [isCardExpanded, setIsCardExpanded] = useState(true);
 	const [isCancelled, setIsCancelled] = useState(data.isCancelled || false);
 	const [toolCallId, setToolCallId] = useState<string | null>(
 		propToolCallId || data.toolCallId || null,
 	);
 
-	// Track the last streamed data to prevent unnecessary updates
-	const lastStreamedDataRef = useRef<any>(null);
-	// Track if the research is completed
+	// Refs
+	const bottomRef = useRef<HTMLDivElement>(null);
+	const lastStreamedDataRef = useRef<string | null>(null);
 	const isCompletedRef = useRef<boolean>(false);
 
-	// Ref for scrolling
-	const bottomRef = useRef<HTMLDivElement>(null);
+	// Memoized counts for badges
+	const resultCounts = useMemo(() => {
+		return {
+			total: results.length,
+			web: results.filter((r) => r.source === 'web').length,
+			academic: results.filter((r) => r.source === 'academic').length,
+			analysis: results.filter((r) => r.source === 'analysis').length,
+		};
+	}, [results]);
 
-	// Function to scroll to the bottom
-	const scrollToBottom = () => {
-		// Small delay to ensure DOM is updated before scrolling
+	/**
+	 * Scroll to the bottom of the component
+	 */
+	const scrollToBottom = useCallback(() => {
 		setTimeout(() => {
 			bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
 		}, 50);
-	};
+	}, []);
 
-	// Generate a unique toolCallId for this research instance if not already set
+	/**
+	 * Generate a unique toolCallId for this research instance if not already set
+	 */
 	useEffect(() => {
 		if (!toolCallId && triggerAnimation && !preserveData) {
 			const newToolCallId = `research-${researchId}-${Date.now()}`;
@@ -241,22 +374,22 @@ export function ResearchCard({
 		}
 	}, [triggerAnimation, preserveData, toolCallId, researchId, updateState]);
 
-	// Process annotations when they change
+	/**
+	 * Process annotations when they change
+	 */
 	useEffect(() => {
 		if (!annotations || annotations.length === 0 || isCancelled) return;
 
-		// Process research update annotations
+		// Filter annotations
 		const researchUpdates = annotations.filter(
 			(annotation) => annotation.type === 'research_update' && annotation.data,
 		);
 
 		if (researchUpdates.length === 0) return;
 
-		// Process the latest annotations
+		// Process each annotation
 		for (const annotation of researchUpdates) {
 			const data = annotation.data;
-
-			// Skip if no data
 			if (!data) continue;
 
 			// Update progress if available
@@ -271,7 +404,6 @@ export function ResearchCard({
 			if (data.status === 'completed') {
 				if (data.type === 'progress' && data.isComplete) {
 					setSearchPhase('complete');
-					setIsLoading(false);
 					isCompletedRef.current = true;
 				}
 			} else if (data.status === 'running') {
@@ -280,87 +412,14 @@ export function ResearchCard({
 					setSearchPhase('planning');
 				} else if (data.type === 'web' || data.type === 'academic') {
 					setSearchPhase('searching');
-				} else if (
-					data.type === 'analysis' ||
-					data.type === 'gaps' ||
-					data.type === 'synthesis'
-				) {
+				} else if (['analysis', 'gaps', 'synthesis'].includes(data.type)) {
 					setSearchPhase('analyzing');
 				}
 			}
 
-			// Update steps based on annotation data
+			// Update steps
 			if (data.type && data.title) {
-				// Find or create step
-				const stepId = data.type;
-				const existingStepIndex = steps.findIndex((step) => step.id === stepId);
-
-				// Create new step if it doesn't exist
-				if (existingStepIndex === -1) {
-					const newStep: ResearchStep = {
-						id: stepId,
-						title: data.title,
-						subtitle: data.message || '',
-						icon: getIconComponent(
-							data.type === 'web'
-								? 'Globe'
-								: data.type === 'academic'
-									? 'BookOpen'
-									: data.type === 'analysis'
-										? 'BarChart'
-										: 'Search',
-						),
-						status:
-							data.status === 'completed'
-								? 'complete'
-								: data.status === 'running'
-									? 'in-progress'
-									: 'pending',
-						expanded: data.status === 'running',
-					};
-
-					setSteps((prev) => [...prev, newStep]);
-
-					// Add to visible steps if not already there
-					if (!visibleSteps.includes(stepId)) {
-						setVisibleSteps((prev) => [...prev, stepId]);
-					}
-
-					// Set as active step if it's in progress
-					if (data.status === 'running') {
-						setActiveStep(stepId);
-					}
-				} else {
-					// Update existing step
-					const updatedSteps = [...steps];
-					updatedSteps[existingStepIndex] = {
-						...updatedSteps[existingStepIndex],
-						title: data.title,
-						subtitle: data.message || updatedSteps[existingStepIndex].subtitle,
-						status:
-							data.status === 'completed'
-								? 'complete'
-								: data.status === 'running'
-									? 'in-progress'
-									: 'pending',
-						expanded:
-							data.status === 'running'
-								? true
-								: updatedSteps[existingStepIndex].expanded,
-					};
-
-					setSteps(updatedSteps);
-
-					// Add to visible steps if not already there
-					if (!visibleSteps.includes(stepId)) {
-						setVisibleSteps((prev) => [...prev, stepId]);
-					}
-
-					// Set as active step if it's in progress
-					if (data.status === 'running') {
-						setActiveStep(stepId);
-					}
-				}
+				updateStepFromAnnotation(data);
 			}
 
 			// Update results if available
@@ -369,7 +428,6 @@ export function ResearchCard({
 				Array.isArray(data.results) &&
 				data.results.length > 0
 			) {
-				// Convert results to the expected format
 				const formattedResults: ResearchResult[] = data.results.map(
 					(result, index) => ({
 						id: result.id || `result-${index}`,
@@ -391,13 +449,12 @@ export function ResearchCard({
 				setShowResults(true);
 			}
 
-			// If we have findings, show results
+			// Process findings
 			if (
 				data.findings &&
 				Array.isArray(data.findings) &&
 				data.findings.length > 0
 			) {
-				// Convert findings to results format
 				const formattedResults: ResearchResult[] = data.findings.map(
 					(finding, index) => ({
 						id: `finding-${index}`,
@@ -434,48 +491,100 @@ export function ResearchCard({
 	}, [
 		annotations,
 		isCancelled,
-		steps,
-		visibleSteps,
 		searchPhase,
 		progress,
+		steps,
+		visibleSteps,
 		activeStep,
 		results,
 		showResults,
 		toolCallId,
 		updateState,
+		scrollToBottom,
 	]);
 
-	// Update the handleAbort function to pass toolCallId
-	const handleAbort = () => {
-		// Only allow cancellation if research is in progress
-		if (searchPhase !== 'complete' && !isCancelled) {
-			console.log('Aborting research with toolCallId:', toolCallId);
+	/**
+	 * Helper function to update steps from annotation data
+	 */
+	const updateStepFromAnnotation = useCallback(
+		(data: any) => {
+			const stepId = data.type;
+			const existingStepIndex = steps.findIndex((step) => step.id === stepId);
 
-			setIsCancelled(true);
-			updateState({ isCancelled: true });
-			setSearchPhase('complete');
-			setProgress(0);
-			setActiveStep(null);
+			if (existingStepIndex === -1) {
+				// Create new step
+				const newStep: ResearchStep = {
+					id: stepId,
+					title: data.title,
+					subtitle: data.message || '',
+					icon: getIconComponent(
+						data.type === 'web'
+							? 'Globe'
+							: data.type === 'academic'
+								? 'BookOpen'
+								: data.type === 'analysis'
+									? 'BarChart'
+									: 'Search',
+					),
+					status:
+						data.status === 'completed'
+							? 'complete'
+							: data.status === 'running'
+								? 'in-progress'
+								: 'pending',
+					expanded: data.status === 'running',
+				};
 
-			// Call the onAbort callback with this instance's toolCallId
-			if (onAbort) {
-				onAbort(toolCallId || undefined);
-			} else if (contextOnAbort) {
-				contextOnAbort(toolCallId || undefined);
+				setSteps((prev) => [...prev, newStep]);
+
+				// Add to visible steps if not already there
+				if (!visibleSteps.includes(stepId)) {
+					setVisibleSteps((prev) => [...prev, stepId]);
+				}
+
+				// Set as active step if it's in progress
+				if (data.status === 'running') {
+					setActiveStep(stepId);
+				}
+			} else {
+				// Update existing step
+				setSteps((prevSteps) => {
+					const updatedSteps = [...prevSteps];
+					updatedSteps[existingStepIndex] = {
+						...updatedSteps[existingStepIndex],
+						title: data.title,
+						subtitle: data.message || updatedSteps[existingStepIndex].subtitle,
+						status:
+							data.status === 'completed'
+								? 'complete'
+								: data.status === 'running'
+									? 'in-progress'
+									: 'pending',
+						expanded:
+							data.status === 'running'
+								? true
+								: updatedSteps[existingStepIndex].expanded,
+					};
+					return updatedSteps;
+				});
+
+				// Add to visible steps if not already there
+				if (!visibleSteps.includes(stepId)) {
+					setVisibleSteps((prev) => [...prev, stepId]);
+				}
+
+				// Set as active step if it's in progress
+				if (data.status === 'running') {
+					setActiveStep(stepId);
+				}
 			}
+		},
+		[steps, visibleSteps],
+	);
 
-			// Update all steps to show they were cancelled
-			setSteps((prev) =>
-				prev.map((step) =>
-					step.status === 'in-progress'
-						? { ...step, status: 'pending', expanded: false }
-						: step,
-				),
-			);
-		}
-	};
-
-	// Process streamed data and convert string icons to React components
+	/**
+	 * Process streamed data
+	 */
 	const processStreamedData = useCallback((data: any) => {
 		if (!data) return null;
 
@@ -504,7 +613,9 @@ export function ResearchCard({
 		return processed;
 	}, []);
 
-	// Update state when streamed data changes
+	/**
+	 * Update state when streamed data changes
+	 */
 	useEffect(() => {
 		if (!streamedData || isCancelled) return;
 
@@ -555,9 +666,8 @@ export function ResearchCard({
 		if (processedData.results) setResults(processedData.results);
 		if (processedData.showResults !== undefined)
 			setShowResults(processedData.showResults);
-		if (processedData.completed) setIsLoading(false);
 
-		// Update the context state (but don't trigger a re-render from this effect)
+		// Update the context state when research is completed
 		if (processedData.completed) {
 			updateState({
 				phase: processedData.phase || data.phase,
@@ -589,27 +699,27 @@ export function ResearchCard({
 		toolCallId,
 	]);
 
-	// Scroll to bottom when visible steps change
+	/**
+	 * Scroll to bottom when visible steps change
+	 */
 	useEffect(() => {
 		if (visibleSteps.length > 0) {
-			// First let the DOM update, then scroll
-			requestAnimationFrame(() => {
-				scrollToBottom();
-			});
+			requestAnimationFrame(scrollToBottom);
 		}
-	}, [visibleSteps]);
+	}, [visibleSteps, scrollToBottom]);
 
-	// Scroll to bottom when results appear
+	/**
+	 * Scroll to bottom when results appear
+	 */
 	useEffect(() => {
 		if (showResults) {
-			// First let the DOM update, then scroll
-			requestAnimationFrame(() => {
-				scrollToBottom();
-			});
+			requestAnimationFrame(scrollToBottom);
 		}
-	}, [showResults]);
+	}, [showResults, scrollToBottom]);
 
-	// When research is completed, ensure all visible steps are marked as complete
+	/**
+	 * When research is completed, ensure all visible steps are marked as complete
+	 */
 	useEffect(() => {
 		if (searchPhase === 'complete' && !isCancelled) {
 			setSteps((prevSteps) =>
@@ -622,74 +732,135 @@ export function ResearchCard({
 		}
 	}, [searchPhase, visibleSteps, isCancelled]);
 
-	const toggleResultExpansion = (id: string) => {
-		if (expandedResult === id) {
-			setExpandedResult(null);
-		} else {
-			setExpandedResult(id);
-			// First update the state, then scroll after DOM update
-			requestAnimationFrame(() => {
-				scrollToBottom();
+	/**
+	 * Toggle result expansion
+	 */
+	const toggleResultExpansion = useCallback(
+		(id: string) => {
+			setExpandedResult((prev) => {
+				const newValue = prev === id ? null : id;
+				if (newValue) {
+					// Schedule scroll after state update and DOM render
+					requestAnimationFrame(scrollToBottom);
+				}
+				return newValue;
 			});
-		}
-	};
+		},
+		[scrollToBottom],
+	);
 
-	const toggleStepExpansion = (id: string) => {
+	/**
+	 * Toggle step expansion
+	 */
+	const toggleStepExpansion = useCallback((id: string) => {
 		setSteps((prev) =>
 			prev.map((step) =>
 				step.id === id ? { ...step, expanded: !step.expanded } : step,
 			),
 		);
-		// Remove the scrollToBottom call here to prevent automatic scrolling when expanding steps
-	};
+	}, []);
 
-	const toggleCardExpansion = () => {
-		setIsCardExpanded(!isCardExpanded);
-	};
+	/**
+	 * Toggle card expansion
+	 */
+	const toggleCardExpansion = useCallback(() => {
+		setIsCardExpanded((prev) => !prev);
+	}, []);
 
-	// Improve the contrast of the phase text badge
-	const getPhaseText = () => {
-		if (isCancelled) {
-			return 'Research cancelled';
+	/**
+	 * Handle research cancellation
+	 */
+	const handleAbort = useCallback(() => {
+		if (searchPhase !== 'complete' && !isCancelled) {
+			console.log('Aborting research with toolCallId:', toolCallId);
+
+			setIsCancelled(true);
+			updateState({ isCancelled: true });
+			setSearchPhase('complete');
+			setProgress(0);
+			setActiveStep(null);
+
+			// Call the onAbort callback with this instance's toolCallId
+			if (onAbort) {
+				onAbort(toolCallId || undefined);
+			} else if (contextOnAbort) {
+				contextOnAbort(toolCallId || undefined);
+			}
+
+			// Update all steps to show they were cancelled
+			setSteps((prev) =>
+				prev.map((step) =>
+					step.status === 'in-progress'
+						? { ...step, status: 'pending', expanded: false }
+						: step,
+				),
+			);
 		}
+	}, [
+		searchPhase,
+		isCancelled,
+		toolCallId,
+		updateState,
+		onAbort,
+		contextOnAbort,
+	]);
 
-		switch (searchPhase) {
-			case 'planning':
-				return 'Planning research';
-			case 'searching':
-				return 'Searching sources';
-			case 'analyzing':
-				return 'Analyzing results';
-			case 'complete':
-				return 'Research complete';
-		}
-	};
-
-	// Improve the status color contrast in dark mode
-	const getStatusColor = (status: 'complete' | 'in-progress' | 'pending') => {
-		switch (status) {
-			case 'complete':
-				return 'text-peppermint-600 dark:text-peppermint-300';
-			case 'in-progress':
-				return 'text-indigo-600 dark:text-indigo-200'; // Improved contrast for dark mode
-			case 'pending':
-				return 'text-foreground/50 dark:text-foreground/70';
-		}
-	};
-
-	// Improve the source color contrast in dark mode
-	const getSourceColor = (source: string) => {
-		switch (source) {
-			case 'web':
-				return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-800 dark:text-indigo-100';
-			case 'academic':
-				return 'bg-peppermint-100 text-peppermint-800 dark:bg-peppermint-800 dark:text-peppermint-100';
-			case 'analysis':
-				return 'bg-merino-100 text-merino-800 dark:bg-merino-800 dark:text-merino-100';
-			default:
-				return 'bg-muted text-muted-foreground';
-		}
-	};
+	/**
+	 * Render step content based on step type
+	 */
+	const renderStepContent = useCallback(
+		(stepId: string) => {
+			switch (stepId) {
+				case 'plan':
+					return (
+						<>
+							<p>Research plan for "{query}":</p>
+							<ul className="list-disc space-y-1 pl-5">
+								<li>Query Go documentation for concurrency patterns</li>
+								<li>Search academic papers on CSP implementation in Go</li>
+								<li>Analyze common usage patterns in open source projects</li>
+								<li>Compare with other language concurrency models</li>
+							</ul>
+						</>
+					);
+				case 'web':
+					return (
+						<>
+							<p>Web search results:</p>
+							<ul className="list-disc space-y-1 pl-5">
+								<li>Go Blog: Concurrency Patterns</li>
+								<li>GitHub: Go Concurrency Examples</li>
+								<li>Medium: Advanced Go Concurrency</li>
+							</ul>
+						</>
+					);
+				case 'academic':
+					return (
+						<>
+							<p>Academic sources:</p>
+							<ul className="list-disc space-y-1 pl-5">
+								<li>Paper: "Effective Go Concurrency Patterns"</li>
+								<li>Research: "CSP vs Actor Model in Modern Languages"</li>
+							</ul>
+						</>
+					);
+				case 'analysis':
+					return (
+						<>
+							<p>Analysis findings:</p>
+							<ul className="list-disc space-y-1 pl-5">
+								<li>Worker pools are the most common pattern</li>
+								<li>Context package is underutilized for cancellation</li>
+								<li>Error handling in concurrent code needs improvement</li>
+							</ul>
+						</>
+					);
+				default:
+					return null;
+			}
+		},
+		[query],
+	);
 
 	return (
 		<div className="mt-4 space-y-4">
@@ -725,14 +896,10 @@ export function ResearchCard({
 						<div
 							className={cn(
 								'rounded-full px-3 py-1 text-sm font-medium',
-								isCancelled
-									? 'bg-destructive/10 text-destructive dark:bg-destructive/20 dark:text-destructive-foreground'
-									: searchPhase === 'complete'
-										? 'bg-peppermint-100 text-peppermint-800 dark:bg-peppermint-800 dark:text-peppermint-100'
-										: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-800 dark:text-indigo-100',
+								styleUtils.getPhaseBadgeStyle(searchPhase, isCancelled),
 							)}
 						>
-							{getPhaseText()}
+							{styleUtils.getPhaseText(searchPhase, isCancelled)}
 						</div>
 
 						{/* Cancel button - only show when research is in progress */}
@@ -768,17 +935,10 @@ export function ResearchCard({
 					</div>
 
 					<div className="space-y-3">
-						{steps.map((step, index) => (
+						{steps.map((step) => (
 							<div
 								key={step.id}
-								className={cn(
-									'rounded-lg border border-border/20 p-3',
-									'transition-all duration-300 ease-in-out',
-									!visibleSteps.includes(step.id) && 'hidden',
-									step.status === 'in-progress' &&
-										'-translate-y-1 translate-x-1 bg-accent/10 shadow-[-4px_4px_0_hsl(var(--border-color))]',
-									step.status === 'complete' && 'bg-background',
-								)}
+								className={styleUtils.getStepContainerStyle(step, visibleSteps)}
 								style={{
 									transitionProperty: 'transform, box-shadow, background-color',
 									transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
@@ -789,16 +949,7 @@ export function ResearchCard({
 									onClick={() => toggleStepExpansion(step.id)}
 								>
 									<div className="flex items-start gap-3">
-										<div
-											className={cn(
-												'rounded-full p-2 transition-colors duration-300',
-												step.status === 'complete'
-													? 'bg-peppermint-100 text-peppermint-800 dark:bg-peppermint-800 dark:text-peppermint-100'
-													: step.status === 'in-progress'
-														? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200' // Improved contrast for dark mode
-														: 'bg-muted text-muted-foreground dark:bg-muted/80 dark:text-muted-foreground/90',
-											)}
-										>
+										<div className={styleUtils.getStepIconStyle(step.status)}>
 											{step.status === 'in-progress' ? (
 												<div className="animate-spin">
 													<Loader2 className="h-5 w-5" />
@@ -811,7 +962,7 @@ export function ResearchCard({
 											<h3
 												className={cn(
 													'font-medium',
-													getStatusColor(step.status),
+													styleUtils.getStatusColor(step.status),
 												)}
 											>
 												{step.title}
@@ -832,61 +983,7 @@ export function ResearchCard({
 
 								{step.expanded && (
 									<div className="mt-3 space-y-2 pl-12 text-sm text-foreground/90 animate-in fade-in-50 dark:text-foreground/90">
-										{step.id === 'plan' && (
-											<>
-												<p>Research plan for "{query}":</p>
-												<ul className="list-disc space-y-1 pl-5">
-													<li>
-														Query Go documentation for concurrency patterns
-													</li>
-													<li>
-														Search academic papers on CSP implementation in Go
-													</li>
-													<li>
-														Analyze common usage patterns in open source
-														projects
-													</li>
-													<li>
-														Compare with other language concurrency models
-													</li>
-												</ul>
-											</>
-										)}
-										{step.id === 'web' && (
-											<>
-												<p>Web search results:</p>
-												<ul className="list-disc space-y-1 pl-5">
-													<li>Go Blog: Concurrency Patterns</li>
-													<li>GitHub: Go Concurrency Examples</li>
-													<li>Medium: Advanced Go Concurrency</li>
-												</ul>
-											</>
-										)}
-										{step.id === 'academic' && (
-											<>
-												<p>Academic sources:</p>
-												<ul className="list-disc space-y-1 pl-5">
-													<li>Paper: "Effective Go Concurrency Patterns"</li>
-													<li>
-														Research: "CSP vs Actor Model in Modern Languages"
-													</li>
-												</ul>
-											</>
-										)}
-										{step.id === 'analysis' && (
-											<>
-												<p>Analysis findings:</p>
-												<ul className="list-disc space-y-1 pl-5">
-													<li>Worker pools are the most common pattern</li>
-													<li>
-														Context package is underutilized for cancellation
-													</li>
-													<li>
-														Error handling in concurrent code needs improvement
-													</li>
-												</ul>
-											</>
-										)}
+										{renderStepContent(step.id)}
 									</div>
 								)}
 							</div>
@@ -917,12 +1014,10 @@ export function ResearchCard({
 							>
 								Complete
 							</Badge>
-							{showResults && (
-								<FeedbackButtons
-									messageId={`research-${researchId}`}
-									source="research"
-								/>
-							)}
+							<FeedbackButtons
+								messageId={`research-${researchId}`}
+								source="research"
+							/>
 						</div>
 					</CardHeader>
 
@@ -933,28 +1028,27 @@ export function ResearchCard({
 									variant="outline"
 									className="bg-background text-foreground/70 hover:bg-accent"
 								>
-									{results.length} results
+									{resultCounts.total} results
 								</Badge>
 								<Badge
 									variant="outline"
 									className="bg-indigo-100/50 text-indigo-800 hover:bg-indigo-100 dark:bg-indigo-800/50 dark:text-indigo-100 dark:hover:bg-indigo-700"
 								>
-									<Globe className="mr-1 h-3 w-3" /> Web:{' '}
-									{results.filter((r) => r.source === 'web').length}
+									<Globe className="mr-1 h-3 w-3" /> Web: {resultCounts.web}
 								</Badge>
 								<Badge
 									variant="outline"
 									className="bg-peppermint-100/50 text-peppermint-800 hover:bg-peppermint-100 dark:bg-peppermint-800/50 dark:text-peppermint-100 dark:hover:bg-peppermint-700"
 								>
 									<BookOpen className="mr-1 h-3 w-3" /> Academic:{' '}
-									{results.filter((r) => r.source === 'academic').length}
+									{resultCounts.academic}
 								</Badge>
 								<Badge
 									variant="outline"
 									className="bg-merino-100/50 text-merino-800 hover:bg-merino-100 dark:bg-merino-800/50 dark:text-merino-100 dark:hover:bg-merino-700"
 								>
 									<BarChart className="mr-1 h-3 w-3" /> Analysis:{' '}
-									{results.filter((r) => r.source === 'analysis').length}
+									{resultCounts.analysis}
 								</Badge>
 							</div>
 
@@ -962,11 +1056,8 @@ export function ResearchCard({
 								{results.map((result) => (
 									<div
 										key={result.id}
-										className={cn(
-											'rounded-lg border border-border/20 p-3 transition-all duration-200',
-											expandedResult === result.id
-												? 'bg-accent'
-												: 'bg-background hover:bg-accent/10',
+										className={styleUtils.getResultContainerStyle(
+											expandedResult === result.id,
 										)}
 									>
 										<div
@@ -977,7 +1068,7 @@ export function ResearchCard({
 												<div
 													className={cn(
 														'rounded-md p-2',
-														getSourceColor(result.source),
+														styleUtils.getSourceColor(result.source),
 													)}
 												>
 													{result.sourceIcon}
