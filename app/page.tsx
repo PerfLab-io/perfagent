@@ -42,7 +42,7 @@ export default function LandingPage() {
       </section>
 
       {/* Features section */}
-      <section id="features" className="py-20 bg-accent/30">
+      <section id="features" className="py-20">
         <LandingBanner />
       </section>
 

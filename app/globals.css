@@ -5,47 +5,45 @@
 @layer base {
   :root {
     /* Peppermint palette */
-    --peppermint-25: #f8fef8;
-    --peppermint-50: #f3fcf3;
-    --peppermint-100: #e9fbea;
-    --peppermint-200: #cbf0d0;
-    --peppermint-300: #9ce2ad;
-    --peppermint-400: #67cb87;
-    --peppermint-500: #3cb46c;
-    --peppermint-600: #2d9561;
-    --peppermint-700: #277756;
-    --peppermint-800: #255f4b;
-    --peppermint-900: #214f44;
-    --peppermint-950: #0d312d;
+    --peppermint-50: 120 65% 97%;
+    --peppermint-100: 123 71% 95%;
+    --peppermint-200: 122 66% 85%;
+    --peppermint-300: 124 65% 73%;
+    --peppermint-400: 124 59% 58%;
+    --peppermint-500: 124 60% 45%;
+    --peppermint-600: 125 64% 36%;
+    --peppermint-700: 125 61% 29%;
+    --peppermint-800: 124 54% 24%;
+    --peppermint-900: 126 51% 20%;
+    --peppermint-950: 129 69% 10%;
 
     /* Merino palette */
-    --merino-50: #f7f2ea;
-    --merino-100: #f3ece1;
-    --merino-200: #e7d7c1;
-    --merino-300: #d7bd9a;
-    --merino-400: #c69c71;
-    --merino-500: #ba8455;
-    --merino-600: #ad7149;
-    --merino-700: #905b3e;
-    --merino-800: #744b38;
-    --merino-900: #5f3e2f;
-    --merino-950: #321f18;
+    --merino-50: 37 45% 94%;
+    --merino-100: 37 43% 92%;
+    --merino-200: 35 44% 83%;
+    --merino-300: 34 43% 72%;
+    --merino-400: 30 43% 61%;
+    --merino-500: 28 42% 53%;
+    --merino-600: 24 41% 48%;
+    --merino-700: 21 40% 40%;
+    --merino-800: 19 35% 34%;
+    --merino-900: 19 34% 28%;
+    --merino-950: 16 35% 15%;
 
     /* Midnight palette */
-    --midnight-50: #eef6ff;
-    --midnight-100: #dfefff;
-    --midnight-200: #c6e0ff;
-    --midnight-300: #a3cafe;
-    --midnight-400: #7eaafb;
-    --midnight-500: #6089f4;
-    --midnight-600: #4263e9;
-    --midnight-700: #3551cd;
-    --midnight-800: #2d44a6;
-    --midnight-900: #2c3f83;
-    --midnight-950: #10162f;
 
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Midnight palette */
+    --midnight-50: 212 100% 97%;
+    --midnight-100: 210 100% 94%;
+    --midnight-200: 213 100% 89%;
+    --midnight-300: 214 98% 82%;
+    --midnight-400: 219 94% 74%;
+    --midnight-500: 223 87% 67%;
+    --midnight-600: 228 79% 59%;
+    --midnight-700: 229 60% 51%;
+    --midnight-800: 229 57% 41%;
+    --midnight-900: 227 50% 34%;
+    --midnight-950: 228 49% 12%;
 
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
@@ -76,9 +74,6 @@
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
     --card: 222.2 84% 4.9%;
     --card-foreground: 210 40% 98%;
 
@@ -124,7 +119,7 @@
   /* Use merino-200 for accent */
   --accent-color: var(--merino-200);
   /* Use white for card background */
-  --card-bg: white;
+  --card-bg: 0 0% 100%;
   /* Use midnight-950 for border */
   --border-color: var(--midnight-950);
 }
