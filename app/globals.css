@@ -137,3 +137,122 @@
   /* Use merino-200 for border (light tan) */
   --border-color: var(--merino-200);
 }
+
+/* Add these keyframe animations to the existing globals.css file */
+
+@keyframes bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes pulse-border {
+  0%,
+  100% {
+    border-color: var(--peppermint-300);
+  }
+  50% {
+    border-color: var(--peppermint-500);
+  }
+}
+
+@keyframes zoom-in-out {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+@keyframes spin-slow {
+  0% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-15deg);
+  }
+  75% {
+    transform: rotate(15deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+/* Add these to the existing animations in the file */
+.animate-bounce {
+  animation: bounce 1s infinite ease-in-out;
+}
+
+.animate-pulse-border {
+  animation: pulse-border 2s infinite ease-in-out;
+}
+
+.animate-zoom-in-out {
+  animation: zoom-in-out 2s infinite ease-in-out;
+}
+
+.animate-spin-slow {
+  animation: spin-slow 1.5s infinite ease-in-out;
+}
+
+/* Remove the container query section and replace with this */
+@media (max-width: 640px) {
+  .report-button-text {
+    display: none;
+  }
+
+  .report-button-icon-only {
+    padding: 0.5rem;
+    height: 2rem;
+  }
+}
+
+/* Report button responsive behavior */
+.report-button {
+  transition: all 0.3s ease;
+}
+
+.report-button-text {
+  transition: all 0.3s ease;
+  flex-shrink: 1;
+}
+
+/* When the panel is active (showing the report), hide the button text */
+.panel-active .report-button-text {
+  max-width: 0;
+  opacity: 0;
+  margin: 0;
+  padding: 0;
+}
+
+/* When the panel is active, adjust the button to be more compact */
+.panel-active .report-button {
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+  min-width: 32px;
+  gap: 0.25rem;
+}
+
+/* Media query for small screens */
+@media (max-width: 768px) {
+  .report-button-text {
+    max-width: 0;
+    opacity: 0;
+    margin: 0;
+    padding: 0;
+  }
+
+  .report-button {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    min-width: 32px;
+    gap: 0.25rem;
+  }
+}
