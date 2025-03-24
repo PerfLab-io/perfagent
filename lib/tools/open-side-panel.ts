@@ -1,4 +1,4 @@
-import { registerTool } from "../mock-ai-sdk"
+import { registerTool } from "../mock-ai-sdk";
 
 export const openSidePanelTool = registerTool({
   name: "openSidePanel",
@@ -13,7 +13,6 @@ export const openSidePanelTool = registerTool({
         // For now, we'll just return a simple indicator
         showPanel: true,
       },
-    }
+    };
   },
-})
-
+});

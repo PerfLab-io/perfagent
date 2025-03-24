@@ -1,5 +1,5 @@
-import { registerTool } from "../mock-ai-sdk"
-import { getAnimationUrlForTopic } from "../utils/gif-generator"
+import { registerTool } from "../mock-ai-sdk";
+import { getAnimationUrlForTopic } from "../utils/gif-generator";
 
 // Mock report content based on topics
 const reportContent = {
@@ -332,7 +332,7 @@ func validateAge(age int) error {
       },
     ],
   },
-}
+};
 
 // Update the generateReportTool to support streaming
 export const generateReportTool = registerTool({
@@ -340,18 +340,21 @@ export const generateReportTool = registerTool({
   description: "Generates a comprehensive report on a Go programming topic",
   execute: async (params: { query: string }) => {
     // Ensure params is an object and query is a string
-    const safeParams = params || {}
-    const query = typeof safeParams.query === "string" ? safeParams.query.toLowerCase() : ""
+    const safeParams = params || {};
+    const query =
+      typeof safeParams.query === "string"
+        ? safeParams.query.toLowerCase()
+        : "";
 
-    console.log("Generate report query:", query)
+    console.log("Generate report query:", query);
 
     // Determine which report to generate based on the query
-    let reportType = "go-overview"
+    let reportType = "go-overview";
 
     if (query.includes("concurrency")) {
-      reportType = "concurrency"
+      reportType = "concurrency";
     } else if (query.includes("error handling")) {
-      reportType = "error-handling"
+      reportType = "error-handling";
     }
 
     // Return the complete report data
@@ -359,28 +362,36 @@ export const generateReportTool = registerTool({
       type: "report",
       reportType,
       reportData: reportContent[reportType as keyof typeof reportContent],
-    }
+    };
   },
   // Add streaming support
-  stream: async function* (params: { query: string; toolCallId?: string }, dataStream?: any) {
+  stream: async function* (
+    params: { query: string; toolCallId?: string },
+    dataStream?: any,
+  ) {
     // Ensure params is an object and query is a string
-    const safeParams = params || {}
-    const query = typeof safeParams.query === "string" ? safeParams.query.toLowerCase() : ""
+    const safeParams = params || {};
+    const query =
+      typeof safeParams.query === "string"
+        ? safeParams.query.toLowerCase()
+        : "";
 
     // Generate a unique toolCallId if not provided
-    const toolCallId = params.toolCallId || `report-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
+    const toolCallId =
+      params.toolCallId ||
+      `report-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
     // Determine which report to generate based on the query
-    let reportType = "go-overview"
+    let reportType = "go-overview";
 
     if (query.includes("concurrency")) {
-      reportType = "concurrency"
+      reportType = "concurrency";
     } else if (query.includes("error handling")) {
-      reportType = "error-handling"
+      reportType = "error-handling";
     }
 
     // Get the report content
-    const report = reportContent[reportType as keyof typeof reportContent]
+    const report = reportContent[reportType as keyof typeof reportContent];
 
     // First yield just the title to show something immediately
     yield {
@@ -391,16 +402,18 @@ export const generateReportTool = registerTool({
         sections: [],
       },
       toolCallId,
-    }
+    };
 
     // Then stream each section with a delay
-    let currentSections = []
+    let currentSections = [];
     for (let i = 0; i < report.sections.length; i++) {
       // Add a delay to simulate streaming
-      await new Promise((resolve) => setTimeout(resolve, 1000 + Math.random() * 1000))
+      await new Promise((resolve) =>
+        setTimeout(resolve, 1000 + Math.random() * 1000),
+      );
 
       // Add this section to our current sections
-      currentSections = [...currentSections, report.sections[i]]
+      currentSections = [...currentSections, report.sections[i]];
 
       // Yield the report with sections up to this point
       yield {
@@ -411,8 +424,7 @@ export const generateReportTool = registerTool({
           sections: currentSections,
         },
         toolCallId,
-      }
+      };
     }
   },
-})
-
+});

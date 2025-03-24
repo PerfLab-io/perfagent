@@ -1,5 +1,5 @@
-import { registerTool } from "../mock-ai-sdk"
-import type { DataStream } from "../mock-ai-sdk"
+import { registerTool } from "../mock-ai-sdk";
+import type { DataStream } from "../mock-ai-sdk";
 
 export const generateBreakdownTool = registerTool({
   name: "generateBreakdown",
@@ -10,16 +10,21 @@ export const generateBreakdownTool = registerTool({
       beginner: 8,
       intermediate: 5,
       advanced: 3,
-    }
+    };
 
     return {
       type: "breakdown",
       data: courseData,
-    }
+    };
   },
   // Add streaming support similar to the research tool
-  stream: async function* (params: { query: string; toolCallId?: string }, dataStream?: DataStream) {
-    const toolCallId = params.toolCallId || `breakdown-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
+  stream: async function* (
+    params: { query: string; toolCallId?: string },
+    dataStream?: DataStream,
+  ) {
+    const toolCallId =
+      params.toolCallId ||
+      `breakdown-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
     // Send initial annotation
     if (dataStream?.writeMessageAnnotation) {
@@ -34,11 +39,11 @@ export const generateBreakdownTool = registerTool({
           timestamp: Date.now(),
           progress: 0,
         },
-      })
+      });
     }
 
     // Increase initial processing time to 3 seconds for better testing
-    await new Promise((resolve) => setTimeout(resolve, 3000))
+    await new Promise((resolve) => setTimeout(resolve, 3000));
 
     // Send progress update
     if (dataStream?.writeMessageAnnotation) {
@@ -52,11 +57,11 @@ export const generateBreakdownTool = registerTool({
           timestamp: Date.now(),
           progress: 25,
         },
-      })
+      });
     }
 
     // Add another delay and progress update at 50%
-    await new Promise((resolve) => setTimeout(resolve, 2500))
+    await new Promise((resolve) => setTimeout(resolve, 2500));
 
     if (dataStream?.writeMessageAnnotation) {
       dataStream.writeMessageAnnotation({
@@ -69,11 +74,11 @@ export const generateBreakdownTool = registerTool({
           timestamp: Date.now(),
           progress: 50,
         },
-      })
+      });
     }
 
     // Add another delay and progress update at 75%
-    await new Promise((resolve) => setTimeout(resolve, 2500))
+    await new Promise((resolve) => setTimeout(resolve, 2500));
 
     if (dataStream?.writeMessageAnnotation) {
       dataStream.writeMessageAnnotation({
@@ -86,18 +91,18 @@ export const generateBreakdownTool = registerTool({
           timestamp: Date.now(),
           progress: 75,
         },
-      })
+      });
     }
 
     // Final delay before completion
-    await new Promise((resolve) => setTimeout(resolve, 2500))
+    await new Promise((resolve) => setTimeout(resolve, 2500));
 
     // Mock data for Go course breakdown
     const courseData = {
       beginner: 8,
       intermediate: 5,
       advanced: 3,
-    }
+    };
 
     // Send completion annotation
     if (dataStream?.writeMessageAnnotation) {
@@ -112,7 +117,7 @@ export const generateBreakdownTool = registerTool({
           progress: 100,
           isComplete: true,
         },
-      })
+      });
     }
 
     // Return the final result
@@ -120,7 +125,6 @@ export const generateBreakdownTool = registerTool({
       type: "breakdown",
       data: courseData,
       toolCallId,
-    }
+    };
   },
-})
-
+});

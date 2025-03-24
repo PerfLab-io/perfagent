@@ -1,5 +1,5 @@
-import { registerTool } from "../mock-ai-sdk"
-import type { DataStream } from "../mock-ai-sdk"
+import { registerTool } from "../mock-ai-sdk";
+import type { DataStream } from "../mock-ai-sdk";
 
 // Mock research results for Go concurrency patterns
 const mockResults = [
@@ -46,7 +46,7 @@ const mockResults = [
     source: "web",
     sourceIcon: "Globe",
   },
-]
+];
 
 // Define the research steps
 const initialSteps = (query: string) => [
@@ -78,7 +78,7 @@ const initialSteps = (query: string) => [
     icon: "BarChart",
     status: "pending",
   },
-]
+];
 
 // Define the research phases
 const researchPhases = [
@@ -168,7 +168,7 @@ const researchPhases = [
     visibleSteps: ["plan", "web", "academic", "analysis"],
     showResults: true,
   },
-]
+];
 
 export const performResearchTool = registerTool({
   name: "performResearch",
@@ -177,7 +177,7 @@ export const performResearchTool = registerTool({
     // Determine the research query
     const researchQuery = params.query.toLowerCase().includes("concurrency")
       ? "concurrency patterns in Go"
-      : "Go programming concepts"
+      : "Go programming concepts";
 
     // Create the initial research state
     const initialState = {
@@ -192,23 +192,28 @@ export const performResearchTool = registerTool({
       showResults: false,
       completed: false,
       toolCallId: params.toolCallId || null,
-    }
+    };
 
     // Return the initial state immediately
     return {
       ...initialState,
       streamSteps: true, // Signal that this result will be streamed in steps
-    }
+    };
   },
   // Update the stream method to handle dataStream for annotations
-  stream: async function* (params: { query: string; toolCallId?: string }, dataStream?: DataStream) {
+  stream: async function* (
+    params: { query: string; toolCallId?: string },
+    dataStream?: DataStream,
+  ) {
     const researchQuery = params.query.toLowerCase().includes("concurrency")
       ? "concurrency patterns in Go"
-      : "Go programming concepts"
+      : "Go programming concepts";
 
     // Initial state
-    const steps = initialSteps(researchQuery)
-    const toolCallId = params.toolCallId || `research-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
+    const steps = initialSteps(researchQuery);
+    const toolCallId =
+      params.toolCallId ||
+      `research-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
     // Send initial research update annotation
     if (dataStream?.writeMessageAnnotation) {
@@ -222,29 +227,31 @@ export const performResearchTool = registerTool({
           message: "Starting research analysis...",
           timestamp: Date.now(),
         },
-      })
+      });
     }
 
     // Yield each phase with a delay
     for (let i = 0; i < researchPhases.length; i++) {
-      const phase = researchPhases[i]
+      const phase = researchPhases[i];
 
       // Wait before sending the next phase (simulating research time)
-      await new Promise((resolve) => setTimeout(resolve, i === 0 ? 1000 : 1500))
+      await new Promise((resolve) =>
+        setTimeout(resolve, i === 0 ? 1000 : 1500),
+      );
 
       // Update steps based on the current phase
-      const updatedSteps = [...steps]
+      const updatedSteps = [...steps];
       phase.steps.forEach((stepUpdate) => {
-        const index = updatedSteps.findIndex((s) => s.id === stepUpdate.id)
+        const index = updatedSteps.findIndex((s) => s.id === stepUpdate.id);
         if (index !== -1) {
           updatedSteps[index] = {
             ...updatedSteps[index],
             status: stepUpdate.status,
             expanded: stepUpdate.expanded,
             subtitle: stepUpdate.subtitle || updatedSteps[index].subtitle,
-          }
+          };
         }
-      })
+      });
 
       // Create the research state for this phase
       const researchState = {
@@ -259,7 +266,7 @@ export const performResearchTool = registerTool({
         showResults: !!phase.showResults,
         completed: i === researchPhases.length - 1,
         toolCallId: toolCallId,
-      }
+      };
 
       // Send research update annotation
       if (dataStream?.writeMessageAnnotation) {
@@ -281,7 +288,7 @@ export const performResearchTool = registerTool({
             totalSteps: researchPhases.length,
             overwrite: true,
           },
-        })
+        });
 
         // If this is the final phase, send a completed status
         if (i === researchPhases.length - 1) {
@@ -298,13 +305,12 @@ export const performResearchTool = registerTool({
               timestamp: Date.now(),
             },
             overwrite: true,
-          })
+          });
         }
       }
 
       // Yield the updated research state
-      yield researchState
+      yield researchState;
     }
   },
-})
-
+});

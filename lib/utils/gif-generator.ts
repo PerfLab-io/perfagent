@@ -20,10 +20,9 @@ export function getAnimationUrlForTopic(topic: string): string {
       "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image%20%282%29.jpg-XR4hQMGf76MbljfHkqY9rFzQ7qCGj1.jpeg",
       "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image%20%281%29.jpg-Pz4QxdhLrFAVy9nqI9pErtlFMPMw73.jpeg",
     ],
-  }
+  };
 
   // Return the first image URL for the topic, or a default if not found
-  const images = topicImageMap[topic] || topicImageMap["go-overview"]
-  return images[0] // In a real implementation, this would be a GIF URL
+  const images = topicImageMap[topic] || topicImageMap["go-overview"];
+  return images[0]; // In a real implementation, this would be a GIF URL
 }
-
