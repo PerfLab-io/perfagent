@@ -3,256 +3,256 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
-    /* Peppermint palette */
-    --peppermint-50: 120 65% 97%;
-    --peppermint-100: 123 71% 95%;
-    --peppermint-200: 122 66% 85%;
-    --peppermint-300: 124 65% 73%;
-    --peppermint-400: 124 59% 58%;
-    --peppermint-500: 124 60% 45%;
-    --peppermint-600: 125 64% 36%;
-    --peppermint-700: 125 61% 29%;
-    --peppermint-800: 124 54% 24%;
-    --peppermint-900: 126 51% 20%;
-    --peppermint-950: 129 69% 10%;
+	:root {
+		/* Peppermint palette */
+		--peppermint-50: 120 65% 97%;
+		--peppermint-100: 123 71% 95%;
+		--peppermint-200: 122 66% 85%;
+		--peppermint-300: 124 65% 73%;
+		--peppermint-400: 124 59% 58%;
+		--peppermint-500: 124 60% 45%;
+		--peppermint-600: 125 64% 36%;
+		--peppermint-700: 125 61% 29%;
+		--peppermint-800: 124 54% 24%;
+		--peppermint-900: 126 51% 20%;
+		--peppermint-950: 129 69% 10%;
 
-    /* Merino palette */
-    --merino-50: 37 45% 94%;
-    --merino-100: 37 43% 92%;
-    --merino-200: 35 44% 83%;
-    --merino-300: 34 43% 72%;
-    --merino-400: 30 43% 61%;
-    --merino-500: 28 42% 53%;
-    --merino-600: 24 41% 48%;
-    --merino-700: 21 40% 40%;
-    --merino-800: 19 35% 34%;
-    --merino-900: 19 34% 28%;
-    --merino-950: 16 35% 15%;
+		/* Merino palette */
+		--merino-50: 37 45% 94%;
+		--merino-100: 37 43% 92%;
+		--merino-200: 35 44% 83%;
+		--merino-300: 34 43% 72%;
+		--merino-400: 30 43% 61%;
+		--merino-500: 28 42% 53%;
+		--merino-600: 24 41% 48%;
+		--merino-700: 21 40% 40%;
+		--merino-800: 19 35% 34%;
+		--merino-900: 19 34% 28%;
+		--merino-950: 16 35% 15%;
 
-    /* Midnight palette */
+		/* Midnight palette */
 
-    /* Midnight palette */
-    --midnight-50: 212 100% 97%;
-    --midnight-100: 210 100% 94%;
-    --midnight-200: 213 100% 89%;
-    --midnight-300: 214 98% 82%;
-    --midnight-400: 219 94% 74%;
-    --midnight-500: 223 87% 67%;
-    --midnight-600: 228 79% 59%;
-    --midnight-700: 229 60% 51%;
-    --midnight-800: 229 57% 41%;
-    --midnight-900: 227 50% 34%;
-    --midnight-950: 228 49% 12%;
+		/* Midnight palette */
+		--midnight-50: 212 100% 97%;
+		--midnight-100: 210 100% 94%;
+		--midnight-200: 213 100% 89%;
+		--midnight-300: 214 98% 82%;
+		--midnight-400: 219 94% 74%;
+		--midnight-500: 223 87% 67%;
+		--midnight-600: 228 79% 59%;
+		--midnight-700: 229 60% 51%;
+		--midnight-800: 229 57% 41%;
+		--midnight-900: 227 50% 34%;
+		--midnight-950: 228 49% 12%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+		--card: 0 0% 100%;
+		--card-foreground: 222.2 84% 4.9%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+		--popover: 0 0% 100%;
+		--popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+		--primary: 222.2 47.4% 11.2%;
+		--primary-foreground: 210 40% 98%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+		--secondary: 210 40% 96.1%;
+		--secondary-foreground: 222.2 47.4% 11.2%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+		--muted: 210 40% 96.1%;
+		--muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+		--accent: 210 40% 96.1%;
+		--accent-foreground: 222.2 47.4% 11.2%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+		--destructive: 0 84.2% 60.2%;
+		--destructive-foreground: 210 40% 98%;
 
-    --border: var(--midnight-950);
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+		--border: var(--midnight-950);
+		--input: 214.3 31.8% 91.4%;
+		--ring: 222.2 84% 4.9%;
 
-    --radius: 0.5rem;
-  }
+		--radius: 0.5rem;
+	}
 
-  .dark {
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+	.dark {
+		--card: 222.2 84% 4.9%;
+		--card-foreground: 210 40% 98%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+		--popover: 222.2 84% 4.9%;
+		--popover-foreground: 210 40% 98%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+		--primary: 210 40% 98%;
+		--primary-foreground: 222.2 47.4% 11.2%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+		--secondary: 217.2 32.6% 17.5%;
+		--secondary-foreground: 210 40% 98%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+		--muted: 217.2 32.6% 17.5%;
+		--muted-foreground: 215 20.2% 65.1%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+		--accent: 217.2 32.6% 17.5%;
+		--accent-foreground: 210 40% 98%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+		--destructive: 0 62.8% 30.6%;
+		--destructive-foreground: 210 40% 98%;
 
-    --border: var(--merino-200);
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-  }
+		--border: var(--merino-200);
+		--input: 217.2 32.6% 17.5%;
+		--ring: 212.7 26.8% 83.9%;
+	}
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
+	* {
+		@apply border-border;
+	}
+	body {
+		@apply bg-background text-foreground;
+	}
 }
 
 /* Light mode */
 :root {
-  /* Use peppermint-25 for background */
-  --bg-color: var(--peppermint-50);
-  /* Use midnight-950 for text */
-  --text-color: var(--midnight-950);
-  /* Use merino-200 for accent */
-  --accent-color: var(--merino-200);
-  /* Use white for card background */
-  --card-bg: 0 0% 100%;
-  /* Use midnight-950 for border */
-  --border-color: var(--midnight-950);
+	/* Use peppermint-25 for background */
+	--bg-color: var(--peppermint-50);
+	/* Use midnight-950 for text */
+	--text-color: var(--midnight-950);
+	/* Use merino-200 for accent */
+	--accent-color: var(--merino-200);
+	/* Use white for card background */
+	--card-bg: 0 0% 100%;
+	/* Use midnight-950 for border */
+	--border-color: var(--midnight-950);
 }
 
 /* Dark mode */
 .dark {
-  /* Use peppermint-950 for background (dark green) */
-  --bg-color: var(--peppermint-950);
-  /* Use merino-50 for text (light cream) */
-  --text-color: var(--merino-50);
-  /* Use merino-600 for accent (darker tan) */
-  --accent-color: var(--merino-600);
-  /* Use peppermint-50 for card background (light green) instead of midnight */
-  --card-bg: var(--peppermint-50);
-  /* Use merino-200 for border (light tan) */
-  --border-color: var(--merino-200);
+	/* Use peppermint-950 for background (dark green) */
+	--bg-color: var(--peppermint-950);
+	/* Use merino-50 for text (light cream) */
+	--text-color: var(--merino-50);
+	/* Use merino-600 for accent (darker tan) */
+	--accent-color: var(--merino-600);
+	/* Use peppermint-50 for card background (light green) instead of midnight */
+	--card-bg: var(--peppermint-50);
+	/* Use merino-200 for border (light tan) */
+	--border-color: var(--merino-200);
 }
 
 /* Add these keyframe animations to the existing globals.css file */
 
 @keyframes bounce {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
+	0%,
+	100% {
+		transform: translateY(0);
+	}
+	50% {
+		transform: translateY(-10px);
+	}
 }
 
 @keyframes pulse-border {
-  0%,
-  100% {
-    border-color: hsl(var(--peppermint-300));
-  }
-  50% {
-    border-color: hsl(var(--peppermint-500));
-  }
+	0%,
+	100% {
+		border-color: hsl(var(--peppermint-300));
+	}
+	50% {
+		border-color: hsl(var(--peppermint-500));
+	}
 }
 
 @keyframes zoom-in-out {
-  0%,
-  100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.1);
-  }
+	0%,
+	100% {
+		transform: scale(1);
+	}
+	50% {
+		transform: scale(1.1);
+	}
 }
 
 @keyframes spin-slow {
-  0% {
-    transform: rotate(0deg);
-  }
-  25% {
-    transform: rotate(-15deg);
-  }
-  75% {
-    transform: rotate(15deg);
-  }
-  100% {
-    transform: rotate(0deg);
-  }
+	0% {
+		transform: rotate(0deg);
+	}
+	25% {
+		transform: rotate(-15deg);
+	}
+	75% {
+		transform: rotate(15deg);
+	}
+	100% {
+		transform: rotate(0deg);
+	}
 }
 
 /* Add these to the existing animations in the file */
 .animate-bounce {
-  animation: bounce 1s infinite ease-in-out;
+	animation: bounce 1s infinite ease-in-out;
 }
 
 .animate-pulse-border {
-  animation: pulse-border 2s infinite ease-in-out;
+	animation: pulse-border 2s infinite ease-in-out;
 }
 
 .animate-zoom-in-out {
-  animation: zoom-in-out 2s infinite ease-in-out;
+	animation: zoom-in-out 2s infinite ease-in-out;
 }
 
 .animate-spin-slow {
-  animation: spin-slow 1.5s infinite ease-in-out;
+	animation: spin-slow 1.5s infinite ease-in-out;
 }
 
 /* Remove the container query section and replace with this */
 @media (max-width: 640px) {
-  .report-button-text {
-    display: none;
-  }
+	.report-button-text {
+		display: none;
+	}
 
-  .report-button-icon-only {
-    padding: 0.5rem;
-    height: 2rem;
-  }
+	.report-button-icon-only {
+		padding: 0.5rem;
+		height: 2rem;
+	}
 }
 
 /* Report button responsive behavior */
 .report-button {
-  transition: all 0.3s ease;
+	transition: all 0.3s ease;
 }
 
 .report-button-text {
-  transition: all 0.3s ease;
-  flex-shrink: 1;
+	transition: all 0.3s ease;
+	flex-shrink: 1;
 }
 
 /* When the panel is active (showing the report), hide the button text */
 .panel-active .report-button-text {
-  max-width: 0;
-  opacity: 0;
-  margin: 0;
-  padding: 0;
+	max-width: 0;
+	opacity: 0;
+	margin: 0;
+	padding: 0;
 }
 
 /* When the panel is active, adjust the button to be more compact */
 .panel-active .report-button {
-  padding-left: 0.5rem;
-  padding-right: 0.5rem;
-  min-width: 32px;
-  gap: 0.25rem;
+	padding-left: 0.5rem;
+	padding-right: 0.5rem;
+	min-width: 32px;
+	gap: 0.25rem;
 }
 
 /* Media query for small screens */
 @media (max-width: 768px) {
-  .report-button-text {
-    max-width: 0;
-    opacity: 0;
-    margin: 0;
-    padding: 0;
-  }
+	.report-button-text {
+		max-width: 0;
+		opacity: 0;
+		margin: 0;
+		padding: 0;
+	}
 
-  .report-button {
-    padding-left: 0.5rem;
-    padding-right: 0.5rem;
-    min-width: 32px;
-    gap: 0.25rem;
-  }
+	.report-button {
+		padding-left: 0.5rem;
+		padding-right: 0.5rem;
+		min-width: 32px;
+		gap: 0.25rem;
+	}
 }

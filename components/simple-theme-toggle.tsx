@@ -1,44 +1,44 @@
-"use client";
+'use client';
 
-import * as React from "react";
-import { Moon, Sun } from "lucide-react";
-import { useTheme } from "next-themes";
-import { Button } from "@/components/ui/button";
+import * as React from 'react';
+import { Moon, Sun } from 'lucide-react';
+import { useTheme } from 'next-themes';
+import { Button } from '@/components/ui/button';
 
 export function SimpleThemeToggle() {
-  const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = React.useState(false);
+	const { theme, setTheme } = useTheme();
+	const [mounted, setMounted] = React.useState(false);
 
-  // useEffect only runs on the client, so now we can safely show the UI
-  React.useEffect(() => {
-    setMounted(true);
-  }, []);
+	// useEffect only runs on the client, so now we can safely show the UI
+	React.useEffect(() => {
+		setMounted(true);
+	}, []);
 
-  if (!mounted) {
-    return (
-      <Button variant="outline" size="icon" className="rounded-full w-10 h-10">
-        <span className="sr-only">Toggle theme</span>
-      </Button>
-    );
-  }
+	if (!mounted) {
+		return (
+			<Button variant="outline" size="icon" className="h-10 w-10 rounded-full">
+				<span className="sr-only">Toggle theme</span>
+			</Button>
+		);
+	}
 
-  const toggleTheme = () => {
-    setTheme(theme === "dark" ? "light" : "dark");
-  };
+	const toggleTheme = () => {
+		setTheme(theme === 'dark' ? 'light' : 'dark');
+	};
 
-  return (
-    <Button
-      variant="outline"
-      size="icon"
-      className="rounded-full w-10 h-10 border-white/80 text-white/80 bg-transparent"
-      onClick={toggleTheme}
-    >
-      {theme === "dark" ? (
-        <Sun className="h-[1.2rem] w-[1.2rem]" />
-      ) : (
-        <Moon className="h-[1.2rem] w-[1.2rem]" />
-      )}
-      <span className="sr-only">Toggle theme</span>
-    </Button>
-  );
+	return (
+		<Button
+			variant="outline"
+			size="icon"
+			className="h-10 w-10 rounded-full border-white/80 bg-transparent text-white/80"
+			onClick={toggleTheme}
+		>
+			{theme === 'dark' ? (
+				<Sun className="h-[1.2rem] w-[1.2rem]" />
+			) : (
+				<Moon className="h-[1.2rem] w-[1.2rem]" />
+			)}
+			<span className="sr-only">Toggle theme</span>
+		</Button>
+	);
 }

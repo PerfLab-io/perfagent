@@ -1,16 +1,16 @@
-import { registerTool } from "../mock-ai-sdk";
-import { getAnimationUrlForTopic } from "../utils/gif-generator";
+import { registerTool } from '../mock-ai-sdk';
+import { getAnimationUrlForTopic } from '../utils/gif-generator';
 
 // Mock report content based on topics
 const reportContent = {
-  "web-performance-overview": {
-    title: "Web Performance Overview",
-    sections: [
-      {
-        title: "Introduction to Web Performance",
-        content: `# Web Performance and Core Web Vitals
+	'web-performance-overview': {
+		title: 'Web Performance Overview',
+		sections: [
+			{
+				title: 'Introduction to Web Performance',
+				content: `# Web Performance and Core Web Vitals
 
-![Web Performance Visualization](${getAnimationUrlForTopic("web-performance-overview")})
+![Web Performance Visualization](${getAnimationUrlForTopic('web-performance-overview')})
 
 Web performance is a critical aspect of modern web development that directly impacts user experience, conversion rates, and SEO rankings. Core Web Vitals are Google's initiative to provide unified guidance for quality signals that are essential to delivering a great user experience on the web.
 
@@ -22,12 +22,12 @@ Web performance is a critical aspect of modern web development that directly imp
 - **Additional Metrics**: TTFB, FCP, TTI, and TBT
 
 Web Vitals combine real-world user experience metrics with clear thresholds, making it easier to understand and optimize website performance.`,
-      },
-      {
-        title: "Getting Started with Web Performance",
-        content: `## Measuring Web Performance
+			},
+			{
+				title: 'Getting Started with Web Performance',
+				content: `## Measuring Web Performance
 
-![Getting Started with Web Performance](${getAnimationUrlForTopic("web-performance-overview")})
+![Getting Started with Web Performance](${getAnimationUrlForTopic('web-performance-overview')})
 
 Getting started with web performance optimization:
 
@@ -52,12 +52,12 @@ img.srcset = "image-400.jpg 400w, image-800.jpg 800w"; // Responsive images
 \`\`\`
 
 These optimizations form the foundation of a fast-loading website.`,
-      },
-      {
-        title: "Core Web Vitals Deep Dive",
-        content: `## Core Web Vitals
+			},
+			{
+				title: 'Core Web Vitals Deep Dive',
+				content: `## Core Web Vitals
 
-![Core Web Vitals](${getAnimationUrlForTopic("web-performance-overview")})
+![Core Web Vitals](${getAnimationUrlForTopic('web-performance-overview')})
 
 ### Largest Contentful Paint (LCP)
 
@@ -70,12 +70,12 @@ FID measures interactivity. A good FID score is under 100 milliseconds.
 ### Cumulative Layout Shift (CLS)
 
 CLS measures visual stability. A good CLS score is less than 0.1.`,
-      },
-      {
-        title: "Performance Resources",
-        content: `## Performance Resources
+			},
+			{
+				title: 'Performance Resources',
+				content: `## Performance Resources
 
-![Web Performance Resources](${getAnimationUrlForTopic("web-performance-overview")})
+![Web Performance Resources](${getAnimationUrlForTopic('web-performance-overview')})
 
 To improve your web performance:
 
@@ -91,17 +91,17 @@ Ready to optimize further? Focus on:
 - Critical rendering path
 - Resource prioritization
 - Performance monitoring`,
-      },
-    ],
-  },
-  "performance-optimization": {
-    title: "Performance Optimization Techniques",
-    sections: [
-      {
-        title: "Understanding Performance Optimization",
-        content: `# Web Performance Optimization
+			},
+		],
+	},
+	'performance-optimization': {
+		title: 'Performance Optimization Techniques',
+		sections: [
+			{
+				title: 'Understanding Performance Optimization',
+				content: `# Web Performance Optimization
 
-![Performance Optimization](${getAnimationUrlForTopic("performance-optimization")})
+![Performance Optimization](${getAnimationUrlForTopic('performance-optimization')})
 
 Performance optimization is crucial for delivering fast, responsive web experiences. It encompasses various techniques from code optimization to resource delivery strategies.
 
@@ -111,12 +111,12 @@ Performance optimization is crucial for delivering fast, responsive web experien
 - **Runtime Performance**: Improve JavaScript execution and rendering
 - **Network Optimization**: Reduce latency and payload size
 - **Caching Strategies**: Implement effective caching mechanisms`,
-      },
-      {
-        title: "Advanced Optimization Techniques",
-        content: `## Advanced Techniques
+			},
+			{
+				title: 'Advanced Optimization Techniques',
+				content: `## Advanced Techniques
 
-![Advanced Optimization](${getAnimationUrlForTopic("performance-optimization")})
+![Advanced Optimization](${getAnimationUrlForTopic('performance-optimization')})
 
 ### Code Splitting and Lazy Loading
 
@@ -144,17 +144,17 @@ function MyComponent() {
 <link rel="preload" href="critical.js" as="script">
 <link rel="preload" href="hero.jpg" as="image">
 \`\`\``,
-      },
-    ],
-  },
-  "error-monitoring": {
-    title: "Performance Error Monitoring",
-    sections: [
-      {
-        title: "Performance Monitoring Setup",
-        content: `## Performance Monitoring
+			},
+		],
+	},
+	'error-monitoring': {
+		title: 'Performance Error Monitoring',
+		sections: [
+			{
+				title: 'Performance Monitoring Setup',
+				content: `## Performance Monitoring
 
-![Performance Monitoring](${getAnimationUrlForTopic("error-monitoring")})
+![Performance Monitoring](${getAnimationUrlForTopic('error-monitoring')})
 
 ### Real User Monitoring (RUM)
 
@@ -183,102 +183,102 @@ window.addEventListener('error', (event) => {
   });
 });
 \`\`\``,
-      },
-    ],
-  },
+			},
+		],
+	},
 };
 
 // Update the generateReportTool to support streaming
 export const generateReportTool = registerTool({
-  name: "generateReport",
-  description: "Generates a comprehensive report on a Go programming topic",
-  execute: async (params: { query: string }) => {
-    // Ensure params is an object and query is a string
-    const safeParams = params || {};
-    const query =
-      typeof safeParams.query === "string"
-        ? safeParams.query.toLowerCase()
-        : "";
+	name: 'generateReport',
+	description: 'Generates a comprehensive report on a Go programming topic',
+	execute: async (params: { query: string }) => {
+		// Ensure params is an object and query is a string
+		const safeParams = params || {};
+		const query =
+			typeof safeParams.query === 'string'
+				? safeParams.query.toLowerCase()
+				: '';
 
-    console.log("Generate report query:", query);
+		console.log('Generate report query:', query);
 
-    // Determine which report to generate based on the query
-    let reportType = "web-performance-overview";
+		// Determine which report to generate based on the query
+		let reportType = 'web-performance-overview';
 
-    if (query.includes("performance optimization")) {
-      reportType = "performance-optimization";
-    } else if (query.includes("error monitoring")) {
-      reportType = "error-monitoring";
-    }
+		if (query.includes('performance optimization')) {
+			reportType = 'performance-optimization';
+		} else if (query.includes('error monitoring')) {
+			reportType = 'error-monitoring';
+		}
 
-    // Return the complete report data
-    return {
-      type: "report",
-      reportType,
-      reportData: reportContent[reportType as keyof typeof reportContent],
-    };
-  },
-  // Add streaming support
-  stream: async function* (
-    params: { query: string; toolCallId?: string },
-    dataStream?: any,
-  ) {
-    // Ensure params is an object and query is a string
-    const safeParams = params || {};
-    const query =
-      typeof safeParams.query === "string"
-        ? safeParams.query.toLowerCase()
-        : "";
+		// Return the complete report data
+		return {
+			type: 'report',
+			reportType,
+			reportData: reportContent[reportType as keyof typeof reportContent],
+		};
+	},
+	// Add streaming support
+	stream: async function* (
+		params: { query: string; toolCallId?: string },
+		dataStream?: any,
+	) {
+		// Ensure params is an object and query is a string
+		const safeParams = params || {};
+		const query =
+			typeof safeParams.query === 'string'
+				? safeParams.query.toLowerCase()
+				: '';
 
-    // Generate a unique toolCallId if not provided
-    const toolCallId =
-      params.toolCallId ||
-      `report-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+		// Generate a unique toolCallId if not provided
+		const toolCallId =
+			params.toolCallId ||
+			`report-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
-    // Determine which report to generate based on the query
-    let reportType = "web-performance-overview";
+		// Determine which report to generate based on the query
+		let reportType = 'web-performance-overview';
 
-    if (query.includes("performance optimization")) {
-      reportType = "performance-optimization";
-    } else if (query.includes("error monitoring")) {
-      reportType = "error-monitoring";
-    }
+		if (query.includes('performance optimization')) {
+			reportType = 'performance-optimization';
+		} else if (query.includes('error monitoring')) {
+			reportType = 'error-monitoring';
+		}
 
-    // Get the report content
-    const report = reportContent[reportType as keyof typeof reportContent];
+		// Get the report content
+		const report = reportContent[reportType as keyof typeof reportContent];
 
-    // First yield just the title to show something immediately
-    yield {
-      type: "report",
-      reportType,
-      reportData: {
-        title: report.title,
-        sections: [],
-      },
-      toolCallId,
-    };
+		// First yield just the title to show something immediately
+		yield {
+			type: 'report',
+			reportType,
+			reportData: {
+				title: report.title,
+				sections: [],
+			},
+			toolCallId,
+		};
 
-    // Then stream each section with a delay
-    let currentSections = [];
-    for (let i = 0; i < report.sections.length; i++) {
-      // Add a delay to simulate streaming
-      await new Promise((resolve) =>
-        setTimeout(resolve, 1000 + Math.random() * 1000),
-      );
+		// Then stream each section with a delay
+		let currentSections = [];
+		for (let i = 0; i < report.sections.length; i++) {
+			// Add a delay to simulate streaming
+			await new Promise((resolve) =>
+				setTimeout(resolve, 1000 + Math.random() * 1000),
+			);
 
-      // Add this section to our current sections
-      currentSections = [...currentSections, report.sections[i]];
+			// Add this section to our current sections
+			currentSections = [...currentSections, report.sections[i]];
 
-      // Yield the report with sections up to this point
-      yield {
-        type: "report",
-        reportType,
-        reportData: {
-          title: report.title,
-          sections: currentSections,
-        },
-        toolCallId,
-      };
-    }
-  },
+			// Yield the report with sections up to this point
+			yield {
+				type: 'report',
+				reportType,
+				reportData: {
+					title: report.title,
+					sections: currentSections,
+				},
+				toolCallId,
+			};
+		}
+	},
 });

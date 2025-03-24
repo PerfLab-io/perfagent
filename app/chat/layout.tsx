@@ -1,11 +1,11 @@
-import type React from "react";
-import "../globals.css";
-import "./chat.css";
+import type React from 'react';
+import '../globals.css';
+import './chat.css';
 
 export default function AiChatLayout({
-  children,
+	children,
 }: {
-  children: React.ReactNode;
+	children: React.ReactNode;
 }) {
-  return children;
+	return children;
 }
