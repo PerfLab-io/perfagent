@@ -15,12 +15,14 @@ const badgeVariants = cva(
         destructive:
           "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
         outline: "text-foreground",
+        research:
+          "border-transparent bg-peppermint-100 text-peppermint-800 dark:bg-peppermint-800 dark:text-peppermint-100",
       },
     },
     defaultVariants: {
       variant: "default",
     },
-  },
+  }
 );
 
 export interface BadgeProps
