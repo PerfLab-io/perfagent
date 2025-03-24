@@ -42,7 +42,10 @@ export default function LandingPage() {
       </section>
 
       {/* Features section */}
-      <section id="features" className="py-20">
+      <section
+        id="features"
+        className="py-20 bg-peppermint-50 dark:bg-background"
+      >
         <LandingBanner />
       </section>
 
@@ -52,7 +55,7 @@ export default function LandingPage() {
       </section>
 
       {/* Simple footer */}
-      <footer className="bg-background py-8 border-t border-border">
+      <footer className="bg-peppermint-50 dark:bg-background py-8 border-t border-border">
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="text-sm text-foreground">
