@@ -13,18 +13,22 @@ import {
 import { GenerativeCard } from '@/components/generative-card';
 import { ResearchCard } from '@/components/research-card';
 import { Button } from '@/components/ui/button';
-import type { Message, MessageAnnotation } from '@/lib/hooks/use-chat';
+import type { JSONValue, UIMessage } from '@ai-sdk/ui-utils';
 import { FeedbackButtons } from '@/components/feedback-buttons';
+import { MarkdownRenderer } from './markdown-renderer';
 
 /**
  * Types and Interfaces
  */
 
+type MessageAnnotation = JSONValue;
+
 /**
  * Chat message component props
  */
 interface ChatMessageProps {
-	message: Message;
+	message: UIMessage;
+	isStreaming: boolean;
 	onAbort: (toolCallId?: string) => void;
 	openReport?: (reportId: string) => void;
 	closeReport?: () => void;
@@ -46,6 +50,37 @@ function generateReportId(): string {
 }
 
 /**
+ * Utility function to determine if a message is streaming based on tool invocation state
+ */
+export function isMessageStreaming(message: UIMessage): boolean {
+	// Check if any tool invocation is in partial-call or call state without result
+	return (
+		message.parts?.some(
+			(part) =>
+				(part.type === 'tool-invocation' &&
+					(part.toolInvocation.state === 'partial-call' ||
+						part.toolInvocation.state === 'call')) ||
+				(part.type === 'text' &&
+					(part.text.trim() === '' ||
+						part.text === null ||
+						part.text === undefined ||
+						!part.text)),
+		) ?? false
+	);
+}
+
+/**
+ * Utility function to determine if a message is waiting to be processed
+ */
+export function isMessageWaiting(message: UIMessage): boolean {
+	// A message is waiting if it has no content and no tool invocations yet
+	return (
+		message.content === '' &&
+		!message.parts?.some((part) => part.type === 'tool-invocation')
+	);
+}
+
+/**
  * ChatMessage Component
  * Displays a chat message with support for tool calls (breakdown, research, report)
  */
@@ -57,6 +92,7 @@ export function ChatMessage({
 	isActiveReport = false,
 	hasReport = false,
 	isGeneratingAnyReport = false,
+	isStreaming,
 }: ChatMessageProps) {
 	// Animation and visibility state
 	const [visible, setVisible] = useState(false);
@@ -86,24 +122,64 @@ export function ChatMessage({
 	// Refs
 	const messageEndRef = useRef<HTMLDivElement>(null);
 
+	// Derived state from message
+	const messageIsStreaming = useMemo(
+		() => isMessageStreaming(message) && isStreaming,
+		[isStreaming, message],
+	);
+	const isMessageIsWaiting = useMemo(
+		() => isMessageWaiting(message),
+		[message],
+	);
+
+	/**
+	 * Extract tool call from message parts
+	 */
+	const toolCall = useMemo(() => {
+		// Find completed tool invocation part
+		const toolInvocationPart = message.parts?.find(
+			(part) =>
+				part.type === 'tool-invocation' &&
+				part.toolInvocation.state === 'result',
+		);
+
+		if (toolInvocationPart && toolInvocationPart.type === 'tool-invocation') {
+			const { toolName, toolCallId, result } =
+				toolInvocationPart.toolInvocation;
+
+			// Extract the tool type from the tool name
+			const toolType = toolName
+				.replace(/^generate|^perform|^open/, '')
+				.toLowerCase() as ToolCallType;
+
+			return {
+				type: toolType,
+				data: result || null,
+				toolCallId,
+			};
+		}
+
+		return undefined;
+	}, [message.parts]);
+
 	/**
 	 * Determine if this message contains tools of specific types
 	 */
 	const messageTools = useMemo(() => {
-		const hasBreakdown = message.toolCall?.type === 'breakdown';
+		const hasBreakdown = toolCall?.type === 'breakdown';
 		const hasResearch =
-			message.toolCall?.type === 'research' ||
+			toolCall?.type === 'research' ||
 			researchAnnotations.length > 0 ||
 			(message.parts &&
 				message.parts.some(
 					(part) =>
 						part.type === 'tool-invocation' &&
-						part.toolInvocation?.toolName === 'trace_analysis',
+						part.toolInvocation.toolName === 'trace_analysis',
 				));
-		const hasReportTool = message.toolCall?.type === 'report' || hasReport;
+		const hasReportTool = toolCall?.type === 'report' || hasReport;
 
 		return { hasBreakdown, hasResearch, hasReportTool };
-	}, [message.toolCall, message.parts, researchAnnotations, hasReport]);
+	}, [toolCall, message.parts, researchAnnotations, hasReport]);
 
 	/**
 	 * Process message annotations and tool calls
@@ -115,14 +191,14 @@ export function ChatMessage({
 		}, 100);
 
 		// Process tool calls
-		if (message.toolCall) {
+		if (toolCall) {
 			// Extract and store the toolCallId if present
-			if (message.toolCall.toolCallId) {
-				setToolCallId(message.toolCall.toolCallId);
+			if (toolCall.toolCallId) {
+				setToolCallId(toolCall.toolCallId);
 			}
 
 			// Handle different tool call types
-			if (message.toolCall.type === 'breakdown') {
+			if (toolCall.type === 'breakdown') {
 				const uiTimer = setTimeout(() => {
 					setShowGenerativeUI(true);
 					setIsBreakdownStreaming(true);
@@ -137,7 +213,7 @@ export function ChatMessage({
 					clearTimeout(timer);
 					clearTimeout(uiTimer);
 				};
-			} else if (message.toolCall.type === 'research') {
+			} else if (toolCall.type === 'research') {
 				const researchTimer = setTimeout(() => {
 					setShowResearchUI(true);
 					setInitialResearchStarted(true);
@@ -147,7 +223,7 @@ export function ChatMessage({
 					clearTimeout(timer);
 					clearTimeout(researchTimer);
 				};
-			} else if (message.toolCall.type === 'report') {
+			} else if (toolCall.type === 'report') {
 				// Set showReportUI to true when a report is detected
 				const reportTimer = setTimeout(() => {
 					setShowReportUI(true);
@@ -165,10 +241,10 @@ export function ChatMessage({
 			const toolInvocationPart = message.parts.find(
 				(part) =>
 					part.type === 'tool-invocation' &&
-					part.toolInvocation?.toolName === 'trace_analysis',
+					part.toolInvocation.toolName === 'trace_analysis',
 			);
 
-			if (toolInvocationPart && toolInvocationPart.toolInvocation) {
+			if (toolInvocationPart && toolInvocationPart.type === 'tool-invocation') {
 				setToolCallId(toolInvocationPart.toolInvocation.toolCallId);
 				setShowResearchUI(true);
 				setInitialResearchStarted(true);
@@ -179,7 +255,11 @@ export function ChatMessage({
 		if (message.annotations) {
 			// Process research annotations
 			const researchUpdates = message.annotations.filter(
-				(annotation) => annotation.type === 'research_update',
+				(annotation) =>
+					typeof annotation === 'object' &&
+					annotation !== null &&
+					'type' in annotation &&
+					annotation.type === 'research_update',
 			);
 			if (researchUpdates.length > 0) {
 				setResearchAnnotations(researchUpdates);
@@ -189,7 +269,11 @@ export function ChatMessage({
 
 			// Process breakdown annotations
 			const breakdownUpdates = message.annotations.filter(
-				(annotation) => annotation.type === 'breakdown_update',
+				(annotation) =>
+					typeof annotation === 'object' &&
+					annotation !== null &&
+					'type' in annotation &&
+					annotation.type === 'breakdown_update',
 			);
 			if (breakdownUpdates.length > 0) {
 				setBreakdownAnnotations(breakdownUpdates);
@@ -198,6 +282,9 @@ export function ChatMessage({
 				// Check if any annotation indicates completion
 				const isComplete = breakdownUpdates.some(
 					(annotation) =>
+						typeof annotation === 'object' &&
+						annotation !== null &&
+						'data' in annotation &&
 						annotation.data?.status === 'completed' &&
 						annotation.data?.isComplete,
 				);
@@ -210,7 +297,7 @@ export function ChatMessage({
 		}
 
 		return () => clearTimeout(timer);
-	}, [message.toolCall, message.parts, message.annotations]);
+	}, [toolCall, message.parts, message.annotations]);
 
 	/**
 	 * Handler for aborting breakdown tool calls
@@ -256,10 +343,10 @@ export function ChatMessage({
 	 */
 	const reportSnippet = useMemo(() => {
 		if (
-			message.toolCall?.type === 'report' &&
-			message.toolCall.data?.reportData?.sections?.length > 0
+			toolCall?.type === 'report' &&
+			toolCall.data?.reportData?.sections?.length > 0
 		) {
-			const firstSection = message.toolCall.data.reportData.sections[0];
+			const firstSection = toolCall.data.reportData.sections[0];
 			const content = firstSection.content || '';
 			// Extract the first paragraph, limited to 120 characters
 			const firstParagraph = content
@@ -271,7 +358,7 @@ export function ChatMessage({
 				: firstParagraph;
 		}
 		return 'View detailed information about this topic in the report.';
-	}, [message.toolCall]);
+	}, [toolCall]);
 
 	/**
 	 * Style utilities
@@ -279,7 +366,7 @@ export function ChatMessage({
 	const styles = {
 		// Message container style
 		messageContainer: cn(
-			'flex gap-3 transition-all duration-300',
+			'flex gap-3 transition-all duration-300 [&_p]:m-0',
 			visible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0',
 			message.role === 'user' ? 'justify-end' : 'justify-start',
 		),
@@ -290,7 +377,7 @@ export function ChatMessage({
 			message.role === 'user'
 				? 'bg-indigo-600 text-white'
 				: 'group relative border border-border bg-background text-foreground transition-all duration-300 hover:-translate-y-1 hover:translate-x-1 hover:shadow-[-4px_4px_0_hsl(var(--border-color))]',
-			message.isStreaming &&
+			messageIsStreaming &&
 				'-translate-y-1 translate-x-1 shadow-[-4px_4px_0_hsl(var(--border-color))]',
 		),
 
@@ -314,7 +401,7 @@ export function ChatMessage({
 			'rounded-lg border border-border p-3 transition-all duration-300',
 			'bg-merino-50 dark:bg-merino-950',
 			'hover:-translate-y-1 hover:translate-x-1 hover:shadow-[-4px_4px_0_hsl(var(--border-color))]',
-			(message.isStreaming || isGeneratingAnyReport) &&
+			(messageIsStreaming || isGeneratingAnyReport) &&
 				'-translate-y-1 translate-x-1 shadow-[-4px_4px_0_hsl(var(--border-color))]',
 		),
 
@@ -368,15 +455,14 @@ export function ChatMessage({
 					<div className={styles.reportContainer}>
 						<div className="flex items-center justify-between">
 							<h3 className="mr-2 flex-1 truncate text-sm font-bold text-merino-800 dark:text-merino-200">
-								{message.toolCall?.data?.reportData?.title ||
-									'Web Vitals Report'}
+								{toolCall?.data?.reportData?.title || 'Web Vitals Report'}
 							</h3>
 							<Button
 								variant={isActiveReport ? 'default' : 'outline'}
 								size="sm"
 								className={styles.reportButton}
 								onClick={handleReportToggle}
-								disabled={isGeneratingAnyReport || message.isStreaming}
+								disabled={isGeneratingAnyReport || messageIsStreaming}
 							>
 								<FileText className="h-4 w-4 flex-shrink-0" />
 								<span className="report-button-text overflow-hidden whitespace-nowrap">
@@ -397,8 +483,8 @@ export function ChatMessage({
 		expanded,
 		styles.reportContainer,
 		styles.reportButton,
-		message.toolCall?.data?.reportData?.title,
-		message.isStreaming,
+		toolCall?.data?.reportData?.title,
+		messageIsStreaming,
 		isActiveReport,
 		isGeneratingAnyReport,
 		handleReportToggle,
@@ -420,7 +506,7 @@ export function ChatMessage({
 					<GenerativeCard
 						title="Performance Metrics Breakdown"
 						data={
-							message.toolCall?.data || {
+							toolCall?.data || {
 								beginner: 8,
 								intermediate: 5,
 								advanced: 3,
@@ -439,7 +525,7 @@ export function ChatMessage({
 	}, [
 		messageTools.hasBreakdown,
 		expanded,
-		message.toolCall?.data,
+		toolCall?.data,
 		showGenerativeUI,
 		isBreakdownStreaming,
 		handleAbortBreakdown,
@@ -455,24 +541,35 @@ export function ChatMessage({
 	const renderResearchSection = useCallback(() => {
 		if (!messageTools.hasResearch) return null;
 
+		// Find tool invocation for research
+		const researchInvocation = message.parts?.find(
+			(part) =>
+				part.type === 'tool-invocation' &&
+				(part.toolInvocation.toolName === 'performResearch' ||
+					part.toolInvocation.toolName === 'trace_analysis'),
+		);
+
+		// Extract query from tool args if available
+		const query =
+			toolCall?.data?.query ||
+			(researchInvocation?.type === 'tool-invocation'
+				? researchInvocation.toolInvocation.args?.metric ||
+					'performance metrics'
+				: 'performance metrics');
+
 		return (
 			<div className="mt-1">
 				{renderToolHeader('Research Results')}
 
 				{expanded && (
 					<ResearchCard
-						query={
-							message.toolCall?.data?.query ||
-							message.parts?.find((p) => p.toolInvocation?.args?.metric)
-								?.toolInvocation?.args?.metric ||
-							'performance metrics'
-						}
+						query={query}
 						triggerAnimation={showResearchUI && initialResearchStarted}
 						preserveData={false}
 						researchId={researchId}
 						toolCallId={toolCallId}
 						onAbort={handleAbortResearch}
-						streamedData={message.toolCall?.data}
+						streamedData={toolCall?.data}
 						annotations={researchAnnotations}
 					/>
 				)}
@@ -481,8 +578,8 @@ export function ChatMessage({
 	}, [
 		messageTools.hasResearch,
 		expanded,
-		message.toolCall?.data,
 		message.parts,
+		toolCall?.data,
 		showResearchUI,
 		initialResearchStarted,
 		researchId,
@@ -493,12 +590,14 @@ export function ChatMessage({
 	]);
 
 	const isUser = message.role === 'user';
-	const hasMessageContent = !message.isWaiting || message.content !== '';
+	const hasMessageContent = messageIsStreaming;
 	const showTypingIndicator =
-		message.role === 'assistant' &&
-		message.isWaiting &&
-		!message.isStreaming &&
-		message.content === '';
+		message.role === 'assistant' && messageIsStreaming;
+
+	console.log(
+		'message',
+		message.parts?.find((part) => part.type === 'text')?.text + '',
+	);
 
 	return (
 		<div className={styles.messageContainer}>
@@ -511,46 +610,58 @@ export function ChatMessage({
 
 			<div className="flex max-w-[80%] flex-col">
 				{/* Message bubble */}
-				{hasMessageContent && (
-					<div className={styles.messageBubble}>
-						<div className="whitespace-pre-wrap">
-							{message.content}
-							{/* Streaming cursor */}
-							{message.role === 'assistant' && message.isStreaming && (
-								<span className="ml-1 inline-block h-4 w-2 animate-pulse bg-foreground"></span>
-							)}
-						</div>
+				{message.parts?.map((part) => {
+					console.log(part, 'ASDAKJDKAJSDKJAKSDJAKJSDK');
+					if (part.type === 'text') {
+						return (
+							<div
+								key={message.id + 'text-part'}
+								className={styles.messageBubble}
+							>
+								<div className="whitespace-pre-wrap">
+									{<MarkdownRenderer content={part.text} />}
+									{/* Streaming cursor */}
+									{message.role === 'assistant' && messageIsStreaming && (
+										<span className="ml-1 inline-block h-4 w-2 animate-pulse bg-foreground"></span>
+									)}
+								</div>
 
-						{/* Timestamp and feedback buttons */}
-						<div className="mt-1 flex items-center justify-between">
-							<div className={styles.timestamp}>
-								{new Date(message.timestamp).toLocaleTimeString([], {
-									hour: '2-digit',
-									minute: '2-digit',
-								})}
+								{/* Timestamp and feedback buttons */}
+								<div className="mt-1 flex items-center justify-between">
+									<div className={styles.timestamp}>
+										{new Date(
+											message.createdAt || Date.now(),
+										).toLocaleTimeString([], {
+											hour: '2-digit',
+											minute: '2-digit',
+										})}
+									</div>
+
+									{/* Only show feedback for assistant messages that are not streaming or waiting */}
+									{!isUser && !messageIsStreaming && !isMessageIsWaiting && (
+										<FeedbackButtons messageId={message.id} source="message" />
+									)}
+								</div>
 							</div>
-
-							{/* Only show feedback for assistant messages that are not streaming or waiting */}
-							{!isUser && !message.isStreaming && !message.isWaiting && (
-								<FeedbackButtons messageId={message.id} source="message" />
-							)}
-						</div>
-					</div>
-				)}
+						);
+					} else {
+						return null;
+					}
+				})}
 
 				{/* Typing indicator */}
-				{showTypingIndicator && (
+				{/* {showTypingIndicator && (
 					<div className="typing-indicator">
 						<span></span>
 						<span></span>
 						<span></span>
 					</div>
-				)}
+				)} */}
 
 				{/* Tool sections */}
-				{renderReportSection()}
+				{/* {renderReportSection()}
 				{renderBreakdownSection()}
-				{renderResearchSection()}
+				{renderResearchSection()} */}
 			</div>
 
 			{/* User avatar */}

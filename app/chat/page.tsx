@@ -1,7 +1,7 @@
 'use client';
 
 import type React from 'react';
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Header } from '@/components/header';
 import { Button } from '@/components/ui/button';
 import { Paperclip, Send, X } from 'lucide-react';
@@ -13,7 +13,7 @@ import { DataPanel } from '@/components/data-panel';
 import { MarkdownReport } from '@/components/markdown-report';
 import { cn } from '@/lib/utils';
 import { ResearchProvider } from '@/components/research-card';
-import { useChat } from '@/lib/hooks/use-chat';
+import { useChat } from '@ai-sdk/react';
 
 /**
  * Type definition for the report data structure
@@ -23,6 +23,13 @@ type Report = {
 	topic: string;
 	toolCallId: string;
 };
+
+export interface AttachedFile {
+	id: string;
+	name: string;
+	size: number;
+	type: string;
+}
 
 /**
  * AiChatPage - Main chat interface component with file handling, messaging,
@@ -34,16 +41,19 @@ export default function AiChatPage() {
 		input,
 		setInput,
 		handleSubmit: originalHandleSubmit,
-		isLoading,
+		status,
 		stop,
-		attachedFiles,
-		setAttachedFiles,
-		handleFileChange,
-		handleFilesDrop,
-		removeFile,
-		suggestionsLoading,
-		suggestions,
-	} = useChat();
+	} = useChat({
+		api: '/api/chat',
+		experimental_throttle: 500,
+	});
+
+	console.log('status', status);
+	console.log('messages', messages);
+
+	const isLoading = status === 'submitted';
+
+	console.log('isLoading', isLoading);
 
 	// UI state management
 	const [chatStarted, setChatStarted] = useState(false);
@@ -66,6 +76,10 @@ export default function AiChatPage() {
 	const [activeReportId, setActiveReportId] = useState<string | null>(null);
 	const [reportsMap, setReportsMap] = useState<Record<string, Report>>({});
 
+	const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
+	const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+	const [suggestions, setSuggestions] = useState<string[]>([]);
+
 	// Refs
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -78,21 +92,88 @@ export default function AiChatPage() {
 		messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
 	}, []);
 
+	const handleFileChange = useCallback(
+		(e: React.ChangeEvent<HTMLInputElement>) => {
+			if (e.target.files && e.target.files.length > 0) {
+				const newFiles: AttachedFile[] = Array.from(e.target.files).map(
+					(file) => ({
+						id: Math.random().toString(36).substring(7),
+						name: file.name,
+						size: file.size,
+						type: file.type,
+					}),
+				);
+
+				const updatedFiles = [...attachedFiles, ...newFiles];
+				setAttachedFiles(updatedFiles);
+
+				// Always trigger suggestions when files are added
+				setSuggestionsLoading(true);
+			}
+		},
+		[attachedFiles, setAttachedFiles, setSuggestionsLoading],
+	);
+
+	// Handle files dropped into the dropzone
+	const handleFilesDrop = useCallback(
+		(files: File[]) => {
+			if (files.length > 0) {
+				const newFiles: AttachedFile[] = files.map((file) => ({
+					id: Math.random().toString(36).substring(7),
+					name: file.name,
+					size: file.size,
+					type: file.type,
+				}));
+
+				// Start suggestion loading immediately before updating state
+				setSuggestionsLoading(true);
+
+				// Update files state
+				const updatedFiles = [...attachedFiles, ...newFiles];
+				setAttachedFiles(updatedFiles);
+			}
+		},
+		[attachedFiles, setAttachedFiles, setSuggestionsLoading],
+	);
+
+	// Remove a file by ID
+	const removeFile = useCallback(
+		(id: string) => {
+			setAttachedFiles((prev) => {
+				const updated = prev.filter((file) => file.id !== id);
+
+				// If all files are removed, reset suggestions
+				if (updated.length === 0) {
+					setSuggestions([]);
+					setSuggestionsLoading(false);
+				}
+
+				return updated;
+			});
+		},
+		[setAttachedFiles, setSuggestions, setSuggestionsLoading],
+	);
+
 	/**
 	 * Handles submission of chat messages
 	 */
 	const handleSubmit = useCallback(
 		(e: React.FormEvent) => {
-			// Only proceed if there's input text or files attached
-			if (input.trim() || attachedFiles.length > 0) {
+			// Only proceed if there's input
+			if (input.trim()) {
 				originalHandleSubmit(e as any);
 				// Hide file section after submission
 				setShowFileSection(false);
+				setAttachedFiles([]);
+
+				// Clear suggestions when submitting a message
+				setSuggestions([]);
+				setSuggestionsLoading(false);
 			} else {
 				e.preventDefault();
 			}
 		},
-		[input, attachedFiles.length, originalHandleSubmit],
+		[input, attachedFiles?.length, originalHandleSubmit],
 	);
 
 	/**
@@ -127,7 +208,7 @@ export default function AiChatPage() {
 	 */
 	const handleAbortReport = useCallback(() => {
 		// Stop the current message stream
-		stop(toolCallId);
+		stop();
 
 		// Update UI state
 		setShowSidePanel(false);
@@ -139,14 +220,14 @@ export default function AiChatPage() {
 		setTimeout(() => {
 			setPanelExiting(false);
 		}, 300);
-	}, [stop, toolCallId]);
+	}, [stop]);
 
 	/**
 	 * Aborts ongoing research
 	 */
 	const handleAbortResearch = useCallback(
 		(callId?: string) => {
-			stop(callId);
+			stop();
 		},
 		[stop],
 	);
@@ -196,7 +277,7 @@ export default function AiChatPage() {
 
 	// Effect: Handle file section visibility based on attached files
 	useEffect(() => {
-		setShowFileSection(attachedFiles.length > 0);
+		setShowFileSection(attachedFiles?.length > 0);
 	}, [attachedFiles, isLoading]);
 
 	// Effect: Adjust layout when file section visibility changes
@@ -244,39 +325,66 @@ export default function AiChatPage() {
 	// Effect: Check for tool calls that should open the side panel
 	useEffect(() => {
 		const latestMessage = messages[messages.length - 1];
-		if (latestMessage?.toolCall) {
-			if (latestMessage.toolCall.id) {
-				setToolCallId(latestMessage.toolCall.id);
-			}
+		// if (latestMessage?.toolCall) {
+		// 	if (latestMessage.toolCall.id) {
+		// 		setToolCallId(latestMessage.toolCall.id);
+		// 	}
 
-			if (latestMessage.toolCall.type === 'report') {
-				if (
-					latestMessage.toolCall.data &&
-					latestMessage.toolCall.data.reportData
-				) {
-					const reportId = latestMessage.id;
-					setReportsMap((prev) => ({
-						...prev,
-						[reportId]: {
-							data: latestMessage.toolCall.data.reportData,
-							topic: latestMessage.toolCall.reportType || 'go-overview',
-							toolCallId: latestMessage.toolCall.id,
-						},
-					}));
+		// 	if (latestMessage.toolCall.type === 'report') {
+		// 		if (
+		// 			latestMessage.toolCall.data &&
+		// 			latestMessage.toolCall.data.reportData
+		// 		) {
+		// 			const reportId = latestMessage.id;
+		// 			setReportsMap((prev) => ({
+		// 				...prev,
+		// 				[reportId]: {
+		// 					data: latestMessage.toolCall.data.reportData,
+		// 					topic: latestMessage.toolCall.reportType || 'go-overview',
+		// 					toolCallId: latestMessage.toolCall.id,
+		// 				},
+		// 			}));
 
-					// Set as active report and open panel
-					setActiveReportId(reportId);
-					setShowSidePanel(true);
-					setPanelContentType('report');
-					setIsGeneratingReport(true);
-					setReportTopic(latestMessage.toolCall.reportType || 'go-overview');
-					setReportData(latestMessage.toolCall.data.reportData);
+		// 			// Set as active report and open panel
+		// 			setActiveReportId(reportId);
+		// 			setShowSidePanel(true);
+		// 			setPanelContentType('report');
+		// 			setIsGeneratingReport(true);
+		// 			setReportTopic(latestMessage.toolCall.reportType || 'go-overview');
+		// 			setReportData(latestMessage.toolCall.data.reportData);
+		// 		}
+		// 	} else if (latestMessage.toolCall.type === 'sidePanel') {
+		// 		setShowSidePanel(true);
+		// 		setPanelContentType('data');
+		// 	}
+		// }
+	}, [messages]);
+
+	const memoizedMessages = useMemo(() => {
+		// Create a shallow copy
+		const msgs = [...messages];
+
+		return msgs.filter((message) => {
+			// Keep all user messages
+			if (message.role === 'user') return true;
+
+			// For assistant messages
+			if (message.role === 'assistant') {
+				// Keep messages that have tool invocations
+				if (message.parts?.some((part) => part.type === 'tool-invocation')) {
+					return true;
 				}
-			} else if (latestMessage.toolCall.type === 'sidePanel') {
-				setShowSidePanel(true);
-				setPanelContentType('data');
+				// Keep messages that have text parts but no tool invocations
+				if (
+					message.parts?.some((part) => part.type === 'text') ||
+					!message.parts?.some((part) => part.type === 'tool-invocation')
+				) {
+					return true;
+				}
+				return false;
 			}
-		}
+			return false;
+		});
 	}, [messages]);
 
 	// Effect: Ensure proper scroll behavior when file section visibility changes
@@ -284,7 +392,7 @@ export default function AiChatPage() {
 		if (messagesEndRef.current && messages.length > 0) {
 			setTimeout(scrollToBottom, 300);
 		}
-	}, [showFileSection, attachedFiles.length, messages.length, scrollToBottom]);
+	}, [showFileSection, attachedFiles?.length, messages.length, scrollToBottom]);
 
 	// Common height classes for both panels
 	const panelHeightClasses =
@@ -335,10 +443,11 @@ export default function AiChatPage() {
 									)}
 								>
 									<div className="space-y-4 p-4">
-										{messages.map((message) => (
+										{memoizedMessages.map((message) => (
 											<ChatMessage
 												key={message.id}
 												message={message}
+												isStreaming={isLoading}
 												onAbort={stop}
 												openReport={openReport}
 												closeReport={closeReport}
@@ -363,7 +472,7 @@ export default function AiChatPage() {
 									style={{ transformOrigin: 'center bottom' }}
 								>
 									{/* File previews */}
-									{attachedFiles.length > 0 && (
+									{attachedFiles?.length > 0 && (
 										<div
 											className={cn(
 												'file-section rounded-t-lg border-b bg-peppermint-100 px-4 py-2 dark:bg-peppermint-900',
@@ -373,7 +482,7 @@ export default function AiChatPage() {
 											)}
 										>
 											<div className="flex flex-wrap gap-2">
-												{attachedFiles.map((file) => (
+												{attachedFiles?.map((file) => (
 													<FilePreview
 														key={file.id}
 														file={file}
@@ -445,7 +554,7 @@ export default function AiChatPage() {
 														type="submit"
 														disabled={
 															isLoading ||
-															(!input.trim() && attachedFiles.length === 0)
+															(!input.trim() && attachedFiles?.length === 0)
 														}
 														variant="default"
 														title="Send message"

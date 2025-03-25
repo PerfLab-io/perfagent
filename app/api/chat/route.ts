@@ -1,13 +1,154 @@
 import { type NextRequest, NextResponse } from 'next/server';
+import { serverEnv } from '@/lib/env/server';
+import { tavily } from '@tavily/core';
+import {
+	convertToCoreMessages,
+	customProvider,
+	generateObject,
+	streamText,
+	createDataStreamResponse,
+	tool,
+} from 'ai';
+import { type InsightSet } from '@paulirish/trace_engine/models/trace/insights/types';
+import { createOpenAI } from '@ai-sdk/openai';
+import dedent from 'dedent';
+import { TraceTopic, analyzeInsights } from '@/lib/insights';
+import { z } from 'zod';
+import { systemPrompt } from '@/lib/ai/model';
 
-// Import the tool functions
-import { generateReportTool } from '@/lib/tools/generate-report';
-import { openSidePanelTool } from '@/lib/tools/open-side-panel';
-import { generateBreakdownTool } from '@/lib/tools/generate-breakdown';
-import { performResearchTool } from '@/lib/tools/perform-research';
-import { generateSuggestionsTool } from '@/lib/tools/generate-suggestions';
-import { streamText, createDataStreamResponse } from '@/lib/mock-ai-sdk';
-import { ModelProvider } from '@/lib/mock-ai-sdk';
+const openai = createOpenAI({
+	// custom settings, e.g.
+	baseURL: 'http://localhost:11434/v1',
+	apiKey: 'ollama', // required but unused
+	name: 'ollama',
+	compatibility: 'strict', // strict mode, enable when using the OpenAI API
+});
+
+const perfAgent = customProvider({
+	languageModels: {
+		default_model: openai('qwen2.5-coder:14b', {
+			structuredOutputs: true,
+			simulateStreaming: true,
+		}),
+		topics_model: openai('llama3.1:8b', {
+			structuredOutputs: true,
+			simulateStreaming: true,
+		}),
+	},
+});
+
+// Define tool schemas
+const traceAnalysisToolSchema = z.object({
+	topic: z.nativeEnum(TraceTopic).describe('Topic of the trace'),
+});
+
+const researchToolSchema = z.object({
+	query: z.string().describe('Research query based on the user message'),
+});
+
+/**
+ * Trace Analysis Tool
+ * Analyzes trace data for specific topics
+ */
+const traceAnalysisTool = tool({
+	name: 'trace_analysis',
+	description:
+		'Analyzes performance trace data for specific web performance metrics',
+	schema: traceAnalysisToolSchema,
+	execute: async ({ topic }, { insights, userInteractions }) => {
+		try {
+			if (!insights || !insights.length) {
+				return {
+					type: 'trace_analysis',
+					error: 'No trace data provided',
+				};
+			}
+
+			const result = await analyzeInsights(insights, userInteractions, topic);
+
+			return {
+				type: 'trace_analysis',
+				topic,
+				result,
+			};
+		} catch (error) {
+			console.error('Error in trace analysis tool:', error);
+			return {
+				type: 'trace_analysis',
+				error: error.message || 'Failed to analyze trace data',
+			};
+		}
+	},
+});
+
+/**
+ * Research Tool
+ * Fetches web performance information from trusted sources
+ */
+const researchTool = tool({
+	name: 'research_tool',
+	description:
+		'Fetches research information about web performance from trusted sources',
+	schema: researchToolSchema,
+	execute: async ({ query }) => {
+		try {
+			let tav;
+			// Configure Tavily API
+			if (serverEnv.TAVILY_API_KEY) {
+				tav = tavily({ apiKey: serverEnv.TAVILY_API_KEY });
+			} else {
+				console.warn('TAVILY_API_KEY is not set');
+				return {
+					type: 'research',
+					query,
+					results: [
+						{
+							title: 'No Tavily API key configured',
+							content:
+								'Please configure a Tavily API key to enable research functionality.',
+							url: 'https://tavily.com',
+						},
+					],
+				};
+			}
+
+			// Define trusted domains for web performance research
+			const trustedDomains = [
+				'web.dev',
+				'chromium.org',
+				'developer.chrome.com',
+				'developer.mozilla.org',
+				'dev.to',
+			];
+
+			// Enhanced query with domain-specific scoping
+			const enhancedQuery = `${query} (site:${trustedDomains.join(' OR site:')})`;
+
+			// Execute search with Tavily
+			const response = await tav.search(enhancedQuery, {
+				searchDepth: 'advanced',
+				maxResults: 3,
+				includeDomains: trustedDomains,
+				includeAnswer: false,
+				includeRawContent: false,
+			});
+
+			return {
+				type: 'research',
+				query,
+				results: response.results || [],
+			};
+		} catch (error) {
+			console.error('Error in research tool:', error);
+			return {
+				type: 'research',
+				query,
+				error: error.message || 'Failed to fetch research information',
+				results: [],
+			};
+		}
+	},
+});
 
 // Update the POST function in the chat API route
 export async function POST(req: NextRequest) {
@@ -27,10 +168,11 @@ export async function POST(req: NextRequest) {
 		// Ensure body is an object
 		body = body || {};
 
-		// Extract messages, files, and toolCallId with defaults
-		const messages = Array.isArray(body.messages) ? body.messages : [];
+		// Extract messages, files, and other data with defaults
+		const messages = convertToCoreMessages(body.messages);
 		const files = body.files || [];
-		const toolCallId = body.toolCallId || null;
+		const insights: [string, InsightSet][] = body.insights || [];
+		const userInteractions = body.userInteractions || {};
 		const model = body.model || 'default_model';
 
 		if (messages.length === 0) {
@@ -40,121 +182,29 @@ export async function POST(req: NextRequest) {
 			);
 		}
 
-		// Get the last user message
-		const userMessages = messages.filter(
-			(msg) => msg && typeof msg === 'object' && msg.role === 'user',
-		);
-		const lastUserMessage =
-			userMessages.length > 0 ? userMessages[userMessages.length - 1] : null;
-
-		if (!lastUserMessage) {
-			return NextResponse.json(
-				{ error: 'No user message found' },
-				{ status: 400 },
-			);
-		}
-
-		// Ensure content is a string
-		const content =
-			typeof lastUserMessage.content === 'string'
-				? lastUserMessage.content
-				: '';
-
-		// Add artificial latency to simulate AI thinking time (reduced to 500-1500ms)
-		const thinkingTime = 500 + Math.random() * 1000;
-
-		// Create an abort controller that will be triggered if the client aborts
-		const controller = new AbortController();
-		const { signal } = controller;
-
-		// Store the toolCallId in the signal if provided
-		if (toolCallId) {
-			(signal as any).toolCallId = toolCallId;
-		}
-
-		// Forward the client's abort signal to our controller
-		req.signal.addEventListener('abort', () => {
-			console.log(
-				'Client aborted request, toolCallId:',
-				(req.signal as any).toolCallId,
-			);
-
-			// Check if the abort was for a specific toolCallId
-			const abortToolCallId = (req.signal as any).toolCallId;
-
-			// Only abort if no specific toolCallId was requested or if it matches
-			if (!abortToolCallId || abortToolCallId === toolCallId) {
-				controller.abort();
-			}
-		});
-
-		try {
-			// Use the signal for the thinking time promise
-			await new Promise((resolve, reject) => {
-				const timeout = setTimeout(resolve, thinkingTime);
-				signal.addEventListener('abort', () => {
-					clearTimeout(timeout);
-					reject(new DOMException('Aborted', 'AbortError'));
-				});
-			});
-		} catch (error) {
-			if (error.name === 'AbortError') {
-				console.log('Thinking time aborted');
-				return new Response(null, { status: 499 }); // Client Closed Request
-			}
-			throw error;
-		}
-
-		// Set up the tools
-		const tools = {
-			generateReport: generateReportTool,
-			openSidePanel: openSidePanelTool,
-			generateBreakdown: generateBreakdownTool,
-			performResearch: performResearchTool,
-			generateSuggestions: generateSuggestionsTool,
-		};
-
-		// Filter out the generateSuggestionsTool from the tools object
-		const { generateSuggestions, ...chatTools } = tools;
-
-		// Prepare tool parameters
-		const toolParams =
-			files && files.length > 0
-				? { files, query: content }
-				: { query: content };
-
-		// System template
-		const systemTemplate =
-			'You are a helpful assistant specialized in Go programming. Provide clear, concise, and accurate information about Go concepts, patterns, and best practices.';
-
-		// Use createDataStreamResponse to handle the streaming response
 		return createDataStreamResponse({
 			execute: async (dataStream) => {
-				// Get the model from ModelProvider
-				const selectedModel = ModelProvider(model);
-
-				// Create the stream
-				const chatStream = streamText({
-					model: selectedModel,
+				const traceReportStream = streamText({
+					model: perfAgent.languageModel(model),
 					temperature: 0,
 					messages,
-					system: systemTemplate,
-					toolChoice: 'auto',
-					tools: chatTools,
-					toolParams,
+					system: systemPrompt,
+					// tools: { traceAnalysisTool, researchTool },
+					onFinish(event) {
+						console.log(
+							'######################### traceReportStream onFinish #################################',
+						);
+						console.log('Fin reason: ', event.finishReason);
+						console.log('Reasoning: ', event.reasoning);
+						console.log('reasoning details: ', event.reasoningDetails);
+						console.log('Messages: ', event.response.messages);
+					},
 					onError(event) {
 						console.log('Error: ', event.error);
 					},
 				});
 
-				// Set up an abort handler for the dataStream
-				signal.addEventListener('abort', () => {
-					console.log('Aborting dataStream');
-					dataStream.close();
-				});
-
-				// Merge the stream into the dataStream
-				return chatStream.mergeIntoDataStream(dataStream, {
+				return traceReportStream.mergeIntoDataStream(dataStream, {
 					experimental_sendStart: true,
 				});
 			},
