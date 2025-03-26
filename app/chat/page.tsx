@@ -48,13 +48,6 @@ export default function AiChatPage() {
 		experimental_throttle: 500,
 	});
 
-	console.log('status', status);
-	console.log('messages', messages);
-
-	const isLoading = status === 'submitted';
-
-	console.log('isLoading', isLoading);
-
 	// UI state management
 	const [chatStarted, setChatStarted] = useState(false);
 	const [messagesVisible, setMessagesVisible] = useState(false);
@@ -84,6 +77,9 @@ export default function AiChatPage() {
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const messagesEndRef = useRef<HTMLDivElement>(null);
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+	// Check if a message is currently being streamed
+	const isLoading = status === 'submitted';
 
 	/**
 	 * Smoothly scrolls to the bottom of the chat messages
@@ -360,6 +356,17 @@ export default function AiChatPage() {
 		// }
 	}, [messages]);
 
+	// Get the ID of the latest message from the assistant (for typing indicator)
+	const latestAssistantMessageId = useMemo(() => {
+		const assistantMessages = messages.filter(
+			(msg) => msg.role === 'assistant',
+		);
+		return assistantMessages.length > 0
+			? assistantMessages[assistantMessages.length - 1].id
+			: null;
+	}, [messages]);
+
+	// Filter to only display user messages and assistant messages
 	const memoizedMessages = useMemo(() => {
 		// Create a shallow copy
 		const msgs = [...messages];

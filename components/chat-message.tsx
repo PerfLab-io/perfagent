@@ -123,10 +123,14 @@ export function ChatMessage({
 	const messageEndRef = useRef<HTMLDivElement>(null);
 
 	// Derived state from message
-	const messageIsStreaming = useMemo(
-		() => isMessageStreaming(message) && isStreaming,
-		[isStreaming, message],
-	);
+	const messageIsStreaming = useMemo(() => {
+		// Check if the current message is the one that's streaming
+		if (message.role === 'assistant' && isStreaming) {
+			return isMessageStreaming(message) || message.id === message.id;
+		}
+		return false;
+	}, [isStreaming, message]);
+
 	const isMessageIsWaiting = useMemo(
 		() => isMessageWaiting(message),
 		[message],
@@ -589,15 +593,12 @@ export function ChatMessage({
 		renderToolHeader,
 	]);
 
+	// Determine if this is a user or assistant message
 	const isUser = message.role === 'user';
-	const hasMessageContent = messageIsStreaming;
-	const showTypingIndicator =
-		message.role === 'assistant' && messageIsStreaming;
 
-	console.log(
-		'message',
-		message.parts?.find((part) => part.type === 'text')?.text + '',
-	);
+	// Get the message text from parts
+	const messageText =
+		message.parts?.find((part) => part.type === 'text')?.text.trim() || '';
 
 	return (
 		<div className={styles.messageContainer}>
@@ -609,59 +610,43 @@ export function ChatMessage({
 			)}
 
 			<div className="flex max-w-[80%] flex-col">
-				{/* Message bubble */}
-				{message.parts?.map((part) => {
-					console.log(part, 'ASDAKJDKAJSDKJAKSDJAKJSDK');
-					if (part.type === 'text') {
-						return (
-							<div
-								key={message.id + 'text-part'}
-								className={styles.messageBubble}
-							>
-								<div className="whitespace-pre-wrap">
-									{<MarkdownRenderer content={part.text} />}
-									{/* Streaming cursor */}
-									{message.role === 'assistant' && messageIsStreaming && (
-										<span className="ml-1 inline-block h-4 w-2 animate-pulse bg-foreground"></span>
-									)}
-								</div>
+				{/* Message bubble - Always render for assistant, even if empty */}
+				{messageText ? (
+					<div className={styles.messageBubble}>
+						<div className="whitespace-pre-wrap">
+							<MarkdownRenderer content={messageText} />
+						</div>
 
-								{/* Timestamp and feedback buttons */}
-								<div className="mt-1 flex items-center justify-between">
-									<div className={styles.timestamp}>
-										{new Date(
-											message.createdAt || Date.now(),
-										).toLocaleTimeString([], {
-											hour: '2-digit',
-											minute: '2-digit',
-										})}
-									</div>
-
-									{/* Only show feedback for assistant messages that are not streaming or waiting */}
-									{!isUser && !messageIsStreaming && !isMessageIsWaiting && (
-										<FeedbackButtons messageId={message.id} source="message" />
-									)}
-								</div>
+						{/* Timestamp and feedback buttons */}
+						<div className="mt-1 flex items-center justify-between">
+							<div className={styles.timestamp}>
+								{new Date(message.createdAt || Date.now()).toLocaleTimeString(
+									[],
+									{
+										hour: '2-digit',
+										minute: '2-digit',
+									},
+								)}
 							</div>
-						);
-					} else {
-						return null;
-					}
-				})}
 
-				{/* Typing indicator */}
-				{/* {showTypingIndicator && (
-					<div className="typing-indicator">
+							{/* Only show feedback for assistant messages that are not streaming or waiting */}
+							{!isUser && !messageIsStreaming && !isMessageIsWaiting && (
+								<FeedbackButtons messageId={message.id} source="message" />
+							)}
+						</div>
+					</div>
+				) : (
+					<div className="typing-indicator absolute bottom-2 left-4">
 						<span></span>
 						<span></span>
 						<span></span>
 					</div>
-				)} */}
+				)}
 
 				{/* Tool sections */}
-				{/* {renderReportSection()}
+				{renderReportSection()}
 				{renderBreakdownSection()}
-				{renderResearchSection()} */}
+				{renderResearchSection()}
 			</div>
 
 			{/* User avatar */}
