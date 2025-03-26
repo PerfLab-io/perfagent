@@ -364,6 +364,11 @@ export function ChatMessage({
 		return 'View detailed information about this topic in the report.';
 	}, [toolCall]);
 
+	// Get the message text from parts
+	const messageText = message.parts
+		?.find((part) => part.type === 'text')
+		?.text.trim();
+
 	/**
 	 * Style utilities
 	 */
@@ -381,7 +386,8 @@ export function ChatMessage({
 			message.role === 'user'
 				? 'bg-indigo-600 text-white'
 				: 'group relative border border-border bg-background text-foreground transition-all duration-300 hover:-translate-y-1 hover:translate-x-1 hover:shadow-[-4px_4px_0_hsl(var(--border-color))]',
-			messageIsStreaming &&
+			isStreaming &&
+				message.role === 'assistant' &&
 				'-translate-y-1 translate-x-1 shadow-[-4px_4px_0_hsl(var(--border-color))]',
 		),
 
@@ -596,10 +602,6 @@ export function ChatMessage({
 	// Determine if this is a user or assistant message
 	const isUser = message.role === 'user';
 
-	// Get the message text from parts
-	const messageText =
-		message.parts?.find((part) => part.type === 'text')?.text.trim() || '';
-
 	return (
 		<div className={styles.messageContainer}>
 			{/* Bot avatar */}
@@ -614,7 +616,7 @@ export function ChatMessage({
 				{messageText ? (
 					<div className={styles.messageBubble}>
 						<div className="whitespace-pre-wrap">
-							<MarkdownRenderer content={messageText} />
+							<MarkdownRenderer content={messageText || ''} />
 						</div>
 
 						{/* Timestamp and feedback buttons */}

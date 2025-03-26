@@ -11,9 +11,10 @@ import { SuggestedMessages } from '@/components/suggested-messages';
 import { FileDropzone } from '@/components/file-dropzone';
 import { DataPanel } from '@/components/data-panel';
 import { MarkdownReport } from '@/components/markdown-report';
-import { cn } from '@/lib/utils';
+import { cn, yieldToMain } from '@/lib/utils';
 import { ResearchProvider } from '@/components/research-card';
 import { useChat } from '@ai-sdk/react';
+import { analyzeTraceFromFile } from '@/lib/trace';
 
 /**
  * Type definition for the report data structure
@@ -85,13 +86,15 @@ export default function AiChatPage() {
 	const [suggestionsLoading, setSuggestionsLoading] = useState(false);
 	const [suggestions, setSuggestions] = useState<string[]>([]);
 
+	const [traceAnalysis, setTraceAnalysis] = useState<any>(null);
+
 	// Refs
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const messagesEndRef = useRef<HTMLDivElement>(null);
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
-
+	const formRef = useRef<HTMLFormElement>(null);
 	// Check if a message is currently being streamed
-	const isLoading = status === 'submitted';
+	const isLoading = status === 'submitted' || status === 'streaming';
 
 	/**
 	 * Smoothly scrolls to the bottom of the chat messages
@@ -114,6 +117,16 @@ export default function AiChatPage() {
 						size: file.size,
 						type: file.type,
 					}));
+
+					requestAnimationFrame(async () => {
+						await yieldToMain();
+
+						setTimeout(() => {
+							analyzeTraceFromFile(e.target.files[0]).then((trace) => {
+								setTraceAnalysis(trace);
+							});
+						}, 100);
+					});
 				}
 			} else if (isDragEvent(e)) {
 				if (e.dataTransfer.files.length > 0) {
@@ -123,6 +136,12 @@ export default function AiChatPage() {
 						size: file.size,
 						type: file.type,
 					}));
+					requestAnimationFrame(async () => {
+						await yieldToMain();
+						analyzeTraceFromFile(e.dataTransfer.files[0]).then((trace) => {
+							setTraceAnalysis(trace);
+						});
+					});
 				}
 			}
 
@@ -143,6 +162,7 @@ export default function AiChatPage() {
 	// Remove a file by ID
 	const removeFile = useCallback(
 		(id: string) => {
+			setTraceAnalysis(null);
 			setAttachedFiles((prev) => {
 				const updated = prev.filter((file) => file.id !== id);
 
@@ -163,18 +183,25 @@ export default function AiChatPage() {
 	 */
 	const handleSubmit = useCallback(
 		(e: React.FormEvent) => {
+			e.preventDefault();
+
+			console.log(traceAnalysis?.parsedTrace);
+
 			// Only proceed if there's input
 			if (input.trim()) {
-				originalHandleSubmit(e as any);
+				originalHandleSubmit(e as any, {
+					body: {
+						insights: Array.from(traceAnalysis?.insights ?? []),
+						userInteractions: traceAnalysis?.parsedTrace.UserInteractions,
+					},
+				});
 				// Hide file section after submission
 				setShowFileSection(false);
 				setAttachedFiles([]);
-
+				setTraceAnalysis(null);
 				// Clear suggestions when submitting a message
 				setSuggestions([]);
 				setSuggestionsLoading(false);
-			} else {
-				e.preventDefault();
 			}
 		},
 		[input, attachedFiles?.length, originalHandleSubmit],
@@ -186,11 +213,10 @@ export default function AiChatPage() {
 	const handleKeyDown = useCallback(
 		(event: React.KeyboardEvent<HTMLTextAreaElement>) => {
 			if (event.key === 'Enter' && !event.shiftKey) {
-				event.preventDefault();
-				originalHandleSubmit(event as any);
+				handleSubmit(event as any);
 			}
 		},
-		[originalHandleSubmit],
+		[handleSubmit],
 	);
 
 	/**
@@ -364,16 +390,6 @@ export default function AiChatPage() {
 		// }
 	}, [messages]);
 
-	// Get the ID of the latest message from the assistant (for typing indicator)
-	const latestAssistantMessageId = useMemo(() => {
-		const assistantMessages = messages.filter(
-			(msg) => msg.role === 'assistant',
-		);
-		return assistantMessages.length > 0
-			? assistantMessages[assistantMessages.length - 1].id
-			: null;
-	}, [messages]);
-
 	// Filter to only display user messages and assistant messages
 	const memoizedMessages = useMemo(() => {
 		// Create a shallow copy
@@ -401,6 +417,7 @@ export default function AiChatPage() {
 			return false;
 		});
 	}, [messages]);
+	console.log('memoizedMessages: ', memoizedMessages);
 
 	// Effect: Ensure proper scroll behavior when file section visibility changes
 	useEffect(() => {
@@ -458,11 +475,13 @@ export default function AiChatPage() {
 									)}
 								>
 									<div className="space-y-4 p-4">
-										{memoizedMessages.map((message) => (
+										{memoizedMessages.map((message, index) => (
 											<ChatMessage
 												key={message.id}
 												message={message}
-												isStreaming={isLoading}
+												isStreaming={
+													isLoading && index === memoizedMessages.length - 1
+												}
 												onAbort={stop}
 												openReport={openReport}
 												closeReport={closeReport}
@@ -515,7 +534,7 @@ export default function AiChatPage() {
 									)}
 
 									{/* Textarea and buttons */}
-									<form onSubmit={handleSubmit} className="p-4">
+									<form onSubmit={handleSubmit} className="p-4" ref={formRef}>
 										<div className="relative">
 											<textarea
 												ref={textareaRef}
