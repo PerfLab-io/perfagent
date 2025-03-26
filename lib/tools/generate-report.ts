@@ -1,5 +1,5 @@
 import { registerTool } from '../mock-ai-sdk';
-import { getAnimationUrlForTopic } from '../utils/gif-generator';
+import { getAnimationUrlForTopic } from '../utils';
 
 // Mock report content based on topics
 const reportContent = {
