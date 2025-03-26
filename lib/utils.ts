@@ -34,3 +34,16 @@ export function getAnimationUrlForTopic(topic: string): string {
 	return images[0]; // In a real implementation, this would be a GIF URL
 }
 
+export function yieldToMain() {
+	// Use scheduler.yield if it exists:
+	/* @ts-ignore */
+	if (window && 'scheduler' in window && 'yield' in scheduler) {
+		/* @ts-ignore */
+		return scheduler.yield();
+	}
+
+	// Fall back to setTimeout:
+	return new Promise((resolve) => {
+		setTimeout(resolve, 0);
+	});
+}
