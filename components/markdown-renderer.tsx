@@ -12,6 +12,7 @@ import {
 import { ArrowLeftRight, Check, Copy, Loader2, WrapText } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { fetchMetadata, type LinkMetadata } from '@/lib/utils/metadata';
 
 /**
  * Types and Interfaces
@@ -19,13 +20,6 @@ import Link from 'next/link';
 interface MarkdownRendererProps {
 	content: string;
 	className?: string;
-}
-
-interface LinkMetadata {
-	title?: string;
-	description?: string;
-	image?: string;
-	url: string;
 }
 
 interface CitationLink {
@@ -53,24 +47,6 @@ const isValidUrl = (urlString: string): boolean => {
 		return true;
 	} catch (e) {
 		return false;
-	}
-};
-
-/**
- * Fetch metadata for a URL (mock implementation)
- */
-const fetchMetadata = async (url: string): Promise<LinkMetadata | null> => {
-	try {
-		// In a real implementation, this would call an API to fetch metadata
-		// Mock data for demonstration
-		return {
-			title: `Title for ${url}`,
-			description: 'This is a description for the link',
-			url,
-		};
-	} catch (error) {
-		console.error('Error fetching metadata:', error);
-		return null;
 	}
 };
 
@@ -246,6 +222,8 @@ const LinkPreview: React.FC<{ href: string }> = ({ href }) => {
 
 	const domain = new URL(href).hostname;
 	const title = metadata?.title || domain;
+	const description = metadata?.description || '';
+	const image = metadata?.image || '';
 
 	return (
 		<div className="m-0 flex flex-col bg-white text-xs dark:bg-neutral-800">
@@ -264,6 +242,22 @@ const LinkPreview: React.FC<{ href: string }> = ({ href }) => {
 					<h3 className="m-0 line-clamp-2 text-sm font-medium text-neutral-800 dark:text-neutral-200">
 						{title}
 					</h3>
+				</div>
+			)}
+			{description && (
+				<div className="px-2 pb-1.5 text-sm text-neutral-600 dark:text-neutral-400">
+					{description}
+				</div>
+			)}
+			{image && (
+				<div className="px-2 pb-1.5">
+					<Image
+						src={image}
+						alt=""
+						width={800}
+						height={450}
+						className="rounded-sm"
+					/>
 				</div>
 			)}
 		</div>
