@@ -19,38 +19,66 @@
 	box-shadow: -4px 4px 0 hsl(var(--border-color));
 }
 
+/* Retro-style typing animation with rounded squares and diagonal patterns */
 .typing-indicator span {
-	height: 8px;
-	width: 8px;
-	background-color: hsl(var(--text-color));
-	opacity: 0.8; /* Increased opacity for better visibility */
-	border-radius: 50%;
-	display: inline-block;
-	animation: typing 1.5s infinite ease-in-out;
+  height: 12px;
+  width: 12px;
+  background-color: transparent;
+  border-radius: 3px; /* Rounded squares */
+  display: inline-block;
+  position: relative;
+  opacity: 0.8;
+  /* Low FPS animation - one square at a time */
+  animation: none; /* Reset previous animation */
 }
 
+/* Create diagonal line pattern using pseudo-elements */
+.typing-indicator span::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: repeating-linear-gradient(
+    45deg,
+    currentColor,
+    currentColor 2px,
+    transparent 2px,
+    transparent 3px
+  );
+  border-radius: 3px;
+  opacity: 0.7;
+}
+
+/* Apply animations to each square individually */
 .typing-indicator span:nth-child(1) {
-	animation-delay: 0s;
+  animation: retro-bounce 1.8s steps(3) infinite; /* Low FPS effect using steps */
 }
 
 .typing-indicator span:nth-child(2) {
-	animation-delay: 0.3s;
+  animation: retro-bounce 1.8s steps(3) infinite 0.6s; /* Delay for sequential effect */
 }
 
 .typing-indicator span:nth-child(3) {
-	animation-delay: 0.6s;
+  animation: retro-bounce 1.8s steps(3) infinite 1.2s; /* Delay for sequential effect */
 }
 
-@keyframes typing {
-	0%,
-	100% {
-		transform: translateY(0);
-		opacity: 0.6;
-	}
-	50% {
-		transform: translateY(-5px);
-		opacity: 1;
-	}
+/* Retro-style bouncing animation with stepped timing for low FPS effect */
+@keyframes retro-bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.6;
+  }
+  33% {
+    transform: translateY(-6px);
+    opacity: 1;
+  }
+  66% {
+    transform: translateY(0);
+    opacity: 0.8;
+  }
 }
 
 /* Blinking animation for new messages */
