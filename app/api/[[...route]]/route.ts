@@ -1,13 +1,14 @@
-import { type NextRequest, NextResponse } from 'next/server';
+import { type NextRequest } from 'next/server';
 import { serverEnv } from '@/lib/env/server';
 import { tavily } from '@tavily/core';
 import {
 	convertToCoreMessages,
 	customProvider,
-	generateObject,
 	streamText,
-	createDataStreamResponse,
+	createDataStream,
 	tool,
+	wrapLanguageModel,
+	simulateStreamingMiddleware,
 } from 'ai';
 import { type InsightSet } from '@paulirish/trace_engine/models/trace/insights/types';
 import { createOpenAI } from '@ai-sdk/openai';
@@ -15,26 +16,54 @@ import dedent from 'dedent';
 import { TraceTopic, analyzeInsights } from '@/lib/insights';
 import { z } from 'zod';
 import { systemPrompt } from '@/lib/ai/model';
+import { Hono } from 'hono';
+import { handle } from 'hono/vercel';
+import { stream } from 'hono/streaming';
+import { zValidator } from '@hono/zod-validator';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
 
-const openai = createOpenAI({
-	// custom settings, e.g.
+export const runtime = 'nodejs';
+
+const local = createOpenAI({
 	baseURL: 'http://localhost:11434/v1',
 	apiKey: 'ollama', // required but unused
-	name: 'ollama',
-	compatibility: 'strict', // strict mode, enable when using the OpenAI API
 });
 
+const middleware = simulateStreamingMiddleware();
+
+const localModels = {
+	default_model: wrapLanguageModel({
+		model: local('qwen2.5-coder:14b', {
+			structuredOutputs: true,
+		}),
+		middleware,
+	}),
+	topics_model: wrapLanguageModel({
+		model: local('llama3.1:8b', {
+			structuredOutputs: true,
+			simulateStreaming: true,
+		}),
+		middleware,
+	}),
+};
+
+const google = createGoogleGenerativeAI({
+	apiKey: serverEnv.GEMINI_API_KEY,
+});
+
+const googleModels = {
+	default_model: google('gemini-2.0-flash', {
+		structuredOutputs: true,
+	}),
+	topics_model: google('gemini-2.0-flash-lite', {
+		structuredOutputs: true,
+	}),
+};
+
 const perfAgent = customProvider({
-	languageModels: {
-		default_model: openai('qwen2.5-coder:14b', {
-			structuredOutputs: true,
-			simulateStreaming: true,
-		}),
-		topics_model: openai('llama3.1:8b', {
-			structuredOutputs: true,
-			simulateStreaming: true,
-		}),
-	},
+	languageModels:
+		// process.env.NODE_ENV === 'development' ? localModels : googleModels,
+		googleModels,
 });
 
 // Define tool schemas
@@ -150,40 +179,36 @@ const researchTool = tool({
 	},
 });
 
-// Update the POST function in the chat API route
-export async function POST(req: NextRequest) {
+// Define the request body schema
+const requestSchema = z.object({
+	messages: z.array(z.any()).default([]),
+	files: z.array(z.any()).default([]),
+	insights: z.array(z.any()).default([]),
+	userInteractions: z.record(z.any()).default({}),
+	model: z.string().default('default_model'),
+});
+
+// Create Hono app for chat API
+const chat = new Hono().basePath('/api');
+
+// POST endpoint for chat
+chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 	try {
-		// Parse the request body
-		let body;
-		try {
-			body = await req.json();
-		} catch (error) {
-			console.error('Error parsing request body:', error);
-			return NextResponse.json(
-				{ error: 'Invalid request body' },
-				{ status: 400 },
-			);
-		}
-
-		// Ensure body is an object
-		body = body || {};
-
-		// Extract messages, files, and other data with defaults
+		const body = c.req.valid('json');
 		const messages = convertToCoreMessages(body.messages);
-		const files = body.files || [];
-		const insights: [string, InsightSet][] = body.insights || [];
-		const userInteractions = body.userInteractions || {};
-		const model = body.model || 'default_model';
+		const files = body.files;
+		const insights: [string, InsightSet][] = body.insights;
+		const userInteractions = body.userInteractions;
+		const model = body.model;
 
 		if (messages.length === 0) {
-			return NextResponse.json(
-				{ error: 'No messages provided' },
-				{ status: 400 },
-			);
+			return c.json({ error: 'No messages provided' }, 400);
 		}
 
-		return createDataStreamResponse({
-			execute: async (dataStream) => {
+		const dataStream = createDataStream({
+			execute: async (dataStreamWriter) => {
+				dataStreamWriter.writeData('initialized call');
+
 				const traceReportStream = streamText({
 					model: perfAgent.languageModel(model),
 					temperature: 0,
@@ -204,29 +229,40 @@ export async function POST(req: NextRequest) {
 					},
 				});
 
-				return traceReportStream.mergeIntoDataStream(dataStream, {
+				traceReportStream.mergeIntoDataStream(dataStreamWriter, {
+					sendReasoning: true,
+					sendSources: true,
 					experimental_sendStart: true,
 				});
 			},
+			onError: (error) => {
+				return error instanceof Error ? error.message : String(error);
+			},
 		});
+
+		c.header('X-Vercel-AI-Data-Stream', 'v1');
+		c.header('Content-Type', 'text/plain; charset=utf-8');
+
+		return stream(c, (stream) =>
+			stream.pipe(dataStream.pipeThrough(new TextEncoderStream())),
+		);
 	} catch (error) {
 		console.error('Error in chat API:', error);
+
 		if (error.name === 'AbortError') {
 			// Return a specific status code for aborted requests
 			console.log('Returning aborted response');
-			return new Response(JSON.stringify({ error: 'Request aborted' }), {
-				status: 499,
-				headers: {
-					'Content-Type': 'application/json',
-				},
-			});
+			return c.json({ error: 'Request aborted' }, 499);
 		}
-		return NextResponse.json(
+		return c.json(
 			{
 				error: 'Internal server error',
 				message: error.message || 'Unknown error',
 			},
-			{ status: 500 },
+			500,
 		);
 	}
-}
+});
+
+export const GET = handle(chat);
+export const POST = handle(chat);
