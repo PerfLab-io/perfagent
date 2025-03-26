@@ -31,6 +31,18 @@ export interface AttachedFile {
 	type: string;
 }
 
+const isDragEvent = (
+	e: React.ChangeEvent<HTMLInputElement> | React.DragEvent<HTMLDivElement>,
+): e is React.DragEvent<HTMLDivElement & { files: FileList }> => {
+	return 'dataTransfer' in e && 'files' in e.dataTransfer;
+};
+
+const isFileInputEvent = (
+	e: React.ChangeEvent<HTMLInputElement> | React.DragEvent<HTMLDivElement>,
+): e is React.ChangeEvent<HTMLInputElement & { files: FileList }> => {
+	return 'target' in e && 'files' in e.target;
+};
+
 /**
  * AiChatPage - Main chat interface component with file handling, messaging,
  * and side panel functionality for data visualization and reports
@@ -88,49 +100,45 @@ export default function AiChatPage() {
 		messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
 	}, []);
 
-	const handleFileChange = useCallback(
-		(e: React.ChangeEvent<HTMLInputElement>) => {
-			if (e.target.files && e.target.files.length > 0) {
-				const newFiles: AttachedFile[] = Array.from(e.target.files).map(
-					(file) => ({
+	const processFiles = useCallback(
+		(
+			e: React.ChangeEvent<HTMLInputElement> | React.DragEvent<HTMLDivElement>,
+		) => {
+			let newFiles: AttachedFile[] = [];
+
+			if (isFileInputEvent(e)) {
+				if (e.target.files.length > 0) {
+					newFiles = Array.from(e.target.files).map((file) => ({
 						id: Math.random().toString(36).substring(7),
 						name: file.name,
 						size: file.size,
 						type: file.type,
-					}),
-				);
-
-				const updatedFiles = [...attachedFiles, ...newFiles];
-				setAttachedFiles(updatedFiles);
-
-				// Always trigger suggestions when files are added
-				setSuggestionsLoading(true);
+					}));
+				}
+			} else if (isDragEvent(e)) {
+				if (e.dataTransfer.files.length > 0) {
+					newFiles = Array.from(e.dataTransfer.files).map((file) => ({
+						id: Math.random().toString(36).substring(7),
+						name: file.name,
+						size: file.size,
+						type: file.type,
+					}));
+				}
 			}
+
+			const updatedFiles = [...attachedFiles, ...newFiles];
+			setAttachedFiles(updatedFiles);
+
+			// Always trigger suggestions when files are added
+			setSuggestionsLoading(true);
 		},
-		[attachedFiles, setAttachedFiles, setSuggestionsLoading],
+		[],
 	);
+
+	const handleFileChange = processFiles;
 
 	// Handle files dropped into the dropzone
-	const handleFilesDrop = useCallback(
-		(files: File[]) => {
-			if (files.length > 0) {
-				const newFiles: AttachedFile[] = files.map((file) => ({
-					id: Math.random().toString(36).substring(7),
-					name: file.name,
-					size: file.size,
-					type: file.type,
-				}));
-
-				// Start suggestion loading immediately before updating state
-				setSuggestionsLoading(true);
-
-				// Update files state
-				const updatedFiles = [...attachedFiles, ...newFiles];
-				setAttachedFiles(updatedFiles);
-			}
-		},
-		[attachedFiles, setAttachedFiles, setSuggestionsLoading],
-	);
+	const handleFilesDrop = processFiles;
 
 	// Remove a file by ID
 	const removeFile = useCallback(

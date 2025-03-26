@@ -17,7 +17,7 @@ interface FileDropzoneProps {
 	/** Content to render inside the dropzone */
 	children: React.ReactNode;
 	/** Callback function triggered when files are dropped */
-	onFilesDrop: (files: File[]) => void;
+	onFilesDrop: (e: React.DragEvent<HTMLDivElement>) => void;
 	/** Additional CSS classes */
 	className?: string;
 	/** Whether the dropzone is disabled */
@@ -155,10 +155,8 @@ export function FileDropzone({
 			dragCounterRef.current = 0;
 
 			if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-				const files = Array.from(e.dataTransfer.files);
-
 				// Process the files immediately - don't wait for animations
-				onFilesDrop(files);
+				onFilesDrop(e);
 
 				// Show success animation briefly
 				updateState({ dropSuccess: true });
