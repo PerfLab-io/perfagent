@@ -311,37 +311,32 @@ export function MarkdownRenderer({
 	);
 
 	// Render hover card for links
-	const renderHoverCard = useCallback(
-		(href: string, text: React.ReactNode, isCitation = false) => {
-			return (
-				<HoverCard key={`${href}-${isCitation}`}>
-					<HoverCardTrigger asChild>
-						<Link
-							href={href}
-							target="_blank"
-							rel="noopener noreferrer"
-							className={
-								isCitation
-									? 'm-0 cursor-pointer rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary no-underline dark:bg-primary/20'
-									: 'dark:text-primary-light font-medium text-primary no-underline hover:underline'
-							}
-						>
-							{text}
-						</Link>
-					</HoverCardTrigger>
-					<HoverCardContent
-						side="top"
-						align="start"
-						sideOffset={5}
-						className="w-48 overflow-hidden rounded-md border border-neutral-200 p-0 shadow-sm dark:border-neutral-700"
+	const renderHoverCard = useCallback((href: string, text: React.ReactNode) => {
+		return (
+			<HoverCard key={`${href}-${Math.random()}`}>
+				<HoverCardTrigger asChild>
+					<Link
+						href={href}
+						target="_blank"
+						rel="noopener noreferrer"
+						className={
+							'm-0 cursor-pointer rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary no-underline dark:bg-primary/20'
+						}
 					>
-						<LinkPreview href={href} />
-					</HoverCardContent>
-				</HoverCard>
-			);
-		},
-		[],
-	);
+						*
+					</Link>
+				</HoverCardTrigger>
+				<HoverCardContent
+					side="top"
+					align="start"
+					sideOffset={5}
+					className="w-48 overflow-hidden rounded-md border border-neutral-200 p-0 shadow-sm dark:border-neutral-700"
+				>
+					<LinkPreview href={href} />
+				</HoverCardContent>
+			</HoverCard>
+		);
+	}, []);
 
 	// Custom renderer mapping for headings
 	const headingClasses = useMemo(
@@ -385,11 +380,7 @@ export function MarkdownRenderer({
 				);
 
 				if (citationIndex !== -1) {
-					return React.createElement(
-						'sup',
-						null,
-						renderHoverCard(href, citationIndex + 1, true),
-					);
+					return React.createElement('sup', null, renderHoverCard(href, text));
 				}
 
 				return isValidUrl(href) ? (
