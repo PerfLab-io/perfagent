@@ -6,6 +6,7 @@ export const serverEnv = createEnv({
 	server: {
 		RESEND_API_KEY: z.string().min(1),
 		TAVILY_API_KEY: z.string().min(1),
+		GEMINI_API_KEY: z.string().min(1),
 	},
 	experimental__runtimeEnv: process.env,
 });
