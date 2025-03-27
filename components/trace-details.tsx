@@ -125,7 +125,7 @@ export function FileContextSection({
 					? 'max-h-[600px] overflow-y-auto border border-peppermint-200 dark:border-peppermint-900'
 					: 'max-h-[40px] border border-dashed border-peppermint-200 dark:border-peppermint-900',
 				isAnimating &&
-					'-translate-y-1 translate-x-1 shadow-[-4px_4px_0_var(--border-color)]',
+					'-translate-y-1 translate-x-1 shadow-[-4px_4px_0_hsl(var(--border-color))]',
 				isInitialRender && 'file-context-appear',
 			)}
 		>
