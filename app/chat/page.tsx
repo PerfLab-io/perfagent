@@ -15,6 +15,7 @@ import { cn, yieldToMain } from '@/lib/utils';
 import { ResearchProvider } from '@/components/research-card';
 import { useChat } from '@ai-sdk/react';
 import { analyzeTraceFromFile } from '@/lib/trace';
+import { FileContextSection } from '@/components/trace-details';
 
 /**
  * Type definition for the report data structure
@@ -87,12 +88,17 @@ export default function AiChatPage() {
 	const [suggestions, setSuggestions] = useState<string[]>([]);
 
 	const [traceAnalysis, setTraceAnalysis] = useState<any>(null);
+	// Add a new state for the current file in context
+	const [currentContextFile, setCurrentContextFile] =
+		useState<AttachedFile | null>(null);
+	const [showContextFile, setShowContextFile] = useState(false);
 
 	// Refs
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const messagesEndRef = useRef<HTMLDivElement>(null);
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const formRef = useRef<HTMLFormElement>(null);
+
 	// Check if a message is currently being streamed
 	const isLoading = status === 'submitted' || status === 'streaming';
 
@@ -163,6 +169,7 @@ export default function AiChatPage() {
 	const removeFile = useCallback(
 		(id: string) => {
 			setTraceAnalysis(null);
+			setCurrentContextFile(null);
 			setAttachedFiles((prev) => {
 				const updated = prev.filter((file) => file.id !== id);
 
@@ -197,6 +204,8 @@ export default function AiChatPage() {
 				});
 				// Hide file section after submission
 				setShowFileSection(false);
+				setCurrentContextFile(attachedFiles[0]);
+				setShowContextFile(true);
 				setAttachedFiles([]);
 				setTraceAnalysis(null);
 				// Clear suggestions when submitting a message
@@ -459,6 +468,11 @@ export default function AiChatPage() {
 								className="relative flex h-full flex-1 flex-col"
 								disabled={isLoading}
 							>
+								{/* File context section */}
+								<FileContextSection
+									currentFile={currentContextFile}
+									isVisible={showContextFile}
+								/>
 								{/* Chat messages container */}
 								<div
 									className={cn(
