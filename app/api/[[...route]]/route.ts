@@ -376,55 +376,37 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 											? query
 											: `${query} web performance optimization`;
 
-										// Mock research results for web performance patterns
-										const mockResults = [
-											{
-												id: '1',
-												title:
-													'Core Web Vitals: Essential Metrics for Modern Web Performance',
-												snippet:
-													"Core Web Vitals are Google's initiative to provide unified guidance for quality signals. They focus on three aspects of user experience—loading performance (LCP), interactivity (FID), and visual stability (CLS). Understanding and optimizing these metrics is crucial for delivering a great user experience.",
-												source: 'web',
-												sourceIcon: 'Globe',
-												url: 'https://web.dev/vitals/',
-											},
-											{
-												id: '2',
-												title:
-													'Advanced Performance Optimization: Resource Loading and Rendering',
-												snippet:
-													'Modern web performance optimization involves strategic resource loading, efficient JavaScript execution, and optimized rendering paths. Techniques like code splitting, tree shaking, and critical CSS extraction can significantly improve loading times and user experience.',
-												source: 'academic',
-												sourceIcon: 'BookOpen',
-												url: 'https://developer.mozilla.org/en-US/docs/Web/Performance',
-											},
-											{
-												id: '3',
-												title: 'Performance Monitoring and Analysis Patterns',
-												snippet:
-													'Real User Monitoring (RUM) combined with synthetic testing provides comprehensive performance insights. Using tools like the Performance API, Lighthouse, and WebPageTest helps identify bottlenecks and optimization opportunities.',
-												source: 'analysis',
-												sourceIcon: 'BarChart',
-											},
-											{
-												id: '4',
-												title:
-													'Client-Side vs. Server-Side Optimization Strategies',
-												snippet:
-													'A holistic approach to web performance involves both client-side and server-side optimizations. This includes techniques like server-side rendering, edge caching, image optimization, and efficient data loading patterns.',
-												source: 'academic',
-												sourceIcon: 'BookOpen',
-												url: 'https://web.dev/performance-optimizing-content-efficiency/',
-											},
-											{
-												id: '5',
-												title: 'Error Handling and Performance Recovery',
-												snippet:
-													'Implementing robust error handling and recovery mechanisms is crucial for maintaining performance under adverse conditions. This includes graceful degradation, offline capabilities, and strategic error boundaries.',
-												source: 'web',
-												sourceIcon: 'Globe',
-											},
+										let tav;
+										// Configure Tavily API
+										if (serverEnv.TAVILY_API_KEY) {
+											tav = tavily({ apiKey: serverEnv.TAVILY_API_KEY });
+										} else {
+											console.warn('TAVILY_API_KEY is not set');
+											return {
+												type: 'research',
+												query,
+												results: [
+													{
+														title: 'No Tavily API key configured',
+														content:
+															'Please configure a Tavily API key to enable research functionality.',
+														url: 'https://tavily.com',
+													},
+												],
+											};
+										}
+
+										// Define trusted domains for web performance research
+										const trustedDomains = [
+											'web.dev',
+											'chromium.org',
+											'developer.chrome.com',
+											'developer.mozilla.org',
+											'dev.to',
 										];
+
+										// Enhanced query with domain-specific scoping
+										const enhancedQuery = `${researchQuery} (site:${trustedDomains.join(' OR site:')})`;
 
 										// Define the research steps
 										const initialSteps = (query: string) => [
@@ -609,102 +591,335 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 												id: 'trace-insights',
 												type: 'trace-insight',
 												status: 'running',
-												title: 'Research Analysis',
-												message: 'Starting research analysis...',
+												title: 'Research and Analysis',
+												message: 'Starting research and analysis...',
 												timestamp: Date.now(),
 											},
 										});
 
-										const researchStepsStates = [];
+										const depth = 'advanced';
 
-										for (let i = 0; i < researchPhases.length; i++) {
-											const phase = researchPhases[i];
+										dataStreamWriter.writeMessageAnnotation({
+											type: 'research_update',
+											data: {
+												id: `research-plan`,
+												type: 'research_plan',
+												status: 'in-progress',
+												title: 'Research Plan',
+												message: 'Creating research plan...',
+												timestamp: Date.now(),
+												completedSteps: 0,
+											},
+										});
 
-											// Wait before sending the next phase (simulating research time)
-											await new Promise((resolve) =>
-												setTimeout(resolve, i === 0 ? 1000 : 1500),
+										// Now generate the research plan
+										const { object: researchPlan } = await generateObject({
+											model: perfAgent.languageModel(model),
+											temperature: 0,
+											schema: z.object({
+												search_queries: z
+													.array(
+														z.object({
+															query: z.string(),
+															rationale: z.string(),
+															source: z.enum(['web', 'all']),
+															priority: z.number().min(1).max(5),
+														}),
+													)
+													.max(12),
+												required_analyses: z
+													.array(
+														z.object({
+															type: z.string(),
+															description: z.string(),
+															importance: z.number().min(1).max(5),
+														}),
+													)
+													.max(8),
+											}),
+											prompt: dedent`
+												Create a focused research plan for the topic: "${researchQuery}".
+
+												Today's date and day of the week: ${new Date().toLocaleDateString('en-US', {
+													weekday: 'long',
+													year: 'numeric',
+													month: 'long',
+													day: 'numeric',
+												})}
+
+												Keep the plan concise but comprehensive, with:
+												- maximum 5targeted search queries (each can use web as source. Focus on web.dev as main source whenever possible)
+												- 2-4 key analyses to perform
+												- Prioritize the most important aspects to investigate
+
+												Available sources:
+												- "web": General web search
+
+												Do not use floating numbers, use whole numbers only in the priority field!!
+												Do not keep the numbers too low or high, make them reasonable in between.
+												Do not use 0 or 1 in the priority field, use numbers between 2 and 4.
+
+												Consider related topics, but maintain focus on the core aspects.
+												Here's the list of topics represent different aspects of a performance trace.
+
+												Core Web Vitals Context
+												Core Web Vitals are Google's metrics for measuring web page experience:
+
+												Loading (LCP): Largest Contentful Paint - measures loading performance (2.5s or less is good)
+												Interactivity (INP): Interaction to Next Paint - measures responsiveness (100ms or less is good)
+												Visual Stability (CLS): Cumulative Layout Shift - measures visual stability (0.1 or less is good)
+
+												Additional important metrics include:
+
+												TTFB (Time to First Byte)
+												FCP (First Contentful Paint)
+												TTI (Time to Interactive)
+												TBT (Total Blocking Time)
+												Resource optimization (JS, CSS, images, fonts)
+												Network performance (caching, compression)
+
+												Ensure the total number of steps (searches + analyses) does not exceed 10.
+										`,
+										});
+
+										console.log('researchPlan', researchPlan);
+
+										// Execute search with Tavily
+										const response = await tav.search(enhancedQuery, {
+											searchDepth: 'advanced',
+											maxResults: 3,
+											includeDomains: trustedDomains,
+											includeAnswer: false,
+											includeRawContent: false,
+										});
+
+										// Generate IDs for all steps based on the plan
+										const generateStepIds = (plan: typeof researchPlan) => {
+											// Generate an array of search steps.
+											const searchSteps = plan.search_queries.flatMap(
+												(query, index) => {
+													if (query.source === 'all') {
+														return [
+															{ id: `search-web-${index}`, type: 'web', query },
+														];
+													}
+													const searchType = 'web';
+													return [
+														{
+															id: `search-${searchType}-${index}`,
+															type: searchType,
+															query,
+														},
+													];
+												},
 											);
 
-											// Update steps based on the current phase
-											const updatedSteps = [...steps];
-											phase.steps.forEach((stepUpdate) => {
-												const index = updatedSteps.findIndex(
-													(s) => s.id === stepUpdate.id,
-												);
-												if (index !== -1) {
-													updatedSteps[index] = {
-														...updatedSteps[index],
-														status: stepUpdate.status,
-														expanded: stepUpdate.expanded,
-														subtitle:
-															stepUpdate.subtitle ||
-															updatedSteps[index].subtitle,
-													};
-												}
-											});
+											// Generate an array of analysis steps.
+											const analysisSteps = plan.required_analyses.map(
+												(analysis, index) => ({
+													id: `analysis-${index}`,
+													type: 'analysis',
+													analysis,
+												}),
+											);
 
-											// Send research update annotation
+											return {
+												planId: 'research-plan',
+												searchSteps,
+												analysisSteps,
+											};
+										};
 
-											// Send a research update annotation for the current phase
+										const stepIds = generateStepIds(researchPlan);
+										let completedSteps = 1;
+										const totalSteps =
+											stepIds.searchSteps.length +
+											stepIds.analysisSteps.length +
+											1;
+
+										dataStreamWriter.writeMessageAnnotation({
+											type: 'research_update',
+											data: {
+												id: `research-plan`,
+												type: 'research_plan',
+												status: 'complete',
+												title: 'Research Plan',
+												message: 'Research plan created',
+												timestamp: Date.now(),
+												completedSteps,
+												totalSteps,
+											},
+										});
+
+										const searchResults = [];
+										let searchIndex = 0; // Add index tracker
+
+										for (const step of stepIds.searchSteps) {
+											// Send running annotation for this search step
 											dataStreamWriter.writeMessageAnnotation({
 												type: 'research_update',
 												data: {
-													id: `research-${phase.activeStep || 'progress'}`,
-													type: phase.activeStep || 'progress',
-													status:
-														i === researchPhases.length - 1
-															? 'completed'
-															: 'running',
-													title: phase.activeStep
-														? `${phase.activeStep.charAt(0).toUpperCase() + phase.activeStep.slice(1)} Research`
-														: 'Research Progress',
-													message: phase.activeStep
-														? `${phase.activeStep === 'plan' ? 'Creating' : phase.activeStep === 'web' ? 'Searching' : 'Analyzing'} ${phase.activeStep}...`
-														: 'Research in progress...',
+													id: step.id,
+													type: step.type,
+													status: 'in-progress',
+													title: `Searching the web for "${step.query.query}"`,
+													query: step.query.query,
+													message: `Searching ${step.query.source} sources...`,
 													timestamp: Date.now(),
-													completedSteps: i,
-													totalSteps: researchPhases.length,
-													overwrite: true,
 												},
 											});
 
-											// If this is the final phase, send a completed status
-											if (i === researchPhases.length - 1) {
-												dataStreamWriter.writeMessageAnnotation({
-													type: 'research_update',
-													data: {
-														id: 'research-progress',
-														type: 'progress',
-														status: 'completed',
-														message: 'Research complete',
-														completedSteps: researchPhases.length,
-														totalSteps: researchPhases.length,
-														isComplete: true,
-														timestamp: Date.now(),
-													},
-													overwrite: true,
+											if (step.type === 'web' || step.type === 'academic') {
+												const webResults = await tav.search(step.query.query, {
+													searchDepth: depth,
+													includeAnswer: true,
+													includeDomains: trustedDomains,
+													maxResults: Math.min(6 - step.query.priority, 10),
 												});
+
+												searchResults.push({
+													type: 'web',
+													query: step.query,
+													results: webResults.results.map((r) => ({
+														source: 'web',
+														title: r.title,
+														url: r.url,
+														content: r.content,
+													})),
+												});
+												completedSteps++;
 											}
 
-											// Create the research state for this phase
-											const researchState = {
-												type: 'research',
-												query: researchQuery,
-												phase: phase.phase,
-												progress: phase.progress,
-												steps: updatedSteps,
-												visibleSteps: phase.visibleSteps,
-												activeStep: phase.activeStep,
-												results: phase.showResults ? mockResults : [],
-												showResults: !!phase.showResults,
-												completed: i === researchPhases.length - 1,
-												toolCallId: toolCallId,
-											};
+											// Send completed annotation for the search step
+											dataStreamWriter.writeMessageAnnotation({
+												type: 'research_update',
+												data: {
+													id: step.id,
+													type: step.type,
+													status: 'completed',
+													title:
+														step.type === 'web'
+															? `Searched the web for "${step.query.query}"`
+															: step.type === 'academic'
+																? `Searched academic papers for "${step.query.query}"`
+																: `Analysis of ${step.query.query} complete`,
+													query: step.query.query,
+													results: searchResults[
+														searchResults.length - 1
+													].results.map((r) => {
+														return { ...r };
+													}),
+													message: `Found ${
+														searchResults[searchResults.length - 1].results
+															.length
+													} results`,
+													timestamp: Date.now(),
+												},
+											});
 
-											researchStepsStates.push(researchState);
+											searchIndex++; // Increment index
 										}
 
-										return researchStepsStates;
+										// Perform analyses
+										let analysisIndex = 0; // Add index tracker
+										let _analysisResults = null;
+										for (const step of stepIds.analysisSteps) {
+											dataStreamWriter.writeMessageAnnotation({
+												type: 'research_update',
+												data: {
+													id: step.id,
+													type: 'analysis',
+													status: 'in-progress',
+													title: `Analyzing ${step.analysis.type}`,
+													analysisType: step.analysis.type,
+													message: `Analyzing ${step.analysis.type}...`,
+													timestamp: Date.now(),
+												},
+											});
+
+											const { object: analysisResult } = await generateObject({
+												model: perfAgent.languageModel(model),
+												temperature: 0.5,
+												schema: z.object({
+													findings: z.array(
+														z.object({
+															insight: z.string(),
+															evidence: z.array(z.string()),
+															confidence: z.number().min(0).max(1),
+														}),
+													),
+													implications: z.array(z.string()),
+													limitations: z.array(z.string()),
+												}),
+												prompt: dedent`
+													Perform a ${step.analysis.type} analysis on the search results. ${step.analysis.description}
+													Consider all sources and their reliability.
+													Search results: ${JSON.stringify(searchResults)}
+													IMPORTANT: ENSURE TO RETURN CONFIDENCE SCORES BETWEEN 0 AND 1.`,
+											});
+
+											dataStreamWriter.writeMessageAnnotation({
+												type: 'research_update',
+												data: {
+													id: step.id,
+													type: 'analysis',
+													status: 'complete',
+													title: `Analysis of ${step.analysis.type} complete`,
+													analysisType: step.analysis.type,
+													findings: analysisResult.findings,
+													message: `Analysis complete`,
+													timestamp: Date.now(),
+												},
+											});
+
+											_analysisResults = analysisResult;
+											analysisIndex++; // Increment index
+										}
+
+										const researchReport = streamText({
+											model: perfAgent.languageModel(model),
+											temperature: 0,
+											system: dedent`${baseSystemPrompt}
+											
+											Generate a markdown report based on the research plan, search results and analysis results.`,
+											messages: [
+												...messages,
+												{
+													role: 'user',
+													content: `
+														Research plan: ${JSON.stringify(researchPlan)}
+														Search results: ${JSON.stringify(searchResults)}
+														Analysis results: ${JSON.stringify(_analysisResults)}
+														`,
+												},
+											],
+										});
+
+										const finalProgress = {
+											id: 'research-progress',
+											type: 'progress' as const,
+											status: 'completed' as const,
+											message: `Trace analysis complete`,
+											completedSteps:
+												totalSteps + (depth === 'advanced' ? 2 : 1),
+											totalSteps: totalSteps + (depth === 'advanced' ? 2 : 1),
+											isComplete: true,
+											timestamp: Date.now(),
+										};
+
+										dataStreamWriter.writeMessageAnnotation({
+											type: 'research_update',
+											data: finalProgress,
+										});
+
+										researchReport.mergeIntoDataStream(dataStreamWriter);
+
+										return {
+											type: 'research',
+											query: researchQuery,
+											phase: 'complete',
+											progress: 100,
+										};
 									} catch (error) {
 										console.error('Error in research tool:', error);
 										return {
