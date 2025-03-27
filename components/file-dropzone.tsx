@@ -347,7 +347,6 @@ export function FileDropzone({
 			onDragLeave={handleDragOut}
 			onDragOver={handleDragOver}
 			onDrop={handleDrop}
-			role="button"
 			tabIndex={disabled ? -1 : 0}
 			aria-disabled={disabled}
 			aria-label="File upload dropzone"

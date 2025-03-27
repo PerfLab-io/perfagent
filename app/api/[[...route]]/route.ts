@@ -332,357 +332,6 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 									}
 								},
 							}),
-							researchTool: tool({
-								description:
-									'Performs research on web performance optimization topics',
-								parameters: researchToolSchema,
-								execute: async ({ query }) => {
-									try {
-										// Create a unique toolCallId
-										const toolCallId = `research-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-
-										// Determine the research query by adding context if needed
-										const researchQuery = query
-											.toLowerCase()
-											.includes('performance')
-											? query
-											: `${query} web performance optimization`;
-
-										// Initial steps for research process
-										const initialSteps = [
-											{
-												id: 'plan',
-												title: 'Research Plan',
-												subtitle: '(4 queries, 3 analyses)',
-												icon: 'Search',
-												status: 'pending',
-											},
-											{
-												id: 'web',
-												title: `Searched the web for "${researchQuery}"`,
-												subtitle: 'Found 0 results',
-												icon: 'Globe',
-												status: 'pending',
-											},
-											{
-												id: 'academic',
-												title: `Searching academic papers for "${researchQuery}"`,
-												subtitle: 'Searching all sources...',
-												icon: 'BookOpen',
-												status: 'pending',
-											},
-											{
-												id: 'analysis',
-												title: 'Analyzing patterns and insights',
-												subtitle: 'Preparing analysis...',
-												icon: 'BarChart',
-												status: 'pending',
-											},
-										];
-
-										// Send initial research update annotation
-										dataStreamWriter.writeMessageAnnotation({
-											type: 'research_update',
-											data: {
-												id: 'trace-insights',
-												type: 'trace-insight',
-												status: 'running',
-												title: 'Research Analysis',
-												message: 'Starting research analysis...',
-												timestamp: Date.now(),
-											},
-										});
-
-										// Configure Tavily API
-										let tavSearch;
-										let webResults = [];
-										let academicResults = [];
-
-										// Define trusted domains for web performance research
-										const trustedDomains = [
-											'web.dev',
-											'chromium.org',
-											'developer.chrome.com',
-											'developer.mozilla.org',
-											'dev.to',
-											'web.dev',
-											'lighthouse-ci.appspot.com',
-											'github.com',
-											'developers.google.com',
-											'webhint.io',
-											'caniuse.com',
-											'smashingmagazine.com',
-										];
-
-										// Generate research plan using AI
-										const { object: researchPlan } = await generateObject({
-											model: perfAgent.languageModel('topics_model'),
-											temperature: 0.2,
-											schema: z.object({
-												title: z
-													.string()
-													.describe('Title for the research plan'),
-												steps: z
-													.array(
-														z.object({
-															title: z.string(),
-															description: z.string(),
-														}),
-													)
-													.min(3)
-													.max(5)
-													.describe('Steps of the research plan'),
-												relevantTopics: z
-													.array(z.string())
-													.describe('Relevant topics to research'),
-											}),
-											prompt: `Create a comprehensive research plan for understanding "${query}" in the context of web performance optimization. Identify important steps and relevant topics.`,
-										});
-
-										// Calculate progress and send updates
-										let progress = 0;
-										// Planning phase - 15%
-										dataStreamWriter.writeMessageAnnotation({
-											type: 'research_update',
-											data: {
-												id: 'research-plan',
-												type: 'plan',
-												status: 'running',
-												title: 'Creating Research Plan',
-												message: `Planning research for "${query}"...`,
-												timestamp: Date.now(),
-												completedSteps: 0,
-												totalSteps: 4,
-											},
-										});
-
-										await new Promise((resolve) => setTimeout(resolve, 1000));
-										progress = 15;
-
-										dataStreamWriter.writeMessageAnnotation({
-											type: 'research_update',
-											data: {
-												id: 'research-plan',
-												type: 'plan',
-												status: 'completed',
-												title: 'Research Plan Created',
-												message: 'Research plan completed',
-												timestamp: Date.now(),
-												completedSteps: 1,
-												totalSteps: 4,
-											},
-										});
-
-										// Web search phase - 35%
-										dataStreamWriter.writeMessageAnnotation({
-											type: 'research_update',
-											data: {
-												id: 'research-web',
-												type: 'web',
-												status: 'running',
-												title: 'Web Research',
-												message: `Searching web for "${query}"...`,
-												timestamp: Date.now(),
-												completedSteps: 1,
-												totalSteps: 4,
-											},
-										});
-
-										await new Promise((resolve) => setTimeout(resolve, 1500));
-										progress = 35;
-
-										dataStreamWriter.writeMessageAnnotation({
-											type: 'research_update',
-											data: {
-												id: 'research-web',
-												type: 'web',
-												status: 'completed',
-												title: 'Web Research Completed',
-												message: 'Found 3 web results',
-												timestamp: Date.now(),
-												completedSteps: 2,
-												totalSteps: 4,
-											},
-										});
-
-										// Academic search phase - 65%
-										dataStreamWriter.writeMessageAnnotation({
-											type: 'research_update',
-											data: {
-												id: 'research-academic',
-												type: 'academic',
-												status: 'running',
-												title: 'Academic Research',
-												message: `Analyzing academic sources for "${query}"...`,
-												timestamp: Date.now(),
-												completedSteps: 2,
-												totalSteps: 4,
-											},
-										});
-
-										await new Promise((resolve) => setTimeout(resolve, 1500));
-										progress = 65;
-
-										dataStreamWriter.writeMessageAnnotation({
-											type: 'research_update',
-											data: {
-												id: 'research-academic',
-												type: 'academic',
-												status: 'completed',
-												title: 'Academic Research Completed',
-												message: 'Found 2 academic results',
-												timestamp: Date.now(),
-												completedSteps: 3,
-												totalSteps: 4,
-											},
-										});
-
-										// Analysis phase - 85%
-										dataStreamWriter.writeMessageAnnotation({
-											type: 'research_update',
-											data: {
-												id: 'research-analysis',
-												type: 'analysis',
-												status: 'running',
-												title: 'Performance Analysis',
-												message: 'Analyzing patterns and insights...',
-												timestamp: Date.now(),
-												completedSteps: 3,
-												totalSteps: 4,
-											},
-										});
-
-										await new Promise((resolve) => setTimeout(resolve, 1500));
-										progress = 85;
-
-										// Generate analysis results
-										const { object: analysisResults } = await generateObject({
-											model: perfAgent.languageModel('default_model'),
-											temperature: 0.2,
-											schema: z.object({
-												findings: z
-													.array(
-														z.object({
-															insight: z
-																.string()
-																.describe('Key insight about web performance'),
-															evidence: z
-																.string()
-																.describe(
-																	'Supporting evidence for this insight',
-																),
-														}),
-													)
-													.min(2)
-													.max(5)
-													.describe('Key findings from the analysis'),
-											}),
-											prompt: `Analyze "${query}" from a web performance perspective. Provide key insights and supporting evidence.`,
-										});
-
-										// Completion - 100%
-										dataStreamWriter.writeMessageAnnotation({
-											type: 'research_update',
-											data: {
-												id: 'research-analysis',
-												type: 'analysis',
-												status: 'completed',
-												title: 'Analysis Completed',
-												message: 'Analysis complete with findings',
-												timestamp: Date.now(),
-												completedSteps: 4,
-												totalSteps: 4,
-												findings: analysisResults.findings,
-											},
-										});
-
-										// Final completed status
-										dataStreamWriter.writeMessageAnnotation({
-											type: 'research_update',
-											data: {
-												id: 'research-progress',
-												type: 'progress',
-												status: 'completed',
-												message: 'Research complete',
-												completedSteps: 4,
-												totalSteps: 4,
-												isComplete: true,
-												timestamp: Date.now(),
-											},
-										});
-
-										// Mock research results similar to the mock implementation
-										const mockResults = [
-											{
-												id: '1',
-												title:
-													'Core Web Vitals: Essential Metrics for Modern Web Performance',
-												snippet:
-													"Core Web Vitals are Google's initiative to provide unified guidance for quality signals. They focus on three aspects of user experience—loading performance (LCP), interactivity (FID), and visual stability (CLS). Understanding and optimizing these metrics is crucial for delivering a great user experience.",
-												source: 'web',
-												sourceIcon: 'Globe',
-												url: 'https://web.dev/vitals/',
-											},
-											{
-												id: '2',
-												title:
-													'Advanced Performance Optimization: Resource Loading and Rendering',
-												snippet:
-													'Modern web performance optimization involves strategic resource loading, efficient JavaScript execution, and optimized rendering paths. Techniques like code splitting, tree shaking, and critical CSS extraction can significantly improve loading times and user experience.',
-												source: 'academic',
-												sourceIcon: 'BookOpen',
-												url: 'https://developer.mozilla.org/en-US/docs/Web/Performance',
-											},
-											...analysisResults.findings.map((finding, index) => ({
-												id: `finding-${index}`,
-												title: finding.insight,
-												snippet: finding.evidence,
-												source: 'analysis',
-												sourceIcon: 'BarChart',
-											})),
-										];
-
-										// Update all steps to completed for the final state
-										const finalSteps = initialSteps.map((step) => ({
-											...step,
-											status: 'complete',
-											expanded: false,
-											subtitle:
-												step.id === 'analysis'
-													? 'Analysis complete'
-													: step.id === 'web'
-														? 'Found 3 results'
-														: step.id === 'academic'
-															? 'Found 2 results'
-															: step.id === 'plan'
-																? 'Research plan created'
-																: step.subtitle,
-										}));
-
-										return {
-											type: 'research',
-											query,
-											phase: 'complete',
-											progress: 100,
-											steps: finalSteps,
-											visibleSteps: ['plan', 'web', 'academic', 'analysis'],
-											activeStep: null,
-											results: mockResults,
-											showResults: true,
-											completed: true,
-											toolCallId,
-										};
-									} catch (error) {
-										console.error('Error in research tool:', error);
-										return {
-											type: 'research',
-											query,
-											error: error.message || 'Failed to perform research',
-											results: [],
-										};
-									}
-								},
-							}),
 						},
 						onFinish(event) {
 							console.log(
@@ -727,270 +376,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 											? query
 											: `${query} web performance optimization`;
 
-										// Initial steps for research process
-										const initialSteps = [
-											{
-												id: 'plan',
-												title: 'Research Plan',
-												subtitle: '(4 queries, 3 analyses)',
-												icon: 'Search',
-												status: 'pending',
-											},
-											{
-												id: 'web',
-												title: `Searched the web for "${researchQuery}"`,
-												subtitle: 'Found 0 results',
-												icon: 'Globe',
-												status: 'pending',
-											},
-											{
-												id: 'academic',
-												title: `Searching academic papers for "${researchQuery}"`,
-												subtitle: 'Searching all sources...',
-												icon: 'BookOpen',
-												status: 'pending',
-											},
-											{
-												id: 'analysis',
-												title: 'Analyzing patterns and insights',
-												subtitle: 'Preparing analysis...',
-												icon: 'BarChart',
-												status: 'pending',
-											},
-										];
-
-										// Send initial research update annotation
-										dataStreamWriter.writeMessageAnnotation({
-											type: 'research_update',
-											data: {
-												id: 'trace-insights',
-												type: 'trace-insight',
-												status: 'running',
-												title: 'Research Analysis',
-												message: 'Starting research analysis...',
-												timestamp: Date.now(),
-											},
-										});
-
-										// Configure Tavily API
-										let tavSearch;
-										let webResults = [];
-										let academicResults = [];
-
-										// Define trusted domains for web performance research
-										const trustedDomains = [
-											'web.dev',
-											'chromium.org',
-											'developer.chrome.com',
-											'developer.mozilla.org',
-											'dev.to',
-											'web.dev',
-											'lighthouse-ci.appspot.com',
-											'github.com',
-											'developers.google.com',
-											'webhint.io',
-											'caniuse.com',
-											'smashingmagazine.com',
-										];
-
-										// Generate research plan using AI
-										const { object: researchPlan } = await generateObject({
-											model: perfAgent.languageModel('topics_model'),
-											temperature: 0.2,
-											schema: z.object({
-												title: z
-													.string()
-													.describe('Title for the research plan'),
-												steps: z
-													.array(
-														z.object({
-															title: z.string(),
-															description: z.string(),
-														}),
-													)
-													.min(3)
-													.max(5)
-													.describe('Steps of the research plan'),
-												relevantTopics: z
-													.array(z.string())
-													.describe('Relevant topics to research'),
-											}),
-											prompt: `Create a comprehensive research plan for understanding "${query}" in the context of web performance optimization. Identify important steps and relevant topics.`,
-										});
-
-										// Calculate progress and send updates
-										let progress = 0;
-										// Planning phase - 15%
-										dataStreamWriter.writeMessageAnnotation({
-											type: 'research_update',
-											data: {
-												id: 'research-plan',
-												type: 'plan',
-												status: 'running',
-												title: 'Creating Research Plan',
-												message: `Planning research for "${query}"...`,
-												timestamp: Date.now(),
-												completedSteps: 0,
-												totalSteps: 4,
-											},
-										});
-
-										await new Promise((resolve) => setTimeout(resolve, 1000));
-										progress = 15;
-
-										dataStreamWriter.writeMessageAnnotation({
-											type: 'research_update',
-											data: {
-												id: 'research-plan',
-												type: 'plan',
-												status: 'completed',
-												title: 'Research Plan Created',
-												message: 'Research plan completed',
-												timestamp: Date.now(),
-												completedSteps: 1,
-												totalSteps: 4,
-											},
-										});
-
-										// Web search phase - 35%
-										dataStreamWriter.writeMessageAnnotation({
-											type: 'research_update',
-											data: {
-												id: 'research-web',
-												type: 'web',
-												status: 'running',
-												title: 'Web Research',
-												message: `Searching web for "${query}"...`,
-												timestamp: Date.now(),
-												completedSteps: 1,
-												totalSteps: 4,
-											},
-										});
-
-										await new Promise((resolve) => setTimeout(resolve, 1500));
-										progress = 35;
-
-										dataStreamWriter.writeMessageAnnotation({
-											type: 'research_update',
-											data: {
-												id: 'research-web',
-												type: 'web',
-												status: 'completed',
-												title: 'Web Research Completed',
-												message: 'Found 3 web results',
-												timestamp: Date.now(),
-												completedSteps: 2,
-												totalSteps: 4,
-											},
-										});
-
-										// Academic search phase - 65%
-										dataStreamWriter.writeMessageAnnotation({
-											type: 'research_update',
-											data: {
-												id: 'research-academic',
-												type: 'academic',
-												status: 'running',
-												title: 'Academic Research',
-												message: `Analyzing academic sources for "${query}"...`,
-												timestamp: Date.now(),
-												completedSteps: 2,
-												totalSteps: 4,
-											},
-										});
-
-										await new Promise((resolve) => setTimeout(resolve, 1500));
-										progress = 65;
-
-										dataStreamWriter.writeMessageAnnotation({
-											type: 'research_update',
-											data: {
-												id: 'research-academic',
-												type: 'academic',
-												status: 'completed',
-												title: 'Academic Research Completed',
-												message: 'Found 2 academic results',
-												timestamp: Date.now(),
-												completedSteps: 3,
-												totalSteps: 4,
-											},
-										});
-
-										// Analysis phase - 85%
-										dataStreamWriter.writeMessageAnnotation({
-											type: 'research_update',
-											data: {
-												id: 'research-analysis',
-												type: 'analysis',
-												status: 'running',
-												title: 'Performance Analysis',
-												message: 'Analyzing patterns and insights...',
-												timestamp: Date.now(),
-												completedSteps: 3,
-												totalSteps: 4,
-											},
-										});
-
-										await new Promise((resolve) => setTimeout(resolve, 1500));
-										progress = 85;
-
-										// Generate analysis results
-										const { object: analysisResults } = await generateObject({
-											model: perfAgent.languageModel('default_model'),
-											temperature: 0.2,
-											schema: z.object({
-												findings: z
-													.array(
-														z.object({
-															insight: z
-																.string()
-																.describe('Key insight about web performance'),
-															evidence: z
-																.string()
-																.describe(
-																	'Supporting evidence for this insight',
-																),
-														}),
-													)
-													.min(2)
-													.max(5)
-													.describe('Key findings from the analysis'),
-											}),
-											prompt: `Analyze "${query}" from a web performance perspective. Provide key insights and supporting evidence.`,
-										});
-
-										// Completion - 100%
-										dataStreamWriter.writeMessageAnnotation({
-											type: 'research_update',
-											data: {
-												id: 'research-analysis',
-												type: 'analysis',
-												status: 'completed',
-												title: 'Analysis Completed',
-												message: 'Analysis complete with findings',
-												timestamp: Date.now(),
-												completedSteps: 4,
-												totalSteps: 4,
-												findings: analysisResults.findings,
-											},
-										});
-
-										// Final completed status
-										dataStreamWriter.writeMessageAnnotation({
-											type: 'research_update',
-											data: {
-												id: 'research-progress',
-												type: 'progress',
-												status: 'completed',
-												message: 'Research complete',
-												completedSteps: 4,
-												totalSteps: 4,
-												isComplete: true,
-												timestamp: Date.now(),
-											},
-										});
-
-										// Mock research results similar to the mock implementation
+										// Mock research results for web performance patterns
 										const mockResults = [
 											{
 												id: '1',
@@ -1012,45 +398,313 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 												sourceIcon: 'BookOpen',
 												url: 'https://developer.mozilla.org/en-US/docs/Web/Performance',
 											},
-											...analysisResults.findings.map((finding, index) => ({
-												id: `finding-${index}`,
-												title: finding.insight,
-												snippet: finding.evidence,
+											{
+												id: '3',
+												title: 'Performance Monitoring and Analysis Patterns',
+												snippet:
+													'Real User Monitoring (RUM) combined with synthetic testing provides comprehensive performance insights. Using tools like the Performance API, Lighthouse, and WebPageTest helps identify bottlenecks and optimization opportunities.',
 												source: 'analysis',
 												sourceIcon: 'BarChart',
-											})),
+											},
+											{
+												id: '4',
+												title:
+													'Client-Side vs. Server-Side Optimization Strategies',
+												snippet:
+													'A holistic approach to web performance involves both client-side and server-side optimizations. This includes techniques like server-side rendering, edge caching, image optimization, and efficient data loading patterns.',
+												source: 'academic',
+												sourceIcon: 'BookOpen',
+												url: 'https://web.dev/performance-optimizing-content-efficiency/',
+											},
+											{
+												id: '5',
+												title: 'Error Handling and Performance Recovery',
+												snippet:
+													'Implementing robust error handling and recovery mechanisms is crucial for maintaining performance under adverse conditions. This includes graceful degradation, offline capabilities, and strategic error boundaries.',
+												source: 'web',
+												sourceIcon: 'Globe',
+											},
 										];
 
-										// Update all steps to completed for the final state
-										const finalSteps = initialSteps.map((step) => ({
-											...step,
-											status: 'complete',
-											expanded: false,
-											subtitle:
-												step.id === 'analysis'
-													? 'Analysis complete'
-													: step.id === 'web'
-														? 'Found 3 results'
-														: step.id === 'academic'
-															? 'Found 2 results'
-															: step.id === 'plan'
-																? 'Research plan created'
-																: step.subtitle,
-										}));
+										// Define the research steps
+										const initialSteps = (query: string) => [
+											{
+												id: 'plan',
+												title: 'Research Plan',
+												subtitle: '(4 queries, 3 analyses)',
+												icon: 'Search',
+												status: 'pending',
+											},
+											{
+												id: 'web',
+												title: `Searched the web for "${query}"`,
+												subtitle: 'Found 0 results',
+												icon: 'Globe',
+												status: 'pending',
+											},
+											{
+												id: 'academic',
+												title: `Searching academic papers for "${query}"`,
+												subtitle: 'Searching all sources...',
+												icon: 'BookOpen',
+												status: 'pending',
+											},
+											{
+												id: 'analysis',
+												title: 'Analyzing patterns and insights',
+												subtitle: 'Preparing analysis...',
+												icon: 'BarChart',
+												status: 'pending',
+											},
+										];
 
-										return {
+										// Define the research phases
+										const researchPhases = [
+											{
+												phase: 'planning',
+												activeStep: 'plan',
+												steps: [
+													{
+														id: 'plan',
+														status: 'in-progress',
+														expanded: true,
+														subtitle: '(4 queries, 3 analyses)',
+													},
+												],
+												progress: 15,
+												visibleSteps: ['plan'],
+											},
+											{
+												phase: 'searching',
+												activeStep: 'web',
+												steps: [
+													{
+														id: 'plan',
+														status: 'complete',
+														expanded: false,
+														subtitle: 'Research plan created',
+													},
+													{
+														id: 'web',
+														status: 'in-progress',
+														expanded: true,
+													},
+												],
+												progress: 35,
+												visibleSteps: ['plan', 'web'],
+											},
+											{
+												phase: 'searching',
+												activeStep: 'academic',
+												steps: [
+													{
+														id: 'plan',
+														status: 'complete',
+														expanded: false,
+														subtitle: 'Research plan created',
+													},
+													{
+														id: 'web',
+														status: 'complete',
+														expanded: false,
+														subtitle: 'Found 3 results',
+													},
+													{
+														id: 'academic',
+														status: 'in-progress',
+														expanded: true,
+														subtitle: 'Searching academic sources...',
+													},
+												],
+												progress: 65,
+												visibleSteps: ['plan', 'web', 'academic'],
+											},
+											{
+												phase: 'analyzing',
+												activeStep: 'analysis',
+												steps: [
+													{
+														id: 'plan',
+														status: 'complete',
+														expanded: false,
+														subtitle: 'Research plan created',
+													},
+													{
+														id: 'web',
+														status: 'complete',
+														expanded: false,
+														subtitle: 'Found 3 results',
+													},
+													{
+														id: 'academic',
+														status: 'complete',
+														expanded: false,
+														subtitle: 'Found 2 academic sources',
+													},
+													{
+														id: 'analysis',
+														status: 'in-progress',
+														expanded: true,
+													},
+												],
+												progress: 85,
+												visibleSteps: ['plan', 'web', 'academic', 'analysis'],
+											},
+											{
+												phase: 'complete',
+												activeStep: null,
+												steps: [
+													{
+														id: 'plan',
+														status: 'complete',
+														expanded: false,
+														subtitle: 'Research plan created',
+													},
+													{
+														id: 'web',
+														status: 'complete',
+														expanded: false,
+														subtitle: 'Found 3 results',
+													},
+													{
+														id: 'academic',
+														status: 'complete',
+														expanded: false,
+														subtitle: 'Found 2 academic sources',
+													},
+													{
+														id: 'analysis',
+														status: 'complete',
+														expanded: false,
+														subtitle: 'Analysis complete',
+													},
+												],
+												progress: 100,
+												visibleSteps: ['plan', 'web', 'academic', 'analysis'],
+												showResults: true,
+											},
+										];
+
+										// Create the initial research state
+										const initialState = {
 											type: 'research',
-											query,
-											phase: 'complete',
-											progress: 100,
-											steps: finalSteps,
-											visibleSteps: ['plan', 'web', 'academic', 'analysis'],
+											query: researchQuery,
+											phase: 'planning',
+											progress: 0,
+											steps: initialSteps(researchQuery),
+											visibleSteps: [],
 											activeStep: null,
-											results: mockResults,
-											showResults: true,
-											completed: true,
-											toolCallId,
+											results: [],
+											showResults: false,
+											completed: false,
+											toolCallId: toolCallId,
 										};
+
+										// Initial state
+										const steps = initialSteps(researchQuery);
+
+										dataStreamWriter.writeMessageAnnotation({
+											type: 'research_update',
+											data: {
+												id: 'trace-insights',
+												type: 'trace-insight',
+												status: 'running',
+												title: 'Research Analysis',
+												message: 'Starting research analysis...',
+												timestamp: Date.now(),
+											},
+										});
+
+										const researchStepsStates = [];
+
+										for (let i = 0; i < researchPhases.length; i++) {
+											const phase = researchPhases[i];
+
+											// Wait before sending the next phase (simulating research time)
+											await new Promise((resolve) =>
+												setTimeout(resolve, i === 0 ? 1000 : 1500),
+											);
+
+											// Update steps based on the current phase
+											const updatedSteps = [...steps];
+											phase.steps.forEach((stepUpdate) => {
+												const index = updatedSteps.findIndex(
+													(s) => s.id === stepUpdate.id,
+												);
+												if (index !== -1) {
+													updatedSteps[index] = {
+														...updatedSteps[index],
+														status: stepUpdate.status,
+														expanded: stepUpdate.expanded,
+														subtitle:
+															stepUpdate.subtitle ||
+															updatedSteps[index].subtitle,
+													};
+												}
+											});
+
+											// Send research update annotation
+
+											// Send a research update annotation for the current phase
+											dataStreamWriter.writeMessageAnnotation({
+												type: 'research_update',
+												data: {
+													id: `research-${phase.activeStep || 'progress'}`,
+													type: phase.activeStep || 'progress',
+													status:
+														i === researchPhases.length - 1
+															? 'completed'
+															: 'running',
+													title: phase.activeStep
+														? `${phase.activeStep.charAt(0).toUpperCase() + phase.activeStep.slice(1)} Research`
+														: 'Research Progress',
+													message: phase.activeStep
+														? `${phase.activeStep === 'plan' ? 'Creating' : phase.activeStep === 'web' ? 'Searching' : 'Analyzing'} ${phase.activeStep}...`
+														: 'Research in progress...',
+													timestamp: Date.now(),
+													completedSteps: i,
+													totalSteps: researchPhases.length,
+													overwrite: true,
+												},
+											});
+
+											// If this is the final phase, send a completed status
+											if (i === researchPhases.length - 1) {
+												dataStreamWriter.writeMessageAnnotation({
+													type: 'research_update',
+													data: {
+														id: 'research-progress',
+														type: 'progress',
+														status: 'completed',
+														message: 'Research complete',
+														completedSteps: researchPhases.length,
+														totalSteps: researchPhases.length,
+														isComplete: true,
+														timestamp: Date.now(),
+													},
+													overwrite: true,
+												});
+											}
+
+											// Create the research state for this phase
+											const researchState = {
+												type: 'research',
+												query: researchQuery,
+												phase: phase.phase,
+												progress: phase.progress,
+												steps: updatedSteps,
+												visibleSteps: phase.visibleSteps,
+												activeStep: phase.activeStep,
+												results: phase.showResults ? mockResults : [],
+												showResults: !!phase.showResults,
+												completed: i === researchPhases.length - 1,
+												toolCallId: toolCallId,
+											};
+
+											researchStepsStates.push(researchState);
+										}
+
+										return researchStepsStates;
 									} catch (error) {
 										console.error('Error in research tool:', error);
 										return {
