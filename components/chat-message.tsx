@@ -195,65 +195,65 @@ export function ChatMessage({
 		}, 100);
 
 		// Process tool calls
-		if (toolCall) {
-			// Extract and store the toolCallId if present
-			if (toolCall.toolCallId) {
-				setToolCallId(toolCall.toolCallId);
-			}
+		// if (toolCall) {
+		// 	// Extract and store the toolCallId if present
+		// 	if (toolCall.toolCallId) {
+		// 		setToolCallId(toolCall.toolCallId);
+		// 	}
 
-			// Handle different tool call types
-			if (toolCall.type === 'breakdown') {
-				const uiTimer = setTimeout(() => {
-					setShowGenerativeUI(true);
-					setIsBreakdownStreaming(true);
+		// 	// Handle different tool call types
+		// 	if (toolCall.type === 'breakdown') {
+		// 		const uiTimer = setTimeout(() => {
+		// 			setShowGenerativeUI(true);
+		// 			setIsBreakdownStreaming(true);
 
-					// Safety timeout to ensure streaming stops after a reasonable time
-					setTimeout(() => {
-						setIsBreakdownStreaming(false);
-					}, 10000);
-				}, 500);
+		// 			// Safety timeout to ensure streaming stops after a reasonable time
+		// 			setTimeout(() => {
+		// 				setIsBreakdownStreaming(false);
+		// 			}, 10000);
+		// 		}, 500);
 
-				return () => {
-					clearTimeout(timer);
-					clearTimeout(uiTimer);
-				};
-			} else if (toolCall.type === 'research') {
-				const researchTimer = setTimeout(() => {
-					setShowResearchUI(true);
-					setInitialResearchStarted(true);
-				}, 500);
+		// 		return () => {
+		// 			clearTimeout(timer);
+		// 			clearTimeout(uiTimer);
+		// 		};
+		// 	} else if (toolCall.type === 'research') {
+		// 		const researchTimer = setTimeout(() => {
+		// 			setShowResearchUI(true);
+		// 			setInitialResearchStarted(true);
+		// 		}, 500);
 
-				return () => {
-					clearTimeout(timer);
-					clearTimeout(researchTimer);
-				};
-			} else if (toolCall.type === 'report') {
-				// Set showReportUI to true when a report is detected
-				const reportTimer = setTimeout(() => {
-					setShowReportUI(true);
-				}, 500);
+		// 		return () => {
+		// 			clearTimeout(timer);
+		// 			clearTimeout(researchTimer);
+		// 		};
+		// 	} else if (toolCall.type === 'report') {
+		// 		// Set showReportUI to true when a report is detected
+		// 		const reportTimer = setTimeout(() => {
+		// 			setShowReportUI(true);
+		// 		}, 500);
 
-				return () => {
-					clearTimeout(timer);
-					clearTimeout(reportTimer);
-				};
-			}
-		}
+		// 		return () => {
+		// 			clearTimeout(timer);
+		// 			clearTimeout(reportTimer);
+		// 		};
+		// 	}
+		// }
 
 		// Check for tool invocations in parts
-		if (message.parts) {
-			const toolInvocationPart = message.parts.find(
-				(part) =>
-					part.type === 'tool-invocation' &&
-					part.toolInvocation.toolName === 'trace_analysis',
-			);
+		// if (message.parts) {
+		// 	const toolInvocationPart = message.parts.find(
+		// 		(part) =>
+		// 			part.type === 'tool-invocation' &&
+		// 			part.toolInvocation.toolName === 'trace_analysis',
+		// 	);
 
-			if (toolInvocationPart && toolInvocationPart.type === 'tool-invocation') {
-				setToolCallId(toolInvocationPart.toolInvocation.toolCallId);
-				setShowResearchUI(true);
-				setInitialResearchStarted(true);
-			}
-		}
+		// 	if (toolInvocationPart && toolInvocationPart.type === 'tool-invocation') {
+		// 		setToolCallId(toolInvocationPart.toolInvocation.toolCallId);
+		// 		setShowResearchUI(true);
+		// 		setInitialResearchStarted(true);
+		// 	}
+		// }
 
 		// Process annotations
 		if (message.annotations) {
@@ -272,36 +272,36 @@ export function ChatMessage({
 			}
 
 			// Process breakdown annotations
-			const breakdownUpdates = message.annotations.filter(
-				(annotation) =>
-					typeof annotation === 'object' &&
-					annotation !== null &&
-					'type' in annotation &&
-					annotation.type === 'breakdown_update',
-			);
-			if (breakdownUpdates.length > 0) {
-				setBreakdownAnnotations(breakdownUpdates);
-				setShowGenerativeUI(true);
+			// const breakdownUpdates = message.annotations.filter(
+			// 	(annotation) =>
+			// 		typeof annotation === 'object' &&
+			// 		annotation !== null &&
+			// 		'type' in annotation &&
+			// 		annotation.type === 'breakdown_update',
+			// );
+			// if (breakdownUpdates.length > 0) {
+			// 	setBreakdownAnnotations(breakdownUpdates);
+			// 	setShowGenerativeUI(true);
 
-				// Check if any annotation indicates completion
-				const isComplete = breakdownUpdates.some(
-					(annotation) =>
-						typeof annotation === 'object' &&
-						annotation !== null &&
-						'data' in annotation &&
-						annotation.data?.status === 'completed' &&
-						annotation.data?.isComplete,
-				);
+			// 	// Check if any annotation indicates completion
+			// 	const isComplete = breakdownUpdates.some(
+			// 		(annotation) =>
+			// 			typeof annotation === 'object' &&
+			// 			annotation !== null &&
+			// 			'data' in annotation &&
+			// 			annotation.data?.status === 'completed' &&
+			// 			annotation.data?.isComplete,
+			// 	);
 
-				// Update streaming state based on completion status
-				if (isComplete) {
-					setIsBreakdownStreaming(false);
-				}
-			}
+			// 	// Update streaming state based on completion status
+			// 	if (isComplete) {
+			// 		setIsBreakdownStreaming(false);
+			// 	}
+			// }
 		}
 
 		return () => clearTimeout(timer);
-	}, [toolCall, message.parts, message.annotations]);
+	}, [message.parts, message.annotations]);
 
 	/**
 	 * Handler for aborting breakdown tool calls

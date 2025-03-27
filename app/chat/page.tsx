@@ -383,9 +383,6 @@ export default function AiChatPage() {
 		// 			setReportTopic(latestMessage.toolCall.reportType || 'go-overview');
 		// 			setReportData(latestMessage.toolCall.data.reportData);
 		// 		}
-		// 	} else if (latestMessage.toolCall.type === 'sidePanel') {
-		// 		setShowSidePanel(true);
-		// 		setPanelContentType('data');
 		// 	}
 		// }
 	}, [messages]);

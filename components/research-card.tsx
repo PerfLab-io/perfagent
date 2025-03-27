@@ -375,214 +375,6 @@ export function ResearchCard({
 	}, [triggerAnimation, preserveData, toolCallId, researchId, updateState]);
 
 	/**
-	 * Process annotations when they change
-	 */
-	useEffect(() => {
-		if (!annotations || annotations.length === 0 || isCancelled) return;
-
-		// Filter annotations
-		const researchUpdates = annotations.filter(
-			(annotation) => annotation.type === 'research_update' && annotation.data,
-		);
-
-		if (researchUpdates.length === 0) return;
-
-		// Process each annotation
-		for (const annotation of researchUpdates) {
-			const data = annotation.data;
-			if (!data) continue;
-
-			// Update progress if available
-			if (data.completedSteps !== undefined && data.totalSteps !== undefined) {
-				const newProgress = Math.round(
-					(data.completedSteps / data.totalSteps) * 100,
-				);
-				setProgress(newProgress);
-			}
-
-			// Update phase based on status
-			if (data.status === 'completed') {
-				if (data.type === 'progress' && data.isComplete) {
-					setSearchPhase('complete');
-					isCompletedRef.current = true;
-				}
-			} else if (data.status === 'running') {
-				// Set phase based on type
-				if (data.type === 'plan') {
-					setSearchPhase('planning');
-				} else if (data.type === 'web' || data.type === 'academic') {
-					setSearchPhase('searching');
-				} else if (['analysis', 'gaps', 'synthesis'].includes(data.type)) {
-					setSearchPhase('analyzing');
-				}
-			}
-
-			// Update steps
-			if (data.type && data.title) {
-				updateStepFromAnnotation(data);
-			}
-
-			// Update results if available
-			if (
-				data.results &&
-				Array.isArray(data.results) &&
-				data.results.length > 0
-			) {
-				const formattedResults: ResearchResult[] = data.results.map(
-					(result, index) => ({
-						id: result.id || `result-${index}`,
-						title: result.title || '',
-						snippet: result.content || '',
-						source: result.source || 'web',
-						sourceIcon: getIconComponent(
-							result.source === 'web'
-								? 'Globe'
-								: result.source === 'academic'
-									? 'BookOpen'
-									: 'BarChart',
-						),
-						url: result.url,
-					}),
-				);
-
-				setResults(formattedResults);
-				setShowResults(true);
-			}
-
-			// Process findings
-			if (
-				data.findings &&
-				Array.isArray(data.findings) &&
-				data.findings.length > 0
-			) {
-				const formattedResults: ResearchResult[] = data.findings.map(
-					(finding, index) => ({
-						id: `finding-${index}`,
-						title: finding.insight || '',
-						snippet: Array.isArray(finding.evidence)
-							? finding.evidence.join('\n')
-							: finding.evidence || '',
-						source: 'analysis',
-						sourceIcon: getIconComponent('BarChart'),
-						url: undefined,
-					}),
-				);
-
-				setResults((prev) => [...prev, ...formattedResults]);
-				setShowResults(true);
-			}
-		}
-
-		// Update the context state
-		updateState({
-			phase: searchPhase,
-			progress,
-			steps,
-			visibleSteps,
-			activeStep,
-			results,
-			showResults,
-			completed: isCompletedRef.current,
-			toolCallId,
-		});
-
-		// Scroll to bottom when new data arrives
-		scrollToBottom();
-	}, [
-		annotations,
-		isCancelled,
-		searchPhase,
-		progress,
-		steps,
-		visibleSteps,
-		activeStep,
-		results,
-		showResults,
-		toolCallId,
-		updateState,
-		scrollToBottom,
-	]);
-
-	/**
-	 * Helper function to update steps from annotation data
-	 */
-	const updateStepFromAnnotation = useCallback(
-		(data: any) => {
-			const stepId = data.type;
-			const existingStepIndex = steps.findIndex((step) => step.id === stepId);
-
-			if (existingStepIndex === -1) {
-				// Create new step
-				const newStep: ResearchStep = {
-					id: stepId,
-					title: data.title,
-					subtitle: data.message || '',
-					icon: getIconComponent(
-						data.type === 'web'
-							? 'Globe'
-							: data.type === 'academic'
-								? 'BookOpen'
-								: data.type === 'analysis'
-									? 'BarChart'
-									: 'Search',
-					),
-					status:
-						data.status === 'completed'
-							? 'complete'
-							: data.status === 'running'
-								? 'in-progress'
-								: 'pending',
-					expanded: data.status === 'running',
-				};
-
-				setSteps((prev) => [...prev, newStep]);
-
-				// Add to visible steps if not already there
-				if (!visibleSteps.includes(stepId)) {
-					setVisibleSteps((prev) => [...prev, stepId]);
-				}
-
-				// Set as active step if it's in progress
-				if (data.status === 'running') {
-					setActiveStep(stepId);
-				}
-			} else {
-				// Update existing step
-				setSteps((prevSteps) => {
-					const updatedSteps = [...prevSteps];
-					updatedSteps[existingStepIndex] = {
-						...updatedSteps[existingStepIndex],
-						title: data.title,
-						subtitle: data.message || updatedSteps[existingStepIndex].subtitle,
-						status:
-							data.status === 'completed'
-								? 'complete'
-								: data.status === 'running'
-									? 'in-progress'
-									: 'pending',
-						expanded:
-							data.status === 'running'
-								? true
-								: updatedSteps[existingStepIndex].expanded,
-					};
-					return updatedSteps;
-				});
-
-				// Add to visible steps if not already there
-				if (!visibleSteps.includes(stepId)) {
-					setVisibleSteps((prev) => [...prev, stepId]);
-				}
-
-				// Set as active step if it's in progress
-				if (data.status === 'running') {
-					setActiveStep(stepId);
-				}
-			}
-		},
-		[steps, visibleSteps],
-	);
-
-	/**
 	 * Process streamed data
 	 */
 	const processStreamedData = useCallback((data: any) => {
@@ -629,17 +421,30 @@ export function ResearchCard({
 		lastStreamedDataRef.current = currentDataString;
 
 		// Check if research is completed
-		if (processedData.completed) {
+		const isCompleted = processedData.completed || false;
+		if (isCompleted) {
 			isCompletedRef.current = true;
 		}
 
-		// Update component state based on the streamed data
-		if (processedData.phase) setSearchPhase(processedData.phase);
-		if (processedData.progress !== undefined)
-			setProgress(processedData.progress);
+		// Batch state updates to prevent cascading re-renders
+		const updates: Partial<ResearchInstance> = {};
 
-		// Special handling for steps to ensure completed steps stay completed
-		if (processedData.steps) {
+		if (processedData.phase) updates.phase = processedData.phase;
+		if (processedData.progress !== undefined)
+			updates.progress = processedData.progress;
+		if (processedData.steps) updates.steps = processedData.steps;
+		if (processedData.visibleSteps)
+			updates.visibleSteps = processedData.visibleSteps;
+		if (processedData.activeStep !== undefined)
+			updates.activeStep = processedData.activeStep;
+		if (processedData.results) updates.results = processedData.results;
+		if (processedData.showResults !== undefined)
+			updates.showResults = processedData.showResults;
+
+		// Update local state
+		if (updates.phase) setSearchPhase(updates.phase);
+		if (updates.progress !== undefined) setProgress(updates.progress);
+		if (updates.steps) {
 			setSteps((prevSteps) => {
 				// Create a map of previous steps with "complete" status
 				const completedStepsMap = new Map();
@@ -650,8 +455,7 @@ export function ResearchCard({
 				});
 
 				// Update new steps, preserving "complete" status for previously completed steps
-				return processedData.steps.map((step) => {
-					// If the step was previously completed or is now completed, mark it as complete
+				return updates.steps!.map((step) => {
 					if (completedStepsMap.has(step.id) || step.status === 'complete') {
 						return { ...step, status: 'complete' };
 					}
@@ -659,44 +463,157 @@ export function ResearchCard({
 				});
 			});
 		}
-
-		if (processedData.visibleSteps) setVisibleSteps(processedData.visibleSteps);
-		if (processedData.activeStep !== undefined)
-			setActiveStep(processedData.activeStep);
-		if (processedData.results) setResults(processedData.results);
-		if (processedData.showResults !== undefined)
-			setShowResults(processedData.showResults);
+		if (updates.visibleSteps) setVisibleSteps(updates.visibleSteps);
+		if (updates.activeStep !== undefined) setActiveStep(updates.activeStep);
+		if (updates.results) setResults(updates.results);
+		if (updates.showResults !== undefined) setShowResults(updates.showResults);
 
 		// Update the context state when research is completed
-		if (processedData.completed) {
+		if (isCompleted) {
 			updateState({
-				phase: processedData.phase || data.phase,
-				progress:
-					processedData.progress !== undefined
-						? processedData.progress
-						: data.progress,
-				steps: streamedData.steps || data.steps,
-				visibleSteps: processedData.visibleSteps || data.visibleSteps,
-				activeStep:
-					processedData.activeStep !== undefined
-						? processedData.activeStep
-						: data.activeStep,
-				results: streamedData.results || data.results,
-				showResults:
-					processedData.showResults !== undefined
-						? processedData.showResults
-						: data.showResults,
+				...updates,
 				completed: true,
-				toolCallId: toolCallId,
+				toolCallId,
 			});
 		}
+	}, [streamedData, isCancelled, processStreamedData, toolCallId, updateState]);
+
+	/**
+	 * Process annotations when they change
+	 */
+	useEffect(() => {
+		if (!annotations || annotations.length === 0 || isCancelled) return;
+
+		// Filter annotations
+		const researchUpdates = annotations.filter(
+			(annotation) => annotation.type === 'research_update' && annotation.data,
+		);
+
+		if (researchUpdates.length === 0) return;
+
+		// Track if we've already processed these annotations
+		const annotationsString = JSON.stringify(researchUpdates);
+		if (lastStreamedDataRef.current === annotationsString) return;
+		lastStreamedDataRef.current = annotationsString;
+
+		// Process each annotation
+		for (const annotation of researchUpdates) {
+			const data = annotation.data;
+			if (!data) continue;
+
+			// Update progress if available
+			if (data.completedSteps !== undefined && data.totalSteps !== undefined) {
+				const newProgress = Math.round(
+					(data.completedSteps / data.totalSteps) * 100,
+				);
+				setProgress(newProgress);
+			}
+
+			// Update phase based on status
+			if (data.status === 'completed') {
+				if (data.type === 'progress' && data.isComplete) {
+					setSearchPhase('complete');
+					isCompletedRef.current = true;
+				}
+			} else if (data.status === 'running') {
+				// Set phase based on type
+				if (data.type === 'plan') {
+					setSearchPhase('planning');
+				} else if (data.type === 'web' || data.type === 'academic') {
+					setSearchPhase('searching');
+				} else if (['analysis', 'gaps', 'synthesis'].includes(data.type)) {
+					setSearchPhase('analyzing');
+				}
+			}
+
+			// Update steps
+			if (data.type && data.title) {
+				updateStepFromAnnotation(data);
+			}
+
+			// Update results if available
+			if (
+				data.results &&
+				Array.isArray(data.results) &&
+				data.results.length > 0
+			) {
+				const formattedResults: ResearchResult[] = data.results.map(
+					(result: any, index: number) => ({
+						id: result.id || `result-${index}`,
+						title: result.title || '',
+						snippet: result.content || '',
+						source: result.source || 'web',
+						sourceIcon: getIconComponent(
+							result.source === 'web'
+								? 'Globe'
+								: result.source === 'academic'
+									? 'BookOpen'
+									: 'BarChart',
+						),
+						url: result.url,
+					}),
+				);
+
+				setResults((prev) => {
+					const newResults = [...formattedResults];
+					const existingIds = new Set(prev.map((r) => r.id));
+					return [...prev, ...newResults.filter((r) => !existingIds.has(r.id))];
+				});
+				setShowResults(true);
+			}
+
+			// Process findings
+			if (
+				data.findings &&
+				Array.isArray(data.findings) &&
+				data.findings.length > 0
+			) {
+				const formattedResults: ResearchResult[] = data.findings.map(
+					(finding: any, index: number) => ({
+						id: `finding-${index}`,
+						title: finding.insight || '',
+						snippet: Array.isArray(finding.evidence)
+							? finding.evidence.join('\n')
+							: finding.evidence || '',
+						source: 'analysis',
+						sourceIcon: getIconComponent('BarChart'),
+						url: undefined,
+					}),
+				);
+
+				setResults((prev) => {
+					const newResults = [...formattedResults];
+					const existingIds = new Set(prev.map((r) => r.id));
+					return [...prev, ...newResults.filter((r) => !existingIds.has(r.id))];
+				});
+				setShowResults(true);
+			}
+		}
+
+		// Update the context state
+		updateState({
+			phase: searchPhase,
+			progress,
+			steps,
+			visibleSteps,
+			activeStep,
+			results,
+			showResults,
+			completed: isCompletedRef.current,
+			toolCallId,
+		});
 	}, [
-		streamedData,
+		annotations,
 		isCancelled,
-		processStreamedData,
-		updateState,
-		data,
+		searchPhase,
+		progress,
+		steps,
+		visibleSteps,
+		activeStep,
+		results,
+		showResults,
 		toolCallId,
+		updateState,
 	]);
 
 	/**
@@ -804,6 +721,85 @@ export function ResearchCard({
 		onAbort,
 		contextOnAbort,
 	]);
+
+	/**
+	 * Helper function to update steps from annotation data
+	 */
+	const updateStepFromAnnotation = useCallback(
+		(data: any) => {
+			const stepId = data.type;
+			const existingStepIndex = steps.findIndex((step) => step.id === stepId);
+
+			if (existingStepIndex === -1) {
+				// Create new step
+				const newStep: ResearchStep = {
+					id: stepId,
+					title: data.title,
+					subtitle: data.message || '',
+					icon: getIconComponent(
+						data.type === 'web'
+							? 'Globe'
+							: data.type === 'academic'
+								? 'BookOpen'
+								: data.type === 'analysis'
+									? 'BarChart'
+									: 'Search',
+					),
+					status:
+						data.status === 'completed'
+							? 'complete'
+							: data.status === 'running'
+								? 'in-progress'
+								: 'pending',
+					expanded: data.status === 'running',
+				};
+
+				setSteps((prev) => [...prev, newStep]);
+
+				// Add to visible steps if not already there
+				if (!visibleSteps.includes(stepId)) {
+					setVisibleSteps((prev) => [...prev, stepId]);
+				}
+
+				// Set as active step if it's in progress
+				if (data.status === 'running') {
+					setActiveStep(stepId);
+				}
+			} else {
+				// Update existing step
+				setSteps((prevSteps) => {
+					const updatedSteps = [...prevSteps];
+					updatedSteps[existingStepIndex] = {
+						...updatedSteps[existingStepIndex],
+						title: data.title,
+						subtitle: data.message || updatedSteps[existingStepIndex].subtitle,
+						status:
+							data.status === 'completed'
+								? 'complete'
+								: data.status === 'running'
+									? 'in-progress'
+									: 'pending',
+						expanded:
+							data.status === 'running'
+								? true
+								: updatedSteps[existingStepIndex].expanded,
+					};
+					return updatedSteps;
+				});
+
+				// Add to visible steps if not already there
+				if (!visibleSteps.includes(stepId)) {
+					setVisibleSteps((prev) => [...prev, stepId]);
+				}
+
+				// Set as active step if it's in progress
+				if (data.status === 'running') {
+					setActiveStep(stepId);
+				}
+			}
+		},
+		[steps, visibleSteps],
+	);
 
 	/**
 	 * Render step content based on step type
