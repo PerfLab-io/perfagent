@@ -1,7 +1,7 @@
 {
-	"name": "PerfAgent",
+	"name": "PerfAgent - AI-Powered Web Performance Analysis",
 	"short_name": "PerfAgent",
-	"description": "AI-Powered Web Performance Analysis",
+	"description": "Get expert insights on Core Web Vitals and performance optimization from an AI specialized in web performance analysis.",
 	"start_url": "/",
 	"display": "standalone",
 	"background_color": "#1a2b34",
