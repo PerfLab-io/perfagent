@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   description:
     "PerfAgent is an AI assistant specialized in web performance and Core Web Vitals analysis. Get expert insights and recommendations to optimize your website's performance without traditional monitoring.",
   keywords:
-    "web performance, core web vitals, AI agent, performance analysis, web optimization, LCP, CLS, INP, FID, performance insights",
+    "web performance, core web vitals, AI agent, performance analysis, web optimization, performance insights, performance agent, performance analysis agent, performance optimization agent, performance insights agent",
   authors: [{ name: "PerfLab Team" }],
   creator: "PerfLab",
   publisher: "PerfLab",
@@ -52,9 +52,9 @@ export const metadata: Metadata = {
   manifest: "/site.webmanifest",
 
   // Verification for search engines
-  verification: {
-    google: "google-site-verification-code", // Replace with actual verification code if available
-  },
+  // verification: {
+  //   google: "google-site-verification-code", // Replace with actual verification code if available
+  // },
 
   // Canonical URL
   alternates: {
