@@ -67,7 +67,7 @@ interface ResearchResult {
 	id: string;
 	title: string;
 	snippet: string;
-	source: 'web' | 'academic' | 'analysis';
+	source: 'web' | 'analysis';
 	sourceIcon: string | React.ReactNode;
 	url?: string;
 }
@@ -254,8 +254,6 @@ const utils = {
 	getSourceColor: (source: string): string => {
 		const sourceColors = {
 			web: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-800 dark:text-indigo-100',
-			academic:
-				'bg-peppermint-100 text-peppermint-800 dark:bg-peppermint-800 dark:text-peppermint-100',
 			analysis:
 				'bg-merino-100 text-merino-800 dark:bg-merino-800 dark:text-merino-100',
 			default: 'bg-muted text-muted-foreground',
@@ -384,8 +382,6 @@ export function ResearchCard({
 			resultCounts: {
 				total: deduplicatedResults.length,
 				web: deduplicatedResults.filter((r) => r.source === 'web').length,
-				academic: deduplicatedResults.filter((r) => r.source === 'academic')
-					.length,
 				analysis: deduplicatedResults.filter((r) => r.source === 'analysis')
 					.length,
 			},
@@ -638,8 +634,8 @@ export function ResearchCard({
 			if (updates.visibleSteps) setVisibleSteps(updates.visibleSteps);
 			if (updates.activeStep !== undefined) setActiveStep(updates.activeStep);
 			if (updates.results) setResults(updates.results);
-			if (updates.showResults !== undefined)
-				setShowResults(updates.showResults);
+			if (progress === 100 && !showResults && !showResults)
+				setShowResults(true);
 
 			// Update the context state when research is completed
 			if (isCompleted) {
@@ -707,9 +703,6 @@ export function ResearchCard({
 			const data = annotation.data;
 			if (!data) continue;
 
-			// Get the last annotation to check completion status at the end
-			const lastData = data;
-
 			// Handle progress updates
 			if (data.type === 'progress') {
 				if (data.status === 'completed' && data.isComplete) {
@@ -742,12 +735,7 @@ export function ResearchCard({
 				// Set phase based on type
 				if (data.type === 'plan' || data.type === 'research_plan') {
 					updates.searchPhase = 'planning';
-				} else if (
-					data.type === 'web' ||
-					data.type === 'academic' ||
-					data.type.includes('web') ||
-					data.type.includes('academic')
-				) {
+				} else if (data.type === 'web' || data.type.includes('web')) {
 					updates.searchPhase = 'searching';
 				} else if (
 					['analysis', 'gaps', 'synthesis'].some((t) => data.type.includes(t))
@@ -962,11 +950,8 @@ export function ResearchCard({
 			}
 		}
 
-		if (
-			updates.showResults !== undefined &&
-			updates.showResults !== showResults
-		) {
-			setShowResults(updates.showResults);
+		if (progress === 100 && !showResults) {
+			setShowResults(true);
 		}
 
 		// Handle completion state
@@ -1055,15 +1040,6 @@ export function ResearchCard({
 				// Update visible steps without progress steps
 				if (hasProgressSteps) {
 					setVisibleSteps(filteredVisibleSteps);
-				}
-
-				// Only show results once we have fully completed steps
-				// and delay to avoid UI jumping around
-				if (uniqueResults.length > 0 && !showResults) {
-					// Use a timeout to ensure the research progress card updates first
-					setTimeout(() => {
-						setShowResults(true);
-					}, 500);
 				}
 			}
 		}
@@ -1197,30 +1173,6 @@ export function ResearchCard({
 							<ul className="list-disc space-y-1 pl-5">
 								{webResults.map((item, idx) => (
 									<li key={`web-${idx}`}>{item.title}</li>
-								))}
-							</ul>
-						) : (
-							<p className="text-sm">{content}</p>
-						)}
-					</>
-				);
-			}
-
-			if (
-				stepId.startsWith('search-academic-') ||
-				stepId === 'academic' ||
-				stepId.includes('academic')
-			) {
-				const academicResults = uniqueResults
-					.filter((r) => r.source === 'academic')
-					.slice(0, 3);
-				return (
-					<>
-						<p>Academic sources:</p>
-						{academicResults.length > 0 ? (
-							<ul className="list-disc space-y-1 pl-5">
-								{academicResults.map((item, idx) => (
-									<li key={`academic-${idx}`}>{item.title}</li>
 								))}
 							</ul>
 						) : (
@@ -1412,7 +1364,7 @@ export function ResearchCard({
 					<div className="space-y-3">
 						{steps.map((step) => (
 							<div
-								key={step.id}
+								key={`${step.id}-${Math.random()}`}
 								className={utils.getStepContainerStyle(step, visibleSteps)}
 								style={{
 									transitionProperty: 'transform, box-shadow, background-color',
@@ -1513,13 +1465,6 @@ export function ResearchCard({
 								</Badge>
 								<Badge
 									variant="outline"
-									className="bg-peppermint-100/50 text-peppermint-800 hover:bg-peppermint-100 dark:bg-peppermint-800/50 dark:text-peppermint-100 dark:hover:bg-peppermint-700"
-								>
-									<BookOpen className="mr-1 h-3 w-3" /> Academic:{' '}
-									{resultCounts.academic}
-								</Badge>
-								<Badge
-									variant="outline"
 									className="bg-merino-100/50 text-merino-800 hover:bg-merino-100 dark:bg-merino-800/50 dark:text-merino-100 dark:hover:bg-merino-700"
 								>
 									<BarChart className="mr-1 h-3 w-3" /> Analysis:{' '}
@@ -1530,7 +1475,7 @@ export function ResearchCard({
 							<div className="space-y-3">
 								{uniqueResults.map((result) => (
 									<div
-										key={result.id}
+										key={`${result.id}-${Math.random()}`}
 										className={utils.getResultContainerStyle(
 											expandedResult === result.id,
 										)}
