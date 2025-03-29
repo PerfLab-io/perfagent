@@ -612,6 +612,11 @@ export function ChatMessage({
 			)}
 
 			<div className="flex max-w-[80%] flex-col">
+				{/* Tool sections */}
+				{renderReportSection()}
+				{renderBreakdownSection()}
+				{renderResearchSection()}
+
 				{/* Message bubble - Always render for assistant, even if empty */}
 				{messageText ? (
 					<div className={styles.messageBubble}>
@@ -644,11 +649,6 @@ export function ChatMessage({
 						<span></span>
 					</div>
 				)}
-
-				{/* Tool sections */}
-				{renderReportSection()}
-				{renderBreakdownSection()}
-				{renderResearchSection()}
 			</div>
 
 			{/* User avatar */}
