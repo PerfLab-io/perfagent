@@ -323,15 +323,6 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 
 							console.log('researchPlan', researchPlan);
 
-							// Execute search with Tavily
-							const response = await tav.search(enhancedQuery, {
-								searchDepth: 'advanced',
-								maxResults: 3,
-								includeDomains: trustedDomains,
-								includeAnswer: false,
-								includeRawContent: false,
-							});
-
 							// Generate IDs for all steps based on the plan
 							const generateStepIds = (plan: typeof researchPlan) => {
 								// Generate an array of search steps.
@@ -427,25 +418,16 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 									completedSteps++;
 								}
 
-								// Send completed annotation for the search step
+								// Send progress annotation for the search step
 								dataStreamWriter.writeMessageAnnotation({
 									type: 'research_update',
 									data: {
 										id: step.id,
 										type: step.type,
-										status: 'completed',
-										title:
-											step.type === 'web'
-												? `Searched the web for "${step.query.query}"`
-												: step.type === 'academic'
-													? `Searched academic papers for "${step.query.query}"`
-													: `Analysis of ${step.query.query} complete`,
+										status: 'in-progress',
+										title: `Searched the web for "${step.query.query}"`,
 										query: step.query.query,
-										results: searchResults[
-											searchResults.length - 1
-										].results.map((r) => {
-											return { ...r };
-										}),
+										results: searchResults[searchResults.length - 1].results,
 										message: `Found ${
 											searchResults[searchResults.length - 1].results.length
 										} results`,
@@ -455,6 +437,18 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 
 								searchIndex++; // Increment index
 							}
+
+							// Send completed annotation for the search step
+							dataStreamWriter.writeMessageAnnotation({
+								type: 'research_update',
+								data: {
+									id: `search-web-final`,
+									type: 'web',
+									status: 'complete',
+									title: 'Search step complete',
+									timestamp: Date.now(),
+								},
+							});
 
 							// Perform analyses
 							let analysisIndex = 0; // Add index tracker
@@ -499,11 +493,11 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 									data: {
 										id: step.id,
 										type: 'analysis',
-										status: 'complete',
+										status: 'in-progress',
 										title: `Analysis of ${step.analysis.type} complete`,
 										analysisType: step.analysis.type,
 										findings: analysisResult.findings,
-										message: `Analysis complete`,
+										message: `Completed analysis of ${step.analysis.type}`,
 										timestamp: Date.now(),
 									},
 								});
@@ -511,6 +505,17 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 								_analysisResults = analysisResult;
 								analysisIndex++; // Increment index
 							}
+
+							dataStreamWriter.writeMessageAnnotation({
+								type: 'research_update',
+								data: {
+									id: `analysis-final`,
+									type: 'analysis',
+									status: 'complete',
+									title: `Analysis complete`,
+									timestamp: Date.now(),
+								},
+							});
 
 							const researchReport = streamText({
 								model: perfAgent.languageModel(model),

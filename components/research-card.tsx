@@ -440,90 +440,6 @@ export function ResearchCard({
 	}, []);
 
 	/**
-	 * Helper function to update steps from annotation data
-	 */
-	const updateStepFromAnnotation = useCallback(
-		(data: any) => {
-			const stepId = data.type;
-			const existingStepIndex = steps.findIndex((step) => step.id === stepId);
-
-			if (existingStepIndex === -1) {
-				// Create new step
-				const newStep: ResearchStep = {
-					id: stepId,
-					title: data.title,
-					subtitle: data.message || '',
-					icon: utils.getIconComponent(
-						data.type === 'web'
-							? 'Globe'
-							: data.type === 'analysis'
-								? 'BarChart'
-								: 'Search',
-					),
-					status:
-						data.status === 'completed'
-							? 'complete'
-							: data.status === 'running'
-								? 'in-progress'
-								: 'pending',
-					expanded: data.status === 'running',
-				};
-
-				setSteps((prev) => [...prev, newStep]);
-
-				// Add to visible steps if not already there
-				if (!visibleSteps.includes(stepId)) {
-					setVisibleSteps((prev) => [...prev, stepId]);
-				}
-
-				// Set as active step if it's in progress
-				if (data.status === 'running') {
-					setActiveStep(stepId);
-				}
-			} else {
-				// Update existing step
-				setSteps((prevSteps) => {
-					const updatedSteps = [...prevSteps];
-					const currentStep = updatedSteps[existingStepIndex];
-
-					// Don't change status if the step is already complete
-					const newStatus =
-						currentStep.status === 'complete'
-							? 'complete'
-							: data.status === 'completed'
-								? 'complete'
-								: data.status === 'running'
-									? 'in-progress'
-									: 'pending';
-
-					updatedSteps[existingStepIndex] = {
-						...currentStep,
-						title: data.title,
-						subtitle: data.message || currentStep.subtitle,
-						status: newStatus,
-						expanded:
-							data.status === 'running' && newStatus !== 'complete'
-								? true
-								: currentStep.expanded,
-					};
-					return updatedSteps;
-				});
-
-				// Add to visible steps if not already there
-				if (!visibleSteps.includes(stepId)) {
-					setVisibleSteps((prev) => [...prev, stepId]);
-				}
-
-				// Set as active step if it's in progress
-				if (data.status === 'running') {
-					setActiveStep(stepId);
-				}
-			}
-		},
-		[steps, visibleSteps],
-	);
-
-	/**
 	 * Update state when streamed data changes
 	 */
 	useEffect(() => {
@@ -753,7 +669,7 @@ export function ResearchCard({
 				// Generate a consistent stepId that works with prefixed types (search-web-0, etc.)
 				const stepId = data.id || data.type;
 				const existingStepIndex = updates.steps.findIndex(
-					(step) => step.id === stepId,
+					(step) => step.id === stepId || step.id.includes(data.type),
 				);
 
 				if (existingStepIndex === -1) {
@@ -806,7 +722,33 @@ export function ResearchCard({
 
 					updates.steps[existingStepIndex] = {
 						...currentStep,
-						title: data.title || currentStep.title,
+						title:
+							newStatus === 'complete'
+								? (() => {
+										if (data.type === 'web' || data.type === 'web-0') {
+											return `Web Search ${newStatus}`;
+										}
+										if (
+											data.type === 'analysis' ||
+											data.type === 'analysis-0'
+										) {
+											return `Analysis ${newStatus}`;
+										}
+										if (data.type === 'plan' || data.type === 'research_plan') {
+											return `Research Plan ${newStatus}`;
+										}
+										if (data.type === 'gaps' || data.type === 'gaps-0') {
+											return `Gaps ${newStatus}`;
+										}
+										if (
+											data.type === 'synthesis' ||
+											data.type === 'synthesis-0'
+										) {
+											return `Synthesis ${newStatus}`;
+										}
+										return currentStep.title;
+									})()
+								: data.title || currentStep.title,
 						subtitle: data.message || currentStep.subtitle,
 						status: newStatus,
 						expanded:
@@ -866,10 +808,6 @@ export function ResearchCard({
 						const key = `${result.title}-${result.source}`;
 						if (!existingTitles.has(key)) {
 							updates.results.push(result);
-							// Only set showResults when fully complete
-							if (data.status === 'completed' || data.status === 'complete') {
-								updates.showResults = true;
-							}
 						}
 					});
 				};
@@ -955,7 +893,7 @@ export function ResearchCard({
 		}
 
 		// Handle completion state
-		if (updates.completedFlag) {
+		if (updates.completedFlag && !data.completed) {
 			isCompletedRef.current = true;
 
 			// Only update context state once on completion
