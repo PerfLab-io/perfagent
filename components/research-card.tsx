@@ -9,11 +9,19 @@ import React, {
 	useMemo,
 } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+	DialogTrigger,
+} from '@/components/ui/dialog';
+
 import { cn } from '@/lib/utils';
 import {
 	Search,
 	Globe,
-	BookOpen,
 	ChevronRight,
 	ChevronDown,
 	BarChart,
@@ -584,9 +592,7 @@ export function ResearchCard({
 		if (!annotations || annotations.length === 0 || isCancelled) return;
 
 		// Filter annotations related to research updates
-		const researchUpdates = annotations.filter(
-			(annotation) => annotation.type === 'research_update' && annotation.data,
-		);
+		const researchUpdates = annotations;
 
 		if (researchUpdates.length === 0) return;
 
@@ -619,6 +625,13 @@ export function ResearchCard({
 			const data = annotation.data;
 			if (!data) continue;
 
+			// Update progress if available
+			if (data.completedSteps !== undefined && data.totalSteps !== undefined) {
+				updates.progress = Math.round(
+					(data.completedSteps / data.totalSteps) * 100,
+				);
+			}
+
 			// Handle progress updates
 			if (data.type === 'progress') {
 				if (data.status === 'completed' && data.isComplete) {
@@ -626,24 +639,8 @@ export function ResearchCard({
 					updates.completedFlag = true;
 				}
 
-				if (
-					data.completedSteps !== undefined &&
-					data.totalSteps !== undefined
-				) {
-					updates.progress = Math.round(
-						(data.completedSteps / data.totalSteps) * 100,
-					);
-				}
-
 				// Skip creating a step for progress entries
 				continue;
-			}
-
-			// Update progress if available
-			if (data.completedSteps !== undefined && data.totalSteps !== undefined) {
-				updates.progress = Math.round(
-					(data.completedSteps / data.totalSteps) * 100,
-				);
 			}
 
 			// Update phase based on status
@@ -669,7 +666,8 @@ export function ResearchCard({
 				// Generate a consistent stepId that works with prefixed types (search-web-0, etc.)
 				const stepId = data.id || data.type;
 				const existingStepIndex = updates.steps.findIndex(
-					(step) => step.id === stepId || step.id.includes(data.type),
+					(step: ResearchStep) =>
+						step.id === stepId || step.id.includes(data.type),
 				);
 
 				if (existingStepIndex === -1) {
@@ -854,7 +852,25 @@ export function ResearchCard({
 
 			// Check if steps have actually changed before updating
 			if (JSON.stringify(uniqueSteps) !== JSON.stringify(steps)) {
-				setSteps(uniqueSteps);
+				setSteps((prevSteps) => {
+					if (activeStep && !isCancelled) {
+						const stepIds = prevSteps.map((step) => step.id);
+						const activeStepIndex = stepIds.indexOf(activeStep);
+
+						if (activeStepIndex > 0) {
+							return uniqueSteps.map((step) => {
+								const stepIndex = stepIds.indexOf(step.id);
+								// Mark all previous steps as complete
+								if (stepIndex < activeStepIndex && stepIndex !== -1) {
+									return { ...step, status: 'complete' };
+								}
+								return step;
+							});
+						}
+					}
+
+					return uniqueSteps;
+				});
 			}
 		}
 
@@ -913,6 +929,37 @@ export function ResearchCard({
 					toolCallId,
 				});
 			}
+
+			if (searchPhase === 'complete' && !isCancelled) {
+				// Using the utility function from filter-progress.ts
+				const { filteredSteps, filteredVisibleSteps } = filterProgressSteps(
+					steps,
+					visibleSteps,
+				);
+
+				// Only update state if there are actual changes to avoid infinite loop
+				const hasProgressSteps = steps.some((step) => step.id === 'progress');
+				const hasIncompleteSteps = steps.some(
+					(step) =>
+						visibleSteps.includes(step.id) && step.status !== 'complete',
+				);
+
+				if (hasProgressSteps || hasIncompleteSteps) {
+					// Mark all visible steps as complete and collapse them
+					setSteps(
+						filteredSteps.map((step) =>
+							filteredVisibleSteps.includes(step.id)
+								? { ...step, status: 'complete', expanded: false }
+								: step,
+						),
+					);
+
+					// Update visible steps without progress steps
+					if (hasProgressSteps) {
+						setVisibleSteps(filteredVisibleSteps);
+					}
+				}
+			}
 		}
 	}, [
 		// Include necessary dependencies
@@ -947,72 +994,6 @@ export function ResearchCard({
 			requestAnimationFrame(scrollToBottom);
 		}
 	}, [showResults, scrollToBottom]);
-
-	/**
-	 * When research is completed, ensure all visible steps are marked as complete
-	 */
-	useEffect(() => {
-		if (searchPhase === 'complete' && !isCancelled) {
-			// Using the utility function from filter-progress.ts
-			const { filteredSteps, filteredVisibleSteps } = filterProgressSteps(
-				steps,
-				visibleSteps,
-			);
-
-			// Only update state if there are actual changes to avoid infinite loop
-			const hasProgressSteps = steps.some((step) => step.id === 'progress');
-			const hasIncompleteSteps = steps.some(
-				(step) => visibleSteps.includes(step.id) && step.status !== 'complete',
-			);
-
-			if (hasProgressSteps || hasIncompleteSteps) {
-				// Mark all visible steps as complete and collapse them
-				setSteps(
-					filteredSteps.map((step) =>
-						filteredVisibleSteps.includes(step.id)
-							? { ...step, status: 'complete', expanded: false }
-							: step,
-					),
-				);
-
-				// Update visible steps without progress steps
-				if (hasProgressSteps) {
-					setVisibleSteps(filteredVisibleSteps);
-				}
-			}
-		}
-	}, [
-		searchPhase,
-		visibleSteps,
-		isCancelled,
-		steps,
-		uniqueResults,
-		showResults,
-	]);
-
-	/**
-	 * When active step changes, ensure previous steps are marked as completed
-	 */
-	useEffect(() => {
-		if (activeStep && !isCancelled) {
-			setSteps((prevSteps) => {
-				const stepIds = prevSteps.map((step) => step.id);
-				const activeStepIndex = stepIds.indexOf(activeStep);
-
-				if (activeStepIndex > 0) {
-					return prevSteps.map((step) => {
-						const stepIndex = stepIds.indexOf(step.id);
-						// Mark all previous steps as complete
-						if (stepIndex < activeStepIndex && stepIndex !== -1) {
-							return { ...step, status: 'complete' };
-						}
-						return step;
-					});
-				}
-				return prevSteps;
-			});
-		}
-	}, [activeStep, isCancelled]);
 
 	/**
 	 * Toggle result expansion
@@ -1359,121 +1340,143 @@ export function ResearchCard({
 
 			{/* Results Card - Only show when research is complete and we have results */}
 			{showResults && uniqueResults.length > 0 && (
-				<Card
-					className={cn(
-						'group relative w-full rounded-xl border-border bg-background transition-all duration-300 hover:-translate-y-1 hover:translate-x-1 hover:shadow-[-8px_8px_0_hsl(var(--border-color))]',
-						'animate-in fade-in slide-in-from-bottom-5',
-					)}
-				>
-					<CardHeader className="flex flex-row items-center justify-between p-4 pb-2">
-						<div className="flex items-center gap-2">
-							<Search className="h-4 w-4 text-foreground/70" />
-							<CardTitle className="text-lg font-bold text-foreground">
-								Research Results: {query}
-							</CardTitle>
-						</div>
-						<div className="flex items-center gap-2">
-							<Badge
-								variant="outline"
-								className="bg-peppermint-100/50 text-peppermint-800 dark:bg-peppermint-800/50 dark:text-peppermint-100"
-							>
-								Complete
-							</Badge>
-							<FeedbackButtons
-								messageId={`research-${researchId}`}
-								source="research"
-							/>
-						</div>
-					</CardHeader>
-
-					<CardContent className="p-4 pt-2">
-						<div className="space-y-4">
-							<div className="mb-2 flex flex-wrap gap-2">
-								<Badge
-									variant="outline"
-									className="bg-background text-foreground/70 hover:bg-accent"
+				<Dialog>
+					<DialogTrigger>
+						<Button
+							variant="outline"
+							size="sm"
+							className="rounded-full transition-all duration-300 hover:-translate-y-0.5 hover:translate-x-0.5 hover:shadow-[-4px_4px_0_hsl(var(--border-color))]"
+						>
+							Show resuls
+						</Button>
+					</DialogTrigger>
+					<DialogContent className="w-9/12 max-w-screen-lg overflow-y-scroll">
+						<DialogHeader>
+							<DialogDescription className="max-h-[900px] pt-8">
+								<Card
+									className={cn(
+										'group relative w-full rounded-xl border-border bg-background',
+										'animate-in fade-in slide-in-from-bottom-5',
+									)}
 								>
-									{resultCounts.total} results
-								</Badge>
-								<Badge
-									variant="outline"
-									className="bg-indigo-100/50 text-indigo-800 hover:bg-indigo-100 dark:bg-indigo-800/50 dark:text-indigo-100 dark:hover:bg-indigo-700"
-								>
-									<Globe className="mr-1 h-3 w-3" /> Web: {resultCounts.web}
-								</Badge>
-								<Badge
-									variant="outline"
-									className="bg-merino-100/50 text-merino-800 hover:bg-merino-100 dark:bg-merino-800/50 dark:text-merino-100 dark:hover:bg-merino-700"
-								>
-									<BarChart className="mr-1 h-3 w-3" /> Analysis:{' '}
-									{resultCounts.analysis}
-								</Badge>
-							</div>
-
-							<div className="space-y-3">
-								{uniqueResults.map((result) => (
-									<div
-										key={`${result.id}-${Math.random()}`}
-										className={utils.getResultContainerStyle(
-											expandedResult === result.id,
-										)}
-									>
-										<div
-											className="flex cursor-pointer items-start justify-between"
-											onClick={() => toggleResultExpansion(result.id)}
-										>
-											<div className="flex items-start gap-3">
-												<div
-													className={cn(
-														'rounded-md p-2',
-														utils.getSourceColor(result.source),
-													)}
-												>
-													{result.sourceIcon}
-												</div>
-												<div>
-													<h3 className="font-medium text-foreground">
-														{result.title}
-													</h3>
-													{expandedResult !== result.id && (
-														<p className="line-clamp-1 text-sm text-foreground/70">
-															{result.snippet}
-														</p>
-													)}
-												</div>
-											</div>
-											<button type="button" className="mt-1 flex-shrink-0">
-												{expandedResult === result.id ? (
-													<ChevronDown className="h-4 w-4 text-foreground/60" />
-												) : (
-													<ChevronRight className="h-4 w-4 text-foreground/60" />
-												)}
-											</button>
+									<CardHeader className="flex flex-row items-center justify-between p-4 pb-2">
+										<div className="flex items-center gap-2">
+											<Search className="h-4 w-4 text-foreground/70" />
+											<CardTitle className="text-lg font-bold text-foreground">
+												Research Results: {query}
+											</CardTitle>
 										</div>
+										<div className="flex items-center gap-2">
+											<Badge
+												variant="outline"
+												className="bg-peppermint-100/50 text-peppermint-800 dark:bg-peppermint-800/50 dark:text-peppermint-100"
+											>
+												Complete
+											</Badge>
+											<FeedbackButtons
+												messageId={`research-${researchId}`}
+												source="research"
+											/>
+										</div>
+									</CardHeader>
 
-										{expandedResult === result.id && (
-											<div className="mt-2 pl-12">
-												<p className="mb-2 text-sm text-foreground/80">
-													{result.snippet}
-												</p>
-												{result.url && (
-													<a
-														href={result.url}
-														target="_blank"
-														rel="noopener noreferrer"
-														className="inline-flex items-center gap-1 text-xs text-indigo-600 hover:underline dark:text-indigo-400"
-													>
-														View source <ChevronRight className="h-3 w-3" />
-													</a>
-												)}
+									<CardContent className="p-4 pt-2">
+										<div className="space-y-4">
+											<div className="mb-2 flex flex-wrap gap-2">
+												<Badge
+													variant="outline"
+													className="bg-background text-foreground/70 hover:bg-accent"
+												>
+													{resultCounts.total} results
+												</Badge>
+												<Badge
+													variant="outline"
+													className="bg-indigo-100/50 text-indigo-800 hover:bg-indigo-100 dark:bg-indigo-800/50 dark:text-indigo-100 dark:hover:bg-indigo-700"
+												>
+													<Globe className="mr-1 h-3 w-3" /> Web:{' '}
+													{resultCounts.web}
+												</Badge>
+												<Badge
+													variant="outline"
+													className="bg-merino-100/50 text-merino-800 hover:bg-merino-100 dark:bg-merino-800/50 dark:text-merino-100 dark:hover:bg-merino-700"
+												>
+													<BarChart className="mr-1 h-3 w-3" /> Analysis:{' '}
+													{resultCounts.analysis}
+												</Badge>
 											</div>
-										)}
-									</div>
-								))}
-							</div>
-						</div>
-					</CardContent>
-				</Card>
+
+											<div className="space-y-3">
+												{uniqueResults.map((result) => (
+													<div
+														key={`${result.id}-${Math.random()}`}
+														className={utils.getResultContainerStyle(
+															expandedResult === result.id,
+														)}
+													>
+														<div
+															className="flex cursor-pointer items-start justify-between"
+															onClick={() => toggleResultExpansion(result.id)}
+														>
+															<div className="flex items-start gap-3">
+																<div
+																	className={cn(
+																		'rounded-md p-2',
+																		utils.getSourceColor(result.source),
+																	)}
+																>
+																	{result.sourceIcon}
+																</div>
+																<div>
+																	<h3 className="font-medium text-foreground">
+																		{result.title}
+																	</h3>
+																	{expandedResult !== result.id && (
+																		<p className="line-clamp-1 text-sm text-foreground/70">
+																			{result.snippet}
+																		</p>
+																	)}
+																</div>
+															</div>
+															<button
+																type="button"
+																className="mt-1 flex-shrink-0"
+															>
+																{expandedResult === result.id ? (
+																	<ChevronDown className="h-4 w-4 text-foreground/60" />
+																) : (
+																	<ChevronRight className="h-4 w-4 text-foreground/60" />
+																)}
+															</button>
+														</div>
+
+														{expandedResult === result.id && (
+															<div className="mt-2 pl-12">
+																<p className="mb-2 text-sm text-foreground/80">
+																	{result.snippet}
+																</p>
+																{result.url && (
+																	<a
+																		href={result.url}
+																		target="_blank"
+																		rel="noopener noreferrer"
+																		className="inline-flex items-center gap-1 text-xs text-indigo-600 hover:underline dark:text-indigo-400"
+																	>
+																		View source{' '}
+																		<ChevronRight className="h-3 w-3" />
+																	</a>
+																)}
+															</div>
+														)}
+													</div>
+												))}
+											</div>
+										</div>
+									</CardContent>
+								</Card>
+							</DialogDescription>
+						</DialogHeader>
+					</DialogContent>
+				</Dialog>
 			)}
 
 			{/* Invisible element for scrolling reference */}
