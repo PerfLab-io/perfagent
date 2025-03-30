@@ -264,12 +264,9 @@ export default function AiChatPage() {
 	/**
 	 * Aborts ongoing research
 	 */
-	const handleAbortResearch = useCallback(
-		(callId?: string) => {
-			stop();
-		},
-		[stop],
-	);
+	const handleAbortResearch = useCallback(() => {
+		stop();
+	}, [stop]);
 
 	/**
 	 * Opens a specific report in the side panel

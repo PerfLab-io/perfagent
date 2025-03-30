@@ -183,10 +183,10 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 						'Performs research on web performance optimization topics',
 					parameters: researchToolSchema,
 					execute: async ({ query }) => {
-						try {
-							// Create a unique toolCallId
-							const toolCallId = `research-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+						// Create a unique toolCallId
+						const toolCallId = `research-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
+						try {
 							// Determine the research query by adding context if needed
 							const researchQuery = query.toLowerCase().includes('performance')
 								? query
@@ -198,6 +198,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 								tav = tavily({ apiKey: serverEnv.TAVILY_API_KEY });
 							} else {
 								console.warn('TAVILY_API_KEY is not set');
+								// TODO: Make sure the return type is the same as the success case
 								return {
 									type: 'research',
 									query,
@@ -221,15 +222,13 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 								'dev.to',
 							];
 
-							// Enhanced query with domain-specific scoping
-							const enhancedQuery = `${researchQuery} (site:${trustedDomains.join(' OR site:')})`;
-
 							dataStreamWriter.writeMessageAnnotation({
 								type: 'research_update',
+								toolCallId,
 								data: {
-									id: 'trace-insights',
-									type: 'trace-insight',
-									status: 'running',
+									id: 'research-and-analysis',
+									type: 'research-and-analysis',
+									status: 'started',
 									title: 'Research and Analysis',
 									message: 'Starting research and analysis...',
 									timestamp: Date.now(),
@@ -240,6 +239,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 
 							dataStreamWriter.writeMessageAnnotation({
 								type: 'research_update',
+								toolCallId,
 								data: {
 									id: `research-plan`,
 									type: 'research_plan',
@@ -261,11 +261,10 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 											z.object({
 												query: z.string(),
 												rationale: z.string(),
-												source: z.enum(['web', 'all']),
 												priority: z.number().min(1).max(5),
 											}),
 										)
-										.max(12),
+										.max(10),
 									required_analyses: z
 										.array(
 											z.object({
@@ -274,7 +273,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 												importance: z.number().min(1).max(5),
 											}),
 										)
-										.max(8),
+										.max(4),
 								}),
 								prompt: dedent`
 									Create a focused research plan for the topic: "${researchQuery}".
@@ -326,23 +325,11 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 							// Generate IDs for all steps based on the plan
 							const generateStepIds = (plan: typeof researchPlan) => {
 								// Generate an array of search steps.
-								const searchSteps = plan.search_queries.flatMap(
-									(query, index) => {
-										if (query.source === 'all') {
-											return [
-												{ id: `search-web-${index}`, type: 'web', query },
-											];
-										}
-										const searchType = 'web';
-										return [
-											{
-												id: `search-${searchType}-${index}`,
-												type: searchType,
-												query,
-											},
-										];
-									},
-								);
+								const searchSteps = plan.search_queries.map((query, index) => ({
+									id: `search-web-${index}`,
+									type: 'web',
+									query,
+								}));
 
 								// Generate an array of analysis steps.
 								const analysisSteps = plan.required_analyses.map(
@@ -367,6 +354,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 
 							dataStreamWriter.writeMessageAnnotation({
 								type: 'research_update',
+								toolCallId,
 								data: {
 									id: `research-plan`,
 									type: 'research_plan',
@@ -380,82 +368,85 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 							});
 
 							const searchResults = [];
-							let searchIndex = 0; // Add index tracker
 
 							for (const step of stepIds.searchSteps) {
 								// Send running annotation for this search step
 								dataStreamWriter.writeMessageAnnotation({
 									type: 'research_update',
+									toolCallId,
 									data: {
 										id: step.id,
-										type: step.type,
+										type: 'web',
 										status: 'in-progress',
 										title: `Searching the web for "${step.query.query}"`,
 										query: step.query.query,
-										message: `Searching ${step.query.source} sources...`,
+										message: `Searching trusted sources...`,
 										timestamp: Date.now(),
 									},
 								});
 
-								if (step.type === 'web' || step.type === 'academic') {
-									const webResults = await tav.search(step.query.query, {
-										searchDepth: depth,
-										includeAnswer: true,
-										includeDomains: trustedDomains,
-										maxResults: Math.min(6 - step.query.priority, 10),
-									});
+								const webResults = await tav.search(step.query.query, {
+									searchDepth: depth,
+									includeAnswer: true,
+									includeDomains: trustedDomains,
+									maxResults: Math.min(6 - step.query.priority, 10),
+								});
 
-									searchResults.push({
-										type: 'web',
-										query: step.query,
-										results: webResults.results.map((r) => ({
-											source: 'web',
-											title: r.title,
-											url: r.url,
-											content: r.content,
-										})),
-									});
-									completedSteps++;
-								}
+								searchResults.push({
+									type: 'web',
+									query: step.query,
+									results: webResults.results.map((r) => ({
+										source: 'web',
+										title: r.title,
+										url: r.url,
+										content: r.content,
+									})),
+								});
+
+								completedSteps++;
 
 								// Send progress annotation for the search step
 								dataStreamWriter.writeMessageAnnotation({
 									type: 'research_update',
+									toolCallId,
 									data: {
 										id: step.id,
-										type: step.type,
+										type: 'web',
 										status: 'in-progress',
 										title: `Searched the web for "${step.query.query}"`,
 										query: step.query.query,
 										results: searchResults[searchResults.length - 1].results,
 										message: `Found ${
 											searchResults[searchResults.length - 1].results.length
-										} results`,
+										} results for "${step.query.query}"`,
 										timestamp: Date.now(),
+										completedSteps,
+										totalSteps,
 									},
 								});
-
-								searchIndex++; // Increment index
 							}
 
 							// Send completed annotation for the search step
 							dataStreamWriter.writeMessageAnnotation({
 								type: 'research_update',
+								toolCallId,
 								data: {
 									id: `search-web-final`,
 									type: 'web',
 									status: 'complete',
 									title: 'Search step complete',
 									timestamp: Date.now(),
+									completedSteps,
+									totalSteps,
 								},
 							});
 
 							// Perform analyses
-							let analysisIndex = 0; // Add index tracker
-							let _analysisResults = null;
+							let _analysisResults = [];
 							for (const step of stepIds.analysisSteps) {
 								dataStreamWriter.writeMessageAnnotation({
 									type: 'research_update',
+									toolCallId,
 									data: {
 										id: step.id,
 										type: 'analysis',
@@ -464,6 +455,8 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 										analysisType: step.analysis.type,
 										message: `Analyzing ${step.analysis.type}...`,
 										timestamp: Date.now(),
+										completedSteps,
+										totalSteps,
 									},
 								});
 
@@ -471,25 +464,30 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 									model: perfAgent.languageModel(model),
 									temperature: 0.5,
 									schema: z.object({
-										findings: z.array(
-											z.object({
-												insight: z.string(),
-												evidence: z.array(z.string()),
-												confidence: z.number().min(0).max(1),
-											}),
-										),
-										implications: z.array(z.string()),
-										limitations: z.array(z.string()),
+										findings: z
+											.array(
+												z.object({
+													insight: z.string(),
+													evidence: z.array(z.string()),
+													confidence: z.number().min(0).max(1),
+												}),
+											)
+											.max(3),
 									}),
 									prompt: dedent`
-													Perform a ${step.analysis.type} analysis on the search results. ${step.analysis.description}
-													Consider all sources and their reliability.
-													Search results: ${JSON.stringify(searchResults)}
-													IMPORTANT: ENSURE TO RETURN CONFIDENCE SCORES BETWEEN 0 AND 1.`,
+										Perform a ${step.analysis.type} analysis on the search results. ${step.analysis.description}
+										Consider all sources and their reliability.
+										Search results: ${JSON.stringify(searchResults)}
+										IMPORTANT: ENSURE TO RETURN CONFIDENCE SCORES BETWEEN 0 AND 1. And max 3 findings.
+									`,
 								});
+
+								_analysisResults.push(analysisResult.findings);
+								completedSteps++;
 
 								dataStreamWriter.writeMessageAnnotation({
 									type: 'research_update',
+									toolCallId,
 									data: {
 										id: step.id,
 										type: 'analysis',
@@ -499,21 +497,23 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 										findings: analysisResult.findings,
 										message: `Completed analysis of ${step.analysis.type}`,
 										timestamp: Date.now(),
+										completedSteps,
+										totalSteps,
 									},
 								});
-
-								_analysisResults = analysisResult;
-								analysisIndex++; // Increment index
 							}
 
 							dataStreamWriter.writeMessageAnnotation({
 								type: 'research_update',
+								toolCallId,
 								data: {
 									id: `analysis-final`,
 									type: 'analysis',
 									status: 'complete',
 									title: `Analysis complete`,
 									timestamp: Date.now(),
+									completedSteps,
+									totalSteps,
 								},
 							});
 
@@ -521,8 +521,8 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 								model: perfAgent.languageModel(model),
 								temperature: 0,
 								system: dedent`${baseSystemPrompt}
-											
-											Generate a markdown report based on the research plan, search results and analysis results.`,
+
+								Generate a markdown report based on the research plan, search results and analysis results.`,
 								messages: [
 									...messages,
 									{
@@ -536,34 +536,33 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 								],
 							});
 
-							const finalProgress = {
-								id: 'research-progress',
-								type: 'progress' as const,
-								status: 'completed' as const,
-								message: `Trace analysis complete`,
-								completedSteps: totalSteps + (depth === 'advanced' ? 2 : 1),
-								totalSteps: totalSteps + (depth === 'advanced' ? 2 : 1),
-								isComplete: true,
-								timestamp: Date.now(),
-							};
-
 							dataStreamWriter.writeMessageAnnotation({
 								type: 'research_update',
-								data: finalProgress,
+								toolCallId,
+								data: {
+									id: 'research-and-analysis',
+									type: 'research-and-analysis',
+									status: 'complete',
+									message: `Research and analysis complete`,
+									completedSteps: totalSteps,
+									totalSteps,
+									timestamp: Date.now(),
+								},
 							});
 
 							researchReport.mergeIntoDataStream(dataStreamWriter);
 
 							return {
 								type: 'research',
+								toolCallId,
 								query: researchQuery,
-								phase: 'complete',
 								progress: 100,
 							};
 						} catch (error) {
 							console.error('Error in research tool:', error);
 							return {
 								type: 'research',
+								toolCallId,
 								query,
 								error: error.message || 'Failed to perform research',
 								results: [],

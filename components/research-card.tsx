@@ -14,7 +14,6 @@ import {
 	DialogContent,
 	DialogDescription,
 	DialogHeader,
-	DialogTitle,
 	DialogTrigger,
 } from '@/components/ui/dialog';
 
@@ -32,7 +31,6 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
-import type { MessageAnnotation } from '@/lib/hooks/use-chat';
 import { FeedbackButtons } from '@/components/feedback-buttons';
 import { filterProgressSteps } from '@/lib/filter-progress';
 
@@ -45,6 +43,12 @@ import { filterProgressSteps } from '@/lib/filter-progress';
  */
 interface ResearchContextState {
 	[key: string]: ResearchInstance;
+}
+
+export interface ResearchMessageAnnotation {
+	type: string;
+	data: any;
+	toolCallId: string;
 }
 
 /**
@@ -74,7 +78,7 @@ type ResearchPhase = 'planning' | 'searching' | 'analyzing' | 'complete';
 interface ResearchResult {
 	id: string;
 	title: string;
-	snippet: string;
+	content: string;
 	source: 'web' | 'analysis';
 	sourceIcon: string | React.ReactNode;
 	url?: string;
@@ -85,8 +89,9 @@ interface ResearchResult {
  */
 interface ResearchStep {
 	id: string;
+	iteration: string;
 	title: string;
-	subtitle: string;
+	message: string;
 	icon: string | React.ReactNode;
 	status: 'complete' | 'in-progress' | 'pending';
 	expanded?: boolean;
@@ -112,7 +117,7 @@ interface ResearchCardProps {
 		showResults?: boolean;
 		completed?: boolean;
 	};
-	annotations?: MessageAnnotation[];
+	annotations?: ResearchMessageAnnotation[];
 }
 
 /**
@@ -275,14 +280,10 @@ const utils = {
 	/**
 	 * Gets CSS classes for step container
 	 */
-	getStepContainerStyle: (
-		step: ResearchStep,
-		visibleSteps: string[],
-	): string => {
+	getStepContainerStyle: (step: ResearchStep): string => {
 		return cn(
 			'rounded-lg border border-border/20 p-3',
 			'transition-all duration-300 ease-in-out',
-			!visibleSteps.includes(step.id) && 'hidden',
 			step.status === 'in-progress' &&
 				'-translate-y-1 translate-x-1 bg-accent/10 shadow-[-4px_4px_0_hsl(var(--border-color))]',
 			step.status === 'complete' && 'bg-background',
@@ -320,81 +321,32 @@ const utils = {
  * Research Card Component
  * Displays research progress, steps, and results
  */
-export function ResearchCard({
-	query,
-	triggerAnimation,
-	preserveData = false,
-	researchId,
-	toolCallId: propToolCallId,
-	onAbort,
-	streamedData,
-	annotations,
-}: ResearchCardProps) {
+export function ResearchCard({ query, annotations }: ResearchCardProps) {
 	// Context and state management
-	const {
-		data,
-		updateState,
-		onAbort: contextOnAbort,
-	} = useResearch(researchId);
+	const { onAbort: contextOnAbort } = useResearch('asd');
 
-	// UI state
 	const [isCardExpanded, setIsCardExpanded] = useState(true);
+	const [isCancelled, setIsCancelled] = useState(false);
+	const [searchPhase, setSearchPhase] = useState<ResearchPhase>('planning');
+	const [progress, setProgress] = useState(0);
+
+	const [steps, setSteps] = useState<ResearchStep[]>([]);
+	const [activeStep, setActiveStep] = useState<string | null>(null);
+	const [results, setResults] = useState<ResearchResult[]>([]);
 	const [expandedResult, setExpandedResult] = useState<string | null>(null);
 
-	// Research state (using derived state from context where possible)
-	const [searchPhase, setSearchPhase] = useState<ResearchPhase>(
-		preserveData && data.completed ? 'complete' : 'planning',
-	);
-	const [progress, setProgress] = useState(
-		preserveData && data.completed ? 100 : 0,
-	);
-	const [results, setResults] = useState<ResearchResult[]>(
-		preserveData && data.results.length > 0 ? data.results : [],
-	);
-	const [steps, setSteps] = useState<ResearchStep[]>(
-		preserveData && data.steps.length > 0 ? data.steps : [],
-	);
-	const [visibleSteps, setVisibleSteps] = useState<string[]>(
-		preserveData && data.visibleSteps.length > 0 ? data.visibleSteps : [],
-	);
-	const [activeStep, setActiveStep] = useState<string | null>(data.activeStep);
-	const [showResults, setShowResults] = useState(
-		preserveData && data.showResults,
-	);
-	const [isCancelled, setIsCancelled] = useState(data.isCancelled || false);
-	const [toolCallId, setToolCallId] = useState<string | null>(
-		propToolCallId || data.toolCallId || null,
-	);
+	const handleAbort = useCallback(() => {
+		setIsCancelled(true);
+		contextOnAbort?.();
+	}, [contextOnAbort]);
+
+	const toggleCardExpansion = useCallback(() => {
+		setIsCardExpanded((prev) => !prev);
+	}, []);
 
 	// Refs
 	const bottomRef = useRef<HTMLDivElement>(null);
-	const lastStreamedDataRef = useRef<string | null>(null);
-	const isCompletedRef = useRef<boolean>(false);
-
-	// Memoized counts for badges and deduplicated results
-	const { resultCounts, uniqueResults } = useMemo(() => {
-		// Deduplicate results by title and source
-		const seenItems = new Map<string, ResearchResult>();
-
-		results.forEach((result) => {
-			const key = `${result.title}-${result.source}`;
-			if (!seenItems.has(key)) {
-				seenItems.set(key, result);
-			}
-		});
-
-		const deduplicatedResults = Array.from(seenItems.values());
-
-		return {
-			uniqueResults: deduplicatedResults,
-			resultCounts: {
-				total: deduplicatedResults.length,
-				web: deduplicatedResults.filter((r) => r.source === 'web').length,
-				analysis: deduplicatedResults.filter((r) => r.source === 'analysis')
-					.length,
-			},
-		};
-	}, [results]);
+	const lastStreamedDataRef = useRef<string>('');
 
 	/**
 	 * Scroll to the bottom of the component
@@ -406,223 +358,43 @@ export function ResearchCard({
 	}, []);
 
 	/**
-	 * Generate a unique toolCallId for this research instance if not already set
-	 */
-	useEffect(() => {
-		if (!toolCallId && triggerAnimation && !preserveData) {
-			const newToolCallId = `research-${researchId}-${Date.now()}`;
-			setToolCallId(newToolCallId);
-			updateState({ toolCallId: newToolCallId });
-		}
-	}, [triggerAnimation, preserveData, toolCallId, researchId, updateState]);
-
-	/**
-	 * Process streamed data by converting string icons to React components
-	 */
-	const processStreamedData = useCallback((data: any) => {
-		if (!data) return null;
-
-		const processed: any = { ...data };
-
-		if (data.steps) {
-			processed.steps = data.steps.map((step: ResearchStep) => ({
-				...step,
-				icon:
-					typeof step.icon === 'string'
-						? utils.getIconComponent(step.icon)
-						: step.icon,
-			}));
-		}
-
-		if (data.results) {
-			processed.results = data.results.map((result: ResearchResult) => ({
-				...result,
-				sourceIcon:
-					typeof result.sourceIcon === 'string'
-						? utils.getIconComponent(result.sourceIcon)
-						: result.sourceIcon,
-			}));
-		}
-
-		return processed;
-	}, []);
-
-	/**
-	 * Update state when streamed data changes
-	 */
-	useEffect(() => {
-		if (!streamedData || isCancelled) return;
-
-		// Process the streamed data
-		const processedData = processStreamedData(streamedData);
-		if (!processedData) return;
-
-		// Check if the data has actually changed to prevent unnecessary updates
-		const currentDataString = JSON.stringify(processedData);
-		if (lastStreamedDataRef.current === currentDataString) return;
-		lastStreamedDataRef.current = currentDataString;
-
-		// Check if research is completed
-		const isCompleted = processedData.completed || false;
-		if (isCompleted) {
-			isCompletedRef.current = true;
-		}
-
-		// Prepare updates
-		const updates: Record<string, any> = {};
-		let needsUpdate = false;
-
-		// Only add fields to updates if they're different from current state
-		if (processedData.phase && processedData.phase !== searchPhase) {
-			updates.phase = processedData.phase;
-			needsUpdate = true;
-		}
-
-		if (
-			processedData.progress !== undefined &&
-			processedData.progress !== progress
-		) {
-			updates.progress = processedData.progress;
-			needsUpdate = true;
-		}
-
-		if (processedData.steps) {
-			// We need to do a deep comparison here
-			// Convert steps to a format that can be compared consistently
-			const processedStepsString = JSON.stringify(
-				processedData.steps.map((s) => ({ ...s, icon: typeof s.icon })),
-			);
-			const currentStepsString = JSON.stringify(
-				steps.map((s) => ({ ...s, icon: typeof s.icon })),
-			);
-
-			if (processedStepsString !== currentStepsString) {
-				// Preserve completed status for steps
-				const newSteps = processedData.steps.map((step: ResearchStep) => {
-					const existingStep = steps.find((s) => s.id === step.id);
-					if (existingStep && existingStep.status === 'complete') {
-						return { ...step, status: 'complete' };
-					}
-					return step;
-				});
-
-				updates.steps = newSteps;
-				needsUpdate = true;
-			}
-		}
-
-		if (
-			processedData.visibleSteps &&
-			JSON.stringify(processedData.visibleSteps) !==
-				JSON.stringify(visibleSteps)
-		) {
-			updates.visibleSteps = processedData.visibleSteps;
-			needsUpdate = true;
-		}
-
-		if (
-			processedData.activeStep !== undefined &&
-			processedData.activeStep !== activeStep
-		) {
-			updates.activeStep = processedData.activeStep;
-			needsUpdate = true;
-		}
-
-		if (processedData.results) {
-			// Compare results by ID
-			const currentResultIds = new Set(results.map((r) => r.id));
-			const hasNewResults = processedData.results.some(
-				(r: ResearchResult) => !currentResultIds.has(r.id),
-			);
-
-			if (hasNewResults) {
-				updates.results = processedData.results;
-				needsUpdate = true;
-			}
-		}
-
-		if (
-			processedData.showResults !== undefined &&
-			processedData.showResults !== showResults
-		) {
-			updates.showResults = processedData.showResults;
-			needsUpdate = true;
-		}
-
-		// Only apply state updates if something actually changed
-		if (needsUpdate) {
-			// Apply state updates
-			if (updates.phase) setSearchPhase(updates.phase);
-			if (updates.progress !== undefined) setProgress(updates.progress);
-			if (updates.steps) setSteps(updates.steps);
-			if (updates.visibleSteps) setVisibleSteps(updates.visibleSteps);
-			if (updates.activeStep !== undefined) setActiveStep(updates.activeStep);
-			if (updates.results) setResults(updates.results);
-			if (progress === 100 && !showResults && !showResults)
-				setShowResults(true);
-
-			// Update the context state when research is completed
-			if (isCompleted) {
-				updateState({
-					...updates,
-					completed: true,
-					toolCallId,
-				});
-			}
-		}
-	}, [
-		streamedData,
-		isCancelled,
-		processStreamedData,
-		toolCallId,
-		updateState,
-		searchPhase,
-		progress,
-		steps,
-		visibleSteps,
-		activeStep,
-		results,
-		showResults,
-	]);
-
-	/**
 	 * Process annotations when they change
 	 */
 	useEffect(() => {
 		if (!annotations || annotations.length === 0 || isCancelled) return;
 
-		// Filter annotations related to research updates
-		const researchUpdates = annotations;
-
-		if (researchUpdates.length === 0) return;
-
 		// Track if we've already processed these annotations by using their IDs
 		// This is more reliable than comparing the entire object which may have changing timestamps
-		const annotationIds = researchUpdates
+		const annotationIds = `research-${annotations.at(0)?.toolCallId}-${annotations
 			.map(
 				(a) =>
 					`${a.data?.id || ''}-${a.data?.status || ''}-${a.data?.timestamp || ''}`,
 			)
-			.join('|');
+			.join('|')}`;
 
 		if (lastStreamedDataRef.current === annotationIds) return;
 		lastStreamedDataRef.current = annotationIds;
 
 		// Batch all state updates to avoid rerendering loops
-		const updates: Partial<{
+		const updates: {
 			searchPhase: ResearchPhase;
 			progress: number;
 			steps: ResearchStep[];
-			visibleSteps: string[];
 			activeStep: string | null;
 			results: ResearchResult[];
 			showResults: boolean;
-			completedFlag: boolean;
-		}> = {};
+		} = {
+			searchPhase: 'planning',
+			progress: 0,
+			steps: [],
+			activeStep: null,
+			results: [],
+			showResults: false,
+		};
 
 		// Process each annotation
-		for (const annotation of researchUpdates) {
-			const data = annotation.data;
+		for (const annotation of annotations) {
+			const { data, toolCallId } = annotation;
 			if (!data) continue;
 
 			// Update progress if available
@@ -632,169 +404,113 @@ export function ResearchCard({
 				);
 			}
 
-			// Handle progress updates
-			if (data.type === 'progress') {
-				if (data.status === 'completed' && data.isComplete) {
+			// Handle main research and analysis step updates
+			if (data.type === 'research-and-analysis') {
+				if (data.status === 'complete') {
 					updates.searchPhase = 'complete';
-					updates.completedFlag = true;
 				}
 
-				// Skip creating a step for progress entries
 				continue;
 			}
 
-			// Update phase based on status
-			if (data.status === 'running') {
-				// Set phase based on type
-				if (data.type === 'plan' || data.type === 'research_plan') {
-					updates.searchPhase = 'planning';
-				} else if (data.type === 'web' || data.type.includes('web')) {
-					updates.searchPhase = 'searching';
-				} else if (
-					['analysis', 'gaps', 'synthesis'].some((t) => data.type.includes(t))
-				) {
-					updates.searchPhase = 'analyzing';
-				}
+			const stepId = data.type;
+			const stepIteration = data.id;
+			const existingStepIndex = updates.steps.findIndex(
+				(step: ResearchStep) => step.id === stepId,
+			);
+
+			if (existingStepIndex === -1) {
+				// Create a new step
+				const newStep: ResearchStep = {
+					id: stepId,
+					iteration: stepIteration,
+					title: data.title,
+					message: data.message || '',
+					icon: utils.getIconComponent(
+						data.type === 'web'
+							? 'Globe'
+							: data.type === 'analysis'
+								? 'BarChart'
+								: 'Search',
+					),
+					status:
+						data.status === 'complete'
+							? 'complete'
+							: data.status === 'in-progress'
+								? 'in-progress'
+								: 'pending',
+					expanded: data.status === 'in-progress',
+				};
+
+				updates.steps.push(newStep);
+			} else {
+				// Update existing step
+				const currentStep = updates.steps[existingStepIndex];
+
+				// Don't change status if the step is already complete
+				const newStatus =
+					data.status === 'complete'
+						? 'complete'
+						: data.status === 'in-progress'
+							? 'in-progress'
+							: 'pending';
+
+				updates.steps[existingStepIndex] = {
+					...currentStep,
+					iteration: stepIteration,
+					title:
+						newStatus === 'complete'
+							? (() => {
+									if (data.type === 'web') {
+										return `Web Search ${newStatus}`;
+									}
+									if (data.type === 'analysis') {
+										return `Analysis ${newStatus}`;
+									}
+									if (data.type === 'research_plan') {
+										return `Research Plan ${newStatus}`;
+									}
+									return currentStep.title;
+								})()
+							: data.title,
+					message: data.message || currentStep.message,
+					status: newStatus,
+					expanded: newStatus !== 'complete',
+				};
 			}
 
-			// Process step updates
-			if (data.type && data.title) {
-				// Make a defensive copy of steps and visibleSteps if not already done
-				if (!updates.steps) updates.steps = [...steps];
-				if (!updates.visibleSteps) updates.visibleSteps = [...visibleSteps];
-
-				// Generate a consistent stepId that works with prefixed types (search-web-0, etc.)
-				const stepId = data.id || data.type;
-				const existingStepIndex = updates.steps.findIndex(
-					(step: ResearchStep) =>
-						step.id === stepId || step.id.includes(data.type),
-				);
-
-				if (existingStepIndex === -1) {
-					// Create a new step
-					const newStep: ResearchStep = {
-						id: stepId,
-						title: data.title,
-						subtitle: data.message || '',
-						icon: utils.getIconComponent(
-							data.type.includes('web') || data.type === 'web'
-								? 'Globe'
-								: data.type.includes('analysis') || data.type === 'analysis'
-									? 'BarChart'
-									: 'Search',
-						),
-						status:
-							data.status === 'completed' || data.status === 'complete'
-								? 'complete'
-								: data.status === 'running' || data.status === 'in-progress'
-									? 'in-progress'
-									: 'pending',
-						expanded:
-							data.status === 'running' || data.status === 'in-progress',
-					};
-
-					updates.steps.push(newStep);
-
-					// Add to visible steps if not already there
-					if (!updates.visibleSteps.includes(stepId)) {
-						updates.visibleSteps.push(stepId);
-					}
-
-					// Set as active step if it's in progress
-					if (data.status === 'running' || data.status === 'in-progress') {
-						updates.activeStep = stepId;
-					}
-				} else {
-					// Update existing step
-					const currentStep = updates.steps[existingStepIndex];
-
-					// Don't change status if the step is already complete
-					const newStatus =
-						currentStep.status === 'complete'
-							? 'complete'
-							: data.status === 'completed' || data.status === 'complete'
-								? 'complete'
-								: data.status === 'running' || data.status === 'in-progress'
-									? 'in-progress'
-									: 'pending';
-
-					updates.steps[existingStepIndex] = {
-						...currentStep,
-						title:
-							newStatus === 'complete'
-								? (() => {
-										if (data.type === 'web' || data.type === 'web-0') {
-											return `Web Search ${newStatus}`;
-										}
-										if (
-											data.type === 'analysis' ||
-											data.type === 'analysis-0'
-										) {
-											return `Analysis ${newStatus}`;
-										}
-										if (data.type === 'plan' || data.type === 'research_plan') {
-											return `Research Plan ${newStatus}`;
-										}
-										if (data.type === 'gaps' || data.type === 'gaps-0') {
-											return `Gaps ${newStatus}`;
-										}
-										if (
-											data.type === 'synthesis' ||
-											data.type === 'synthesis-0'
-										) {
-											return `Synthesis ${newStatus}`;
-										}
-										return currentStep.title;
-									})()
-								: data.title || currentStep.title,
-						subtitle: data.message || currentStep.subtitle,
-						status: newStatus,
-						expanded:
-							(data.status === 'running' || data.status === 'in-progress') &&
-							newStatus !== 'complete'
-								? true
-								: currentStep.expanded,
-					};
-
-					// Add to visible steps if not already there
-					if (!updates.visibleSteps.includes(stepId)) {
-						updates.visibleSteps.push(stepId);
-					}
-
-					// Set as active step if it's in progress
-					if (data.status === 'running' || data.status === 'in-progress') {
-						updates.activeStep = stepId;
-					}
-				}
+			// Set as active step if it's in progress
+			if (data.status !== 'complete') {
+				updates.activeStep = stepId;
 			}
 
 			// Process results
 			if (data.results || data.findings) {
-				if (!updates.results) updates.results = [...results];
+				if (!updates.results) updates.results = [];
 
 				// Process function to add results
 				const processItems = (items: any[], source: string) => {
 					if (!items || !Array.isArray(items) || items.length === 0) return;
 
-					const sourceIcon =
-						source === 'web' || source.includes('web') ? 'Globe' : 'BarChart';
+					const sourceIcon = source === 'web' ? 'Globe' : 'BarChart';
 
 					// Use stable IDs without Date.now() to prevent duplicates on re-renders
 					const formattedResults: ResearchResult[] = items.map(
 						(item: any, index: number) => ({
-							id:
-								item.id ||
-								`${source}-${index}-${item.title?.slice(0, 10) || ''}`,
-							title: item.title || item.insight || '',
-							snippet:
+							id: `${toolCallId}-${stepIteration}-${index}`,
+							title: item.title || item.insight,
+							content:
 								typeof item.content === 'string'
 									? item.content
 									: Array.isArray(item.evidence)
 										? item.evidence.join('\n')
 										: item.evidence || '',
-							source: source === 'findings' ? 'analysis' : source,
+							source,
 							sourceIcon: utils.getIconComponent(sourceIcon),
 							url: item.url,
+							findingType: data.analysisType
+								? `Analysis of results for '${data.analysisType}'`
+								: undefined,
 						}),
 					);
 
@@ -802,6 +518,7 @@ export function ResearchCard({
 					const existingTitles = new Set(
 						updates.results.map((r) => `${r.title}-${r.source}`),
 					);
+
 					formattedResults.forEach((result) => {
 						const key = `${result.title}-${result.source}`;
 						if (!existingTitles.has(key)) {
@@ -812,22 +529,18 @@ export function ResearchCard({
 
 				// Process standard results
 				if (data.results) {
-					processItems(data.results, data.type || 'web');
+					processItems(data.results, data.type);
 				}
 
 				// Process findings (analysis results)
 				if (data.findings) {
-					processItems(data.findings, 'findings');
+					processItems(data.findings, data.type);
 				}
 			}
 
 			// If this is a completed status, check if it's the final completion
-			if (
-				(data.status === 'completed' || data.status === 'complete') &&
-				(data.isComplete || data.type === 'progress')
-			) {
+			if (data.status === 'complete' && data.type === 'research-and-analysis') {
 				updates.searchPhase = 'complete';
-				updates.completedFlag = true;
 			}
 		}
 
@@ -838,6 +551,7 @@ export function ResearchCard({
 			updates.searchPhase !== searchPhase
 		) {
 			setSearchPhase(updates.searchPhase);
+			scrollToBottom();
 		}
 
 		if (updates.progress !== undefined && updates.progress !== progress) {
@@ -845,47 +559,12 @@ export function ResearchCard({
 		}
 
 		if (updates.steps) {
-			// Deduplicate steps by ID - this prevents duplicates from multiple annotations
-			const stepMap = new Map<string, ResearchStep>();
-			updates.steps.forEach((step) => stepMap.set(step.id, step));
-			const uniqueSteps = Array.from(stepMap.values());
-
-			// Check if steps have actually changed before updating
-			if (JSON.stringify(uniqueSteps) !== JSON.stringify(steps)) {
-				setSteps((prevSteps) => {
-					if (activeStep && !isCancelled) {
-						const stepIds = prevSteps.map((step) => step.id);
-						const activeStepIndex = stepIds.indexOf(activeStep);
-
-						if (activeStepIndex > 0) {
-							return uniqueSteps.map((step) => {
-								const stepIndex = stepIds.indexOf(step.id);
-								// Mark all previous steps as complete
-								if (stepIndex < activeStepIndex && stepIndex !== -1) {
-									return { ...step, status: 'complete' };
-								}
-								return step;
-							});
-						}
-					}
-
-					return uniqueSteps;
-				});
-			}
-		}
-
-		if (updates.visibleSteps) {
-			// Deduplicate visible steps
-			const uniqueVisibleSteps = [...new Set(updates.visibleSteps)];
-
-			// Check if visible steps have actually changed
-			if (JSON.stringify(uniqueVisibleSteps) !== JSON.stringify(visibleSteps)) {
-				setVisibleSteps(uniqueVisibleSteps);
-			}
+			setSteps(updates.steps);
 		}
 
 		if (updates.activeStep !== undefined && updates.activeStep !== activeStep) {
 			setActiveStep(updates.activeStep);
+			scrollToBottom();
 		}
 
 		if (updates.results) {
@@ -903,309 +582,52 @@ export function ResearchCard({
 				setResults(updates.results);
 			}
 		}
-
-		if (progress === 100 && !showResults) {
-			setShowResults(true);
-		}
-
-		// Handle completion state
-		if (updates.completedFlag && !data.completed) {
-			isCompletedRef.current = true;
-
-			// Only update context state once on completion
-			if (steps.length > 0 && !isCompletedRef.current) {
-				updateState({
-					phase: updates.searchPhase || searchPhase,
-					progress: updates.progress || progress,
-					steps: updates.steps || steps,
-					visibleSteps: updates.visibleSteps || visibleSteps,
-					activeStep: updates.activeStep || activeStep,
-					results: updates.results || results,
-					showResults:
-						updates.showResults !== undefined
-							? updates.showResults
-							: showResults,
-					completed: true,
-					toolCallId,
-				});
-			}
-
-			if (searchPhase === 'complete' && !isCancelled) {
-				// Using the utility function from filter-progress.ts
-				const { filteredSteps, filteredVisibleSteps } = filterProgressSteps(
-					steps,
-					visibleSteps,
-				);
-
-				// Only update state if there are actual changes to avoid infinite loop
-				const hasProgressSteps = steps.some((step) => step.id === 'progress');
-				const hasIncompleteSteps = steps.some(
-					(step) =>
-						visibleSteps.includes(step.id) && step.status !== 'complete',
-				);
-
-				if (hasProgressSteps || hasIncompleteSteps) {
-					// Mark all visible steps as complete and collapse them
-					setSteps(
-						filteredSteps.map((step) =>
-							filteredVisibleSteps.includes(step.id)
-								? { ...step, status: 'complete', expanded: false }
-								: step,
-						),
-					);
-
-					// Update visible steps without progress steps
-					if (hasProgressSteps) {
-						setVisibleSteps(filteredVisibleSteps);
-					}
-				}
-			}
-		}
 	}, [
 		// Include necessary dependencies
 		annotations,
 		isCancelled,
-		updateState,
-		toolCallId,
-		// Include state variables that are both read and potentially updated
-		activeStep,
-		progress,
-		results,
-		searchPhase,
-		showResults,
-		steps,
-		visibleSteps,
 	]);
 
-	/**
-	 * Scroll to bottom when visible steps change
-	 */
-	useEffect(() => {
-		if (visibleSteps.length > 0) {
-			requestAnimationFrame(scrollToBottom);
-		}
-	}, [visibleSteps, scrollToBottom]);
-
-	/**
-	 * Scroll to bottom when results appear
-	 */
-	useEffect(() => {
-		if (showResults) {
-			requestAnimationFrame(scrollToBottom);
-		}
-	}, [showResults, scrollToBottom]);
-
-	/**
-	 * Toggle result expansion
-	 */
-	const toggleResultExpansion = useCallback(
-		(id: string) => {
-			setExpandedResult((prev) => {
-				const newValue = prev === id ? null : id;
-				return newValue;
-			});
-		},
-		[scrollToBottom],
-	);
-
-	/**
-	 * Toggle step expansion
-	 */
-	const toggleStepExpansion = useCallback((id: string) => {
-		setSteps((prev) =>
-			prev.map((step) =>
-				step.id === id ? { ...step, expanded: !step.expanded } : step,
+	const toggleStepExpansion = useCallback((stepId: string) => {
+		setSteps((prevSteps) =>
+			prevSteps.map((step) =>
+				step.id === stepId ? { ...step, expanded: !step.expanded } : step,
 			),
 		);
 	}, []);
 
-	/**
-	 * Toggle card expansion
-	 */
-	const toggleCardExpansion = useCallback(() => {
-		setIsCardExpanded((prev) => !prev);
+	const toggleResultExpansion = useCallback((resultId: string) => {
+		setExpandedResult((prev) => (prev === resultId ? null : resultId));
 	}, []);
 
-	/**
-	 * Handle research cancellation
-	 */
-	const handleAbort = useCallback(() => {
-		if (searchPhase !== 'complete' && !isCancelled) {
-			console.log('Aborting research with toolCallId:', toolCallId);
-
-			setIsCancelled(true);
-			updateState({ isCancelled: true });
-			setSearchPhase('complete');
-			setProgress(0);
-			setActiveStep(null);
-
-			// Call the onAbort callback with this instance's toolCallId
-			if (onAbort) {
-				onAbort(toolCallId || undefined);
-			} else if (contextOnAbort) {
-				contextOnAbort(toolCallId || undefined);
-			}
-
-			// Update all steps to show they were cancelled
-			setSteps((prev) =>
-				prev.map((step) =>
-					step.status === 'in-progress'
-						? { ...step, status: 'pending', expanded: false }
-						: step,
-				),
-			);
-		}
-	}, [
-		searchPhase,
-		isCancelled,
-		toolCallId,
-		updateState,
-		onAbort,
-		contextOnAbort,
-	]);
-
-	/**
-	 * Render step content based on step type
-	 */
 	const renderStepContent = useCallback(
 		(stepId: string) => {
-			// Find the step in our steps array to access its data
-			const step = steps.find((s) => s.id === stepId);
+			const step = steps.find((step) => step.id === stepId);
 			if (!step) return null;
 
-			// Extract content from step subtitle
-			const content = step.subtitle || '';
-
-			// Check for special handling of different step types
-			if (
-				stepId.startsWith('search-web-') ||
-				stepId === 'web' ||
-				stepId.includes('web')
-			) {
-				const webResults = uniqueResults
-					.filter((r) => r.source === 'web')
-					.slice(0, 3);
-				return (
-					<>
-						<p>Web search results:</p>
-						{webResults.length > 0 ? (
-							<ul className="list-disc space-y-1 pl-5">
-								{webResults.map((item, idx) => (
-									<li key={`web-${idx}`}>{item.title}</li>
-								))}
-							</ul>
-						) : (
-							<p className="text-sm">{content}</p>
-						)}
-					</>
-				);
-			}
-
-			if (
-				stepId.startsWith('analysis-') ||
-				stepId === 'analysis' ||
-				stepId === 'synthesis' ||
-				stepId === 'gaps' ||
-				stepId.includes('analysis')
-			) {
-				// Try to find analysis results in the results array
-				const analysisResults = uniqueResults.filter(
-					(r) => r.source === 'analysis',
-				);
-				return (
-					<>
-						<p>{step.title || 'Analysis'} findings:</p>
-						{analysisResults.length > 0 ? (
-							<ul className="list-disc space-y-1 pl-5">
-								{analysisResults.slice(0, 3).map((item, idx) => (
-									<li key={`analysis-${idx}`}>{item.title}</li>
-								))}
-							</ul>
-						) : (
-							<p className="text-sm">{content}</p>
-						)}
-					</>
-				);
-			}
-
-			if (
-				stepId === 'plan' ||
-				stepId === 'research-plan' ||
-				stepId.includes('plan')
-			) {
-				// Try to extract structured plan data if available
-				let planItems: string[] = [];
-
-				// Check for JSON plan data
-				try {
-					const jsonMatch = content.match(/\{.*\}/s);
-					if (jsonMatch) {
-						const planData = JSON.parse(jsonMatch[0]);
-						if (planData.plan && Array.isArray(planData.plan)) {
-							planItems = planData.plan;
-						} else if (
-							planData.search_queries &&
-							Array.isArray(planData.search_queries)
-						) {
-							// Extract from search queries format
-							planItems = planData.search_queries
-								.map((q: any) =>
-									q.query
-										? `${q.query}${q.rationale ? ` (${q.rationale})` : ''}`
-										: '',
-								)
-								.filter(Boolean);
-						}
-					}
-				} catch (e) {
-					// If JSON parsing fails, use content as is
-				}
-
-				// If we have no structured data, use content as is or defaults
-				if (planItems.length === 0) {
-					if (content) {
-						// Split content by newlines or bullet points
-						const lines = content
-							.split(/[\n•]+/)
-							.map((line) => line.trim())
-							.filter(Boolean);
-
-						if (lines.length > 0) {
-							planItems = lines;
-						}
-					}
-
-					// If still no items, use defaults
-					if (planItems.length === 0) {
-						planItems = [
-							'Query authoritative web sources',
-							'Analyze performance patterns',
-							'Identify optimization opportunities',
-						];
-					}
-				}
-
-				return (
-					<>
-						<p>Research plan for "{query}":</p>
-						<ul className="list-disc space-y-1 pl-5">
-							{planItems.map((item, idx) => (
-								<li key={`plan-${idx}`}>{item}</li>
-							))}
-						</ul>
-					</>
-				);
-			}
-
-			// Default content rendering for any other step type
 			return (
-				<div className="text-sm">
-					{content || `Processing ${step.title || 'research'} data...`}
-				</div>
+				<ul className="list-disc">
+					{results
+						.filter((result) => result.source === stepId)
+						.reduce((results, result) => {
+							if (
+								results.length &&
+								result.findingType &&
+								results.find((r) => r.findingType === result.findingType)
+							) {
+								return results;
+							}
+
+							results.push(result);
+							return results;
+						}, [] as ResearchResult[])
+						.map((result) => (
+							<li key={result.id}>{result.findingType || result.title}</li>
+						))}
+				</ul>
 			);
 		},
-		// Include all dependencies to fix the linting issue
-		[query, uniqueResults, steps],
+		[results],
 	);
 
 	return (
@@ -1216,7 +638,7 @@ export function ResearchCard({
 					className={cn(
 						'flex flex-row items-center justify-between border-b border-border bg-accent p-4 font-mono text-midnight-950 dark:text-peppermint-950',
 						'rounded-t-lg',
-						!isCardExpanded && 'rounded-lg', // Apply rounded-lg to all corners when collapsed
+						!isCardExpanded && 'rounded-lg',
 					)}
 				>
 					<div className="flex items-center gap-2">
@@ -1281,65 +703,68 @@ export function ResearchCard({
 					</div>
 
 					<div className="space-y-3">
-						{steps.map((step) => (
-							<div
-								key={`${step.id}-${Math.random()}`}
-								className={utils.getStepContainerStyle(step, visibleSteps)}
-								style={{
-									transitionProperty: 'transform, box-shadow, background-color',
-									transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
-								}}
-							>
+						{steps.map((step, index) => {
+							return (
 								<div
-									className="flex cursor-pointer items-start justify-between"
-									onClick={() => toggleStepExpansion(step.id)}
+									key={`${step.id}-${index}`}
+									className={utils.getStepContainerStyle(step)}
+									style={{
+										transitionProperty:
+											'transform, box-shadow, background-color',
+										transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
+									}}
 								>
-									<div className="flex items-start gap-3">
-										<div className={utils.getStepIconStyle(step.status)}>
-											{step.status === 'in-progress' ? (
-												<div className="animate-spin">
-													<Loader2 className="h-5 w-5" />
-												</div>
-											) : (
-												step.icon
-											)}
-										</div>
-										<div>
-											<h3
-												className={cn(
-													'font-medium',
-													utils.getStatusColor(step.status),
+									<div
+										className="flex cursor-pointer items-start justify-between"
+										onClick={() => toggleStepExpansion(step.id)}
+									>
+										<div className="flex items-start gap-3">
+											<div className={utils.getStepIconStyle(step.status)}>
+												{step.status === 'in-progress' ? (
+													<div className="animate-spin">
+														<Loader2 className="h-5 w-5" />
+													</div>
+												) : (
+													step.icon
 												)}
-											>
-												{step.title}
-											</h3>
-											<p className="text-sm text-foreground/70">
-												{step.subtitle}
-											</p>
+											</div>
+											<div>
+												<h3
+													className={cn(
+														'font-medium',
+														utils.getStatusColor(step.status),
+													)}
+												>
+													{step.title}
+												</h3>
+												<p className="text-sm text-foreground/70">
+													{step.message}
+												</p>
+											</div>
 										</div>
+										<button type="button" className="mt-1 flex-shrink-0">
+											{step.expanded ? (
+												<ChevronDown className="h-4 w-4 text-foreground/60" />
+											) : (
+												<ChevronRight className="h-4 w-4 text-foreground/60" />
+											)}
+										</button>
 									</div>
-									<button type="button" className="mt-1 flex-shrink-0">
-										{step.expanded ? (
-											<ChevronDown className="h-4 w-4 text-foreground/60" />
-										) : (
-											<ChevronRight className="h-4 w-4 text-foreground/60" />
-										)}
-									</button>
-								</div>
 
-								{step.expanded && (
-									<div className="mt-3 space-y-2 pl-12 text-sm text-foreground/90 animate-in fade-in-50 dark:text-foreground/90">
-										{renderStepContent(step.id)}
-									</div>
-								)}
-							</div>
-						))}
+									{step.expanded && (
+										<div className="mt-3 space-y-2 pl-12 text-sm text-foreground/90 animate-in fade-in-50 dark:text-foreground/90">
+											{renderStepContent(step.id)}
+										</div>
+									)}
+								</div>
+							);
+						})}
 					</div>
 				</CardContent>
 			</Card>
 
 			{/* Results Card - Only show when research is complete and we have results */}
-			{showResults && uniqueResults.length > 0 && (
+			{searchPhase === 'complete' && results.length > 0 && (
 				<Dialog>
 					<DialogTrigger>
 						<Button
@@ -1350,9 +775,9 @@ export function ResearchCard({
 							Show resuls
 						</Button>
 					</DialogTrigger>
-					<DialogContent className="w-9/12 max-w-screen-lg overflow-y-scroll">
+					<DialogContent className="w-9/12 max-w-screen-lg">
 						<DialogHeader>
-							<DialogDescription className="max-h-[900px] pt-8">
+							<DialogDescription className="my-8">
 								<Card
 									className={cn(
 										'group relative w-full rounded-xl border-border bg-background',
@@ -1374,7 +799,7 @@ export function ResearchCard({
 												Complete
 											</Badge>
 											<FeedbackButtons
-												messageId={`research-${researchId}`}
+												messageId={`research-${annotations?.[0]?.toolCallId}`}
 												source="research"
 											/>
 										</div>
@@ -1387,26 +812,33 @@ export function ResearchCard({
 													variant="outline"
 													className="bg-background text-foreground/70 hover:bg-accent"
 												>
-													{resultCounts.total} results
+													{results.length} results
 												</Badge>
 												<Badge
 													variant="outline"
 													className="bg-indigo-100/50 text-indigo-800 hover:bg-indigo-100 dark:bg-indigo-800/50 dark:text-indigo-100 dark:hover:bg-indigo-700"
 												>
 													<Globe className="mr-1 h-3 w-3" /> Web:{' '}
-													{resultCounts.web}
+													{
+														results.filter((result) => result.source === 'web')
+															.length
+													}
 												</Badge>
 												<Badge
 													variant="outline"
 													className="bg-merino-100/50 text-merino-800 hover:bg-merino-100 dark:bg-merino-800/50 dark:text-merino-100 dark:hover:bg-merino-700"
 												>
 													<BarChart className="mr-1 h-3 w-3" /> Analysis:{' '}
-													{resultCounts.analysis}
+													{
+														results.filter(
+															(result) => result.source === 'analysis',
+														).length
+													}
 												</Badge>
 											</div>
 
-											<div className="space-y-3">
-												{uniqueResults.map((result) => (
+											<div className="max-h-[900px] space-y-3 overflow-y-scroll">
+												{results.map((result) => (
 													<div
 														key={`${result.id}-${Math.random()}`}
 														className={utils.getResultContainerStyle(
@@ -1432,7 +864,7 @@ export function ResearchCard({
 																	</h3>
 																	{expandedResult !== result.id && (
 																		<p className="line-clamp-1 text-sm text-foreground/70">
-																			{result.snippet}
+																			{result.content}
 																		</p>
 																	)}
 																</div>
@@ -1452,7 +884,7 @@ export function ResearchCard({
 														{expandedResult === result.id && (
 															<div className="mt-2 pl-12">
 																<p className="mb-2 text-sm text-foreground/80">
-																	{result.snippet}
+																	{result.content}
 																</p>
 																{result.url && (
 																	<a
