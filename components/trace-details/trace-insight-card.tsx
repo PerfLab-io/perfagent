@@ -41,7 +41,7 @@ export function FileInsightCard({
 			className={cn(
 				'rounded-lg border border-peppermint-200 bg-white dark:border-peppermint-800 dark:bg-peppermint-950/30',
 				'transition-all duration-300 hover:-translate-y-1 hover:translate-x-1 hover:shadow-[-4px_4px_0_hsl(var(--border-color))]',
-				'p-3',
+				'metric-context-appear p-3',
 				className,
 			)}
 		>
