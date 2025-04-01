@@ -5,33 +5,289 @@ import {
 } from '@paulirish/trace_engine/models/trace/insights/types';
 import { type Micro } from '@paulirish/trace_engine/models/trace/types/Timing';
 import { UserInteractionsData } from '@paulirish/trace_engine/models/trace/handlers/UserInteractionsHandler';
+import { TraceTopic, msOrSDisplay } from './trace';
+import { Handlers } from '@paulirish/trace_engine';
+import * as Trace from '@paulirish/trace_engine/models/trace/trace.js';
 
-export const msOrSDisplay: (value: number) => string = (value) => {
-	if (value < 1000) {
-		return `${value.toFixed(1)}ms`;
-	}
-
-	return `${(value / 1000).toFixed(1)}s`;
-};
-
-export enum TraceTopic {
-	CLSCulprits = 'CLSCulprits',
-	DocumentLatency = 'DocumentLatency',
-	DOMSize = 'DOMSize',
-	FontDisplay = 'FontDisplay',
-	ForcedReflow = 'ForcedReflow',
-	ImageDelivery = 'ImageDelivery',
-	InteractionToNextPaint = 'InteractionToNextPaint',
-	LCPDiscovery = 'LCPDiscovery',
-	LCPPhases = 'LCPPhases',
-	LongCriticalNetworkTree = 'LongCriticalNetworkTree',
-	RenderBlocking = 'RenderBlocking',
-	SlowCSSSelector = 'SlowCSSSelector',
-	ThirdParties = 'ThirdParties',
-	Viewport = 'Viewport',
+export enum MetricType {
+	TIME = 'time',
+	SCORE = 'score',
 }
 
-export async function analyzeInsights(
+enum LCPMetricPhases {
+	'ttfb' = 'TTFB',
+	'loadDelay' = 'Load Delay',
+	'loadTime' = 'Load Time',
+	'renderDelay' = 'Render Delay',
+}
+
+export enum MetricScoreClassification {
+	GOOD = 'good',
+	OK = 'ok',
+	BAD = 'bad',
+	UNCLASSIFIED = 'unclassified',
+}
+
+export type InsightsReport = {
+	metric: string;
+	metricTitle?: string;
+	metricValue: number;
+	metricType: MetricType;
+	metricBreakdown: { label: string; value: number }[];
+	metricScore?: MetricScoreClassification;
+	infoContent?: string;
+	recommendations?: string[];
+};
+
+export function analyseInsightsForCWV(
+	traceInsights: Trace.Insights.Types.TraceInsightSets,
+	trace: Handlers.Types.ParsedTrace,
+) {
+	console.log({ traceInsights, trace }, 'TRACE INSIGHTS');
+
+	const {
+		PageLoadMetrics,
+		LayoutShifts,
+		UserInteractions,
+		Animations: { animationFrames },
+		Meta: { traceBounds: traceWindow },
+	} = trace;
+
+	const mainFrameMetrics = PageLoadMetrics.allMarkerEvents;
+
+	const LCPEvent = mainFrameMetrics.find(
+		(metric) => metric.name === 'largestContentfulPaint::Candidate',
+	);
+
+	const layoutShifts = LayoutShifts.clusters;
+
+	let CLS: InsightsReport | undefined = undefined;
+	let LCP: InsightsReport | undefined = undefined;
+	let INP: InsightsReport | undefined = undefined;
+
+	if (LCPEvent) {
+		const _lcp = {
+			metric: 'LCP',
+			metricValue: 0,
+			metricType: MetricType.TIME,
+			metricScore: undefined,
+			metricBreakdown: [],
+			rawEvent: LCPEvent,
+		} as InsightsReport;
+
+		const LCPEventFrame = PageLoadMetrics.metricScoresByFrameId.get(
+			LCPEvent.args.frame,
+		);
+
+		if (LCPEventFrame && LCPEvent.args.data) {
+			const navigationTimings = LCPEventFrame.get(
+				LCPEvent.args.data.navigationId,
+			);
+
+			if (navigationTimings) {
+				for (const [key, value] of navigationTimings.entries()) {
+					const normalizedTiming = microSecondsToMilliSeconds(value.timing);
+					if (key === 'LCP') {
+						_lcp.metricValue = normalizedTiming;
+						// @ts-ignore
+						_lcp.metricScore = value.classification;
+					} else {
+						_lcp.metricBreakdown.push({
+							label: key,
+							value: normalizedTiming,
+						});
+					}
+				}
+
+				_lcp.infoContent = `The LCP event happened at ${msOrSDisplay(
+					// @ts-expect-error
+					microSecondsToMilliSeconds(LCPEvent.ts - (traceWindow.min || 0)),
+				)}.`;
+
+				// INFO: TODO: The main frame may have multiple navigations, depending on the trace
+				// we must account for that in the future.
+				const mainFrameNavigation = trace.Meta.mainFrameNavigations[0];
+
+				if (mainFrameNavigation && mainFrameNavigation.args.data) {
+					const insights = traceInsights.get(
+						mainFrameNavigation.args.data.navigationId,
+					);
+
+					if (
+						insights &&
+						!(insights.model.LCPPhases instanceof Error) &&
+						insights.model.LCPPhases
+					) {
+						const renderDelay = ((insights.model.LCPPhases.phases
+							?.renderDelay || 0) * 1000) as Micro;
+						const ttfb = ((insights.model.LCPPhases.phases?.ttfb || 0) *
+							1000) as Micro;
+						const lcpEvent = LCPEvent.ts;
+						const loadTime =
+							(insights.model.LCPPhases.phases?.loadTime || 0) * 1000;
+						const loadDelay =
+							(insights.model.LCPPhases.phases?.loadDelay || 0) * 1000;
+						const hasDelays = loadDelay !== 0 && loadTime !== 0;
+
+						const renderStart = lcpEvent - renderDelay;
+						const loadBegin = renderStart - loadTime;
+						const loadDelayStart = loadBegin - loadDelay;
+						const reqStart = hasDelays
+							? loadDelayStart - ttfb
+							: renderStart - ttfb;
+
+						const phases = !hasDelays
+							? [
+									{
+										name: 'TTFB',
+										start: reqStart as Micro,
+										end: renderStart as Micro,
+									},
+									{
+										name: 'Render Delay',
+										start: renderStart as Micro,
+										end: lcpEvent as Micro,
+									},
+								]
+							: [
+									{
+										name: 'TTFB',
+										start: reqStart as Micro,
+										end: loadDelayStart as Micro,
+									},
+									{
+										name: 'Resource Load Delay',
+										start: loadDelayStart as Micro,
+										end: loadBegin as Micro,
+									},
+									{
+										name: 'Download Time',
+										start: loadBegin as Micro,
+										end: renderStart as Micro,
+									},
+									{
+										name: 'Render Delay',
+										start: renderStart as Micro,
+										end: lcpEvent as Micro,
+									},
+								];
+
+						const lcpRequest = insights.model.LCPPhases.lcpRequest;
+						const documentRequest =
+							insights.model.DocumentLatency.data?.documentRequest?.ts || 0;
+
+						_lcp.metricBreakdown = [];
+						Array.from(
+							Object.entries(insights.model.LCPPhases.phases || {}),
+						).forEach(([key]) => {
+							// @ts-ignore
+							const value = insights.model.LCPPhases.phases[key] as number;
+
+							if (!value) return;
+
+							_lcp.metricBreakdown.push({
+								label: LCPMetricPhases[key as keyof typeof LCPMetricPhases],
+								value: value,
+							});
+						});
+						_lcp.recommendations = [];
+
+						if (
+							insights.model.LCPDiscovery.checklist &&
+							!insights.model.LCPDiscovery.checklist.priorityHinted
+						) {
+							_lcp.recommendations.push(
+								`Increase priority hint for the LCP resource.
+                    This resource is critical for the user experience and should use fetchpriorit=high.`,
+							);
+						}
+						if (
+							insights.model.LCPDiscovery.checklist &&
+							!insights.model.LCPDiscovery.checklist.requestDiscoverable
+						) {
+							_lcp.recommendations.push(
+								`Consider preload the LCP image, or have it being discovered on the initial document load.
+                    This LCP image has a total load delay of ${msOrSDisplay(
+											insights.model.LCPPhases.phases?.loadDelay || 0,
+										)}.
+                    Sometimes your LCP image may be correctly placed in the document but other resources from
+                    part of the [critical rendering path](https://web.dev/learn/performance/understanding-the-critical-path) are blocking its discovery till a later time.`,
+							);
+						}
+						if (
+							insights.model.LCPDiscovery.checklist &&
+							!insights.model.LCPDiscovery.checklist.eagerlyLoaded
+						) {
+							_lcp.recommendations.push(
+								`Remove lazy loading from the LCP image.
+                    The LCP image should be loaded as soon as possible to avoid a delay in rendering.`,
+							);
+						}
+					}
+				}
+
+				LCP = _lcp;
+			}
+		}
+	}
+
+	if (layoutShifts && layoutShifts.length > 0) {
+		let _cls = {
+			metric: 'CLS',
+			metricValue: 0,
+			metricType: MetricType.SCORE,
+			metricScore: undefined,
+			metricBreakdown: [],
+			rawEvent: null,
+		} as InsightsReport;
+
+		const shiftType = {
+			[MetricScoreClassification.GOOD]: 'good',
+			[MetricScoreClassification.OK]: 'needsImprovement',
+			[MetricScoreClassification.BAD]: 'bad',
+		} as const;
+
+		layoutShifts.forEach((shift) => {
+			if (shift.clusterCumulativeScore > _cls.metricValue) {
+				_cls.metricValue = Number(shift.clusterCumulativeScore.toFixed(2));
+				_cls.metricScore =
+					shift.clusterCumulativeScore > 0.1
+						? shift.clusterCumulativeScore > 0.25
+							? MetricScoreClassification.BAD
+							: MetricScoreClassification.OK
+						: MetricScoreClassification.GOOD;
+
+				const scoreType = shiftType[_cls.metricScore];
+				const shiftWindow = shift.scoreWindows[scoreType];
+				_cls.metricBreakdown = [
+					{
+						label: 'Shift start',
+						// @ts-expect-error
+						value: microSecondsToMilliSeconds(shiftWindow?.min ?? 0),
+					},
+					{
+						label: 'Shift end',
+						// @ts-expect-error
+						value: microSecondsToMilliSeconds(shiftWindow?.max ?? 0),
+					},
+					{
+						label: 'Shift duration',
+						// @ts-expect-error
+						value: microSecondsToMilliSeconds(shiftWindow?.range ?? 0),
+					},
+				];
+				_cls.infoContent = `The CLS window happened at ${shift.events[0]?.cat}.
+            The shift start and end represents the time range of the worst shift.`;
+			}
+		});
+
+		CLS = _cls;
+	}
+
+	return { LCP, CLS, INP };
+}
+
+export async function analyzeInsightsForTopic(
 	insights: [string, InsightSet][],
 	userInteractions: UserInteractionsData,
 	topic: TraceTopic,

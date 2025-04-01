@@ -14,7 +14,8 @@ import {
 import { type InsightSet } from '@paulirish/trace_engine/models/trace/insights/types';
 import { createOpenAI } from '@ai-sdk/openai';
 import dedent from 'dedent';
-import { TraceTopic, analyzeInsights } from '@/lib/insights';
+import { analyzeInsightsForTopic } from '@/lib/insights';
+import { TraceTopic } from '@/lib/trace';
 import { z } from 'zod';
 import { baseSystemPrompt, toolUsagePrompt } from '@/lib/ai/model';
 import { Hono } from 'hono';
@@ -623,7 +624,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 					);
 					console.log('insights ', insights.length);
 
-					const insightsForTopic = await analyzeInsights(
+					const insightsForTopic = await analyzeInsightsForTopic(
 						insights,
 						userInteractions,
 						insightTopic.topic,
