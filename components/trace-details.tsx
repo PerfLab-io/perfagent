@@ -14,7 +14,6 @@ import {
 import { cn } from '@/lib/utils';
 import { FileInsightCard } from './trace-details/trace-insight-card';
 import { FrameHistogram } from './trace-details/trace-histogram';
-import { InteractionTimeline } from './trace-details/interaction-timeline';
 import {
 	Clock,
 	BarChart3,
@@ -23,7 +22,10 @@ import {
 	MousePointer,
 	Pointer,
 } from 'lucide-react';
-
+import { InsightsReport, MetricScoreClassification } from '@/lib/insights';
+import { msOrSDisplay, TraceAnalysis } from '@/lib/trace';
+import { analyseInsightsForCWV } from '@/lib/insights';
+import { InteractionTimeline } from './trace-details/interaction-timeline';
 interface AttachedFile {
 	id: string;
 	name: string;
@@ -35,14 +37,14 @@ interface AttachedFile {
 interface FileContextSectionProps {
 	currentFile: AttachedFile | null;
 	isVisible: boolean;
+	traceAnalysis: TraceAnalysis | null;
 }
 
 export function FileContextSection({
 	currentFile,
 	isVisible,
+	traceAnalysis,
 }: FileContextSectionProps) {
-	// Update the FileContextSection component to implement all the requested improvements
-
 	// First, add a max-height to the main container when expanded
 	// Add a new state to track the initial animation
 	const [isInitialRender, setIsInitialRender] = useState(true);
@@ -68,9 +70,14 @@ export function FileContextSection({
 		}
 	}, [isVisible, isInitialRender]);
 
-	if (!isVisible || !currentFile) {
+	if (!traceAnalysis || !true || !currentFile) {
 		return null;
 	}
+
+	const metrics = analyseInsightsForCWV(
+		traceAnalysis.insights,
+		traceAnalysis.parsedTrace,
+	);
 
 	// Format file size
 	const formatFileSize = (bytes: number): string => {
@@ -116,6 +123,16 @@ export function FileContextSection({
 		{ name: 'pointer', duration: 124, target: 'div.product-card' },
 		{ name: 'keypress', duration: 42, target: 'input.search' },
 	];
+
+	const getMetricVariant = (
+		metricScore: MetricScoreClassification | undefined,
+	) => {
+		return metricScore === MetricScoreClassification.BAD
+			? 'critical'
+			: metricScore === MetricScoreClassification.OK
+				? 'warning'
+				: 'neutral';
+	};
 
 	return (
 		<div
@@ -185,10 +202,10 @@ export function FileContextSection({
 							{/* LCP Card - Updated with better visuals */}
 							<FileInsightCard
 								title="Largest Contentful Paint"
-								value={2.4}
+								value={msOrSDisplay(metrics.LCP?.metricValue || 0)}
 								unit="s"
 								icon={<Clock className="h-3.5 w-3.5" />}
-								status="warning"
+								status={getMetricVariant(metrics.LCP?.metricScore)}
 							>
 								<div className="mt-1 flex items-center justify-between">
 									<div className="flex items-center">
@@ -210,10 +227,10 @@ export function FileContextSection({
 							{/* INP Card - Replaced FID with INP */}
 							<FileInsightCard
 								title="Interaction to Next Paint"
-								value={124}
+								value={msOrSDisplay(metrics.INP?.metricValue || 0)}
 								unit="ms"
 								icon={<MousePointer className="h-3.5 w-3.5" />}
-								status="warning"
+								status={getMetricVariant(metrics.INP?.metricScore)}
 							>
 								<div className="mt-1 flex items-center justify-between">
 									<div className="flex items-center">
@@ -228,16 +245,16 @@ export function FileContextSection({
 								</div>
 								<div className="mt-1 text-[10px] text-peppermint-600 dark:text-peppermint-400">
 									<span className="font-medium">Slowest:</span> Click on
-									product-card (124ms)
+									product-card (285.3ms)
 								</div>
 							</FileInsightCard>
 
 							{/* CLS Card - Updated with better visuals */}
 							<FileInsightCard
 								title="Cumulative Layout Shift"
-								value={0.12}
+								value={metrics.CLS?.metricValue || 0}
 								icon={<Activity className="h-3.5 w-3.5" />}
-								status="warning"
+								status={getMetricVariant(metrics.CLS?.metricScore)}
 							>
 								<div className="mt-1 flex items-center justify-between">
 									<div className="flex items-center">
@@ -386,24 +403,24 @@ export function FileContextSection({
 					{/* Frame Histogram */}
 					<div className="mt-4">
 						<h4 className="mb-2 text-xs font-semibold text-peppermint-800 dark:text-peppermint-200">
-							Frame Duration Distribution
+							AnimationFrame metrics Distribution
 						</h4>
-						<div className="rounded-lg border border-peppermint-200 bg-white p-3 transition-all duration-300 hover:-translate-y-1 hover:translate-x-1 hover:shadow-[-4px_4px_0_var(--border-color)] dark:border-peppermint-800 dark:bg-peppermint-900/30">
+						<div className="rounded-lg border border-peppermint-200 bg-white p-3 transition-all duration-300 hover:-translate-y-1 hover:translate-x-1 hover:shadow-[-4px_4px_0_hsl(var(--border-color))] dark:border-peppermint-800 dark:bg-peppermint-900/30">
 							<div className="h-24">
 								<FrameHistogram data={frameDurations} />
 							</div>
 							<div className="mt-2 flex justify-between text-[10px] text-peppermint-600 dark:text-peppermint-400">
 								<div className="flex items-center">
 									<div className="mr-1 h-2 w-2 bg-green-500"></div>
-									<span>&lt;16ms (60fps)</span>
+									<span>&lt;200ms (Good)</span>
 								</div>
 								<div className="flex items-center">
 									<div className="mr-1 h-2 w-2 bg-amber-500"></div>
-									<span>16-50ms (20-60fps)</span>
+									<span>200-500ms (Needs Improvement)</span>
 								</div>
 								<div className="flex items-center">
 									<div className="mr-1 h-2 w-2 bg-red-500"></div>
-									<span>&gt;50ms (&lt;20fps)</span>
+									<span>&gt;500ms (Poor)</span>
 								</div>
 							</div>
 						</div>
@@ -412,7 +429,7 @@ export function FileContextSection({
 					{/* Task Breakdown */}
 					<div className="mt-4">
 						<h4 className="mb-2 text-xs font-semibold text-peppermint-800 dark:text-peppermint-200">
-							Task Breakdown
+							Metrics Breakdown
 						</h4>
 						<div className="grid grid-cols-2 gap-3">
 							<FileInsightCard
@@ -454,7 +471,7 @@ export function FileContextSection({
 								<div className="mt-1 flex items-center">
 									<div className="mr-1 h-2 w-2 bg-red-500"></div>
 									<span className="text-[10px] text-peppermint-600 dark:text-peppermint-400">
-										Longest: 124ms
+										Longest: 285.3ms
 									</span>
 								</div>
 							</FileInsightCard>

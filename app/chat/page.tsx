@@ -14,7 +14,7 @@ import { MarkdownReport } from '@/components/markdown-report';
 import { cn, yieldToMain } from '@/lib/utils';
 import { ResearchProvider } from '@/components/research-card';
 import { useChat } from '@ai-sdk/react';
-import { analyzeTraceFromFile } from '@/lib/trace';
+import { analyzeTraceFromFile, TraceAnalysis } from '@/lib/trace';
 import { FileContextSection } from '@/components/trace-details';
 
 /**
@@ -87,7 +87,9 @@ export default function AiChatPage() {
 	const [suggestionsLoading, setSuggestionsLoading] = useState(false);
 	const [suggestions, setSuggestions] = useState<string[]>([]);
 
-	const [traceAnalysis, setTraceAnalysis] = useState<any>(null);
+	const [traceAnalysis, setTraceAnalysis] = useState<TraceAnalysis | null>(
+		null,
+	);
 	// Add a new state for the current file in context
 	const [currentContextFile, setCurrentContextFile] =
 		useState<AttachedFile | null>(null);
@@ -114,41 +116,34 @@ export default function AiChatPage() {
 			e: React.ChangeEvent<HTMLInputElement> | React.DragEvent<HTMLDivElement>,
 		) => {
 			let newFiles: AttachedFile[] = [];
+			const files = isDragEvent(e)
+				? e.dataTransfer?.files
+				: isFileInputEvent(e)
+					? e.target?.files
+					: [];
 
-			if (isFileInputEvent(e)) {
-				if (e.target.files.length > 0) {
-					newFiles = Array.from(e.target.files).map((file) => ({
-						id: Math.random().toString(36).substring(7),
-						name: file.name,
-						size: file.size,
-						type: file.type,
-					}));
+			if (files) {
+				newFiles = Array.from(files).map((file) => ({
+					id: Math.random().toString(36).substring(7),
+					name: file.name,
+					size: file.size,
+					type: file.type,
+				}));
 
-					requestAnimationFrame(async () => {
-						await yieldToMain();
+				requestAnimationFrame(async () => {
+					await yieldToMain();
 
-						setTimeout(() => {
-							analyzeTraceFromFile(e.target.files[0]).then((trace) => {
-								setTraceAnalysis(trace);
-							});
-						}, 100);
-					});
-				}
-			} else if (isDragEvent(e)) {
-				if (e.dataTransfer.files.length > 0) {
-					newFiles = Array.from(e.dataTransfer.files).map((file) => ({
-						id: Math.random().toString(36).substring(7),
-						name: file.name,
-						size: file.size,
-						type: file.type,
-					}));
-					requestAnimationFrame(async () => {
-						await yieldToMain();
-						analyzeTraceFromFile(e.dataTransfer.files[0]).then((trace) => {
+					setTimeout(() => {
+						analyzeTraceFromFile(files[0]).then((trace) => {
+							console.log('trace', trace);
 							setTraceAnalysis(trace);
+
+							// TODO: remove this
+							setCurrentContextFile(newFiles[0]);
+							setShowContextFile(true);
 						});
-					});
-				}
+					}, 100);
+				});
 			}
 
 			const updatedFiles = [...attachedFiles, ...newFiles];
@@ -207,7 +202,6 @@ export default function AiChatPage() {
 				setCurrentContextFile(attachedFiles[0]);
 				setShowContextFile(true);
 				setAttachedFiles([]);
-				setTraceAnalysis(null);
 				// Clear suggestions when submitting a message
 				setSuggestions([]);
 				setSuggestionsLoading(false);
@@ -469,6 +463,7 @@ export default function AiChatPage() {
 								<FileContextSection
 									currentFile={currentContextFile}
 									isVisible={showContextFile}
+									traceAnalysis={traceAnalysis}
 								/>
 								{/* Chat messages container */}
 								<div
