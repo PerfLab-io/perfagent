@@ -115,41 +115,51 @@ export default function AiChatPage() {
 		(
 			e: React.ChangeEvent<HTMLInputElement> | React.DragEvent<HTMLDivElement>,
 		) => {
-			let newFiles: AttachedFile[] = [];
 			const files = isDragEvent(e)
 				? e.dataTransfer?.files
 				: isFileInputEvent(e)
 					? e.target?.files
 					: [];
 
-			if (files) {
-				newFiles = Array.from(files).map((file) => ({
-					id: Math.random().toString(36).substring(7),
-					name: file.name,
-					size: file.size,
-					type: file.type,
-				}));
-
-				requestAnimationFrame(async () => {
-					await yieldToMain();
-
-					setTimeout(() => {
-						analyzeTraceFromFile(files[0]).then((trace) => {
-							console.log('trace', trace);
-							setTraceAnalysis(trace);
-
-							// TODO: remove this
-							setCurrentContextFile(newFiles[0]);
-							setShowContextFile(true);
-						});
-					}, 100);
-				});
+			// Validate: only accept 1 file and it must be JSON
+			if (!files || files.length === 0) {
+				return;
 			}
 
-			const updatedFiles = [...attachedFiles, ...newFiles];
-			setAttachedFiles(updatedFiles);
+			// Only process the first file and ensure it's a JSON file
+			const file = files[0];
+			if (!file.name.endsWith('.json') && file.type !== 'application/json') {
+				// Could add error handling/notification here
+				console.error('Only JSON files are supported');
+				return;
+			}
 
-			// Always trigger suggestions when files are added
+			// Create a single file entry
+			const newFile: AttachedFile = {
+				id: Math.random().toString(36).substring(7),
+				name: file.name,
+				size: file.size,
+				type: file.type,
+			};
+
+			requestAnimationFrame(async () => {
+				await yieldToMain();
+
+				setTimeout(() => {
+					analyzeTraceFromFile(file).then((trace) => {
+						console.log('trace', trace);
+						setTraceAnalysis(trace);
+
+						setCurrentContextFile(newFile);
+						setShowContextFile(true);
+					});
+				}, 100);
+			});
+
+			// Replace any existing files with just this one
+			setAttachedFiles([newFile]);
+
+			// Trigger suggestions for the new file
 			setSuggestionsLoading(true);
 		},
 		[],
