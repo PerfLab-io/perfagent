@@ -1,6 +1,10 @@
 import * as Trace from '@paulirish/trace_engine/models/trace/trace.js';
+import { MetaData } from '@paulirish/trace_engine/models/trace/types/File';
 
-export async function analyzeEvents(traceEvents: Trace.Types.Events.Event[]) {
+export async function analyzeEvents(
+	traceEvents: Trace.Types.Events.Event[],
+	metadata: MetaData,
+) {
 	const model = Trace.TraceModel.Model.createWithAllHandlers();
 	await model.parse(traceEvents);
 	const parsedTrace = model.parsedTrace();
@@ -12,20 +16,21 @@ export async function analyzeEvents(traceEvents: Trace.Types.Events.Event[]) {
 	if (!insights) {
 		throw new Error('No insights');
 	}
-	console.log('insights', insights);
-	return { parsedTrace, insights, model };
+	return { parsedTrace, insights, model, metadata };
 }
 
 export async function analyzeTrace(contents: string) {
-	const traceEvents = loadTraceEventsFromFileContents(contents);
-	return analyzeEvents(traceEvents);
+	const { traceEvents, metadata } = loadTraceEventsFromFileContents(contents);
+	return analyzeEvents(traceEvents, metadata);
 }
 
 function loadTraceEventsFromFileContents(contents: string) {
 	const json = JSON.parse(contents);
-	const traceEvents = json.traceEvents ?? json;
-	console.log('traceEvents', traceEvents);
-	return traceEvents;
+	if (!json.traceEvents) {
+		throw new Error('No trace events');
+	}
+	const { traceEvents, metadata } = json;
+	return { traceEvents, metadata };
 }
 
 export const msOrSDisplay: (value: number) => string = (value) => {
@@ -61,6 +66,7 @@ export type TraceAnalysis = {
 	>;
 	insights: Trace.Insights.Types.TraceInsightSets;
 	model: Trace.TraceModel.Model;
+	metadata: MetaData;
 };
 
 export async function analyzeTraceFromFile(
