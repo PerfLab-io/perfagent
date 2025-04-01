@@ -508,3 +508,21 @@
 .file-context-appear {
   animation: file-context-appear 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+@keyframes metric-context-appear {
+  0% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translate(4px, -4px);
+    box-shadow: -4px 4px 0 hsl(var(--border-color));
+  }
+  100% {
+    transform: translateY(0);
+    box-shadow: none;
+  }
+}
+
+.metric-context-appear {
+	animation: metric-context-appear 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
