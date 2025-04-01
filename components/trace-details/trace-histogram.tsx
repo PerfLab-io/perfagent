@@ -14,7 +14,7 @@ export function FrameHistogram({
 	data,
 	maxValue = Math.max(...data),
 	className,
-	thresholds = { good: 16, warning: 50 },
+	thresholds = { good: 200, warning: 500 },
 }: FrameHistogramProps) {
 	return (
 		<div className={cn('flex h-full w-full items-end gap-[1px]', className)}>
