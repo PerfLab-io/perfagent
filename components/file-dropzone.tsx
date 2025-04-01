@@ -320,15 +320,15 @@ export function FileDropzone({
 	 * Render appropriate dropzone text based on state
 	 */
 	const renderText = useCallback(() => {
-		let heading = 'Drop files here';
-		let description = 'Drag and drop your files to upload';
+		let heading = 'Drop your trace file here';
+		let description = 'Drag and drop your trace file to upload';
 
 		if (dropSuccess) {
-			heading = 'Files added!';
+			heading = 'Trace file added!';
 			description = '';
 		} else if (isHovering) {
-			heading = 'Release to upload';
-			description = 'Your files will be uploaded';
+			heading = 'Release to process trace data';
+			description = 'Your trace file will be processed';
 		}
 
 		return (
