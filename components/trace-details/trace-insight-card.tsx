@@ -4,7 +4,6 @@ import { cn } from '@/lib/utils';
 interface InsightCardProps {
 	title: string;
 	value: string | number;
-	unit?: string;
 	icon: React.ReactNode;
 	status?: 'good' | 'warning' | 'critical' | 'neutral';
 	className?: string;
@@ -14,7 +13,6 @@ interface InsightCardProps {
 export function FileInsightCard({
 	title,
 	value,
-	unit,
 	icon,
 	status = 'neutral',
 	className,
@@ -63,11 +61,6 @@ export function FileInsightCard({
 				<span className={cn('text-lg font-bold', statusColors[status])}>
 					{value}
 				</span>
-				{unit && (
-					<span className="ml-1 text-xs text-peppermint-600 dark:text-peppermint-400">
-						{unit}
-					</span>
-				)}
 			</div>
 			{children && <div className="mt-2">{children}</div>}
 		</div>

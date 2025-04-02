@@ -28,6 +28,30 @@ export enum MetricScoreClassification {
 	UNCLASSIFIED = 'unclassified',
 }
 
+export const metricsThresholds = new Map([
+	[
+		'LCP',
+		{
+			good: 2500,
+			needsImprovement: 4000,
+		},
+	],
+	[
+		'CLS',
+		{
+			good: 0.1,
+			needsImprovement: 0.25,
+		},
+	],
+	[
+		'INP',
+		{
+			good: 200,
+			needsImprovement: 500,
+		},
+	],
+]);
+
 export type InsightsReport = {
 	metric: string;
 	metricTitle?: string;
@@ -64,9 +88,30 @@ export function analyseInsightsForCWV(
 
 	const layoutShifts = LayoutShifts.clusters;
 
-	let CLS: InsightsReport | undefined = undefined;
-	let LCP: InsightsReport | undefined = undefined;
-	let INP: InsightsReport | undefined = undefined;
+	let CLS: InsightsReport = {
+		metric: 'CLS',
+		metricValue: 0,
+		metricType: MetricType.SCORE,
+		metricScore: undefined,
+		metricBreakdown: [],
+		rawEvent: null,
+	} as InsightsReport;
+	let LCP: InsightsReport = {
+		metric: 'LCP',
+		metricValue: 0,
+		metricType: MetricType.TIME,
+		metricScore: undefined,
+		metricBreakdown: [],
+		rawEvent: null,
+	} as InsightsReport;
+	let INP: InsightsReport = {
+		metric: 'INP',
+		metricValue: 0,
+		metricType: MetricType.TIME,
+		metricScore: undefined,
+		metricBreakdown: [],
+		rawEvent: null,
+	} as InsightsReport;
 
 	if (LCPEvent) {
 		const _lcp = {
@@ -94,11 +139,6 @@ export function analyseInsightsForCWV(
 						_lcp.metricValue = normalizedTiming;
 						// @ts-ignore
 						_lcp.metricScore = value.classification;
-					} else {
-						_lcp.metricBreakdown.push({
-							label: key,
-							value: normalizedTiming,
-						});
 					}
 				}
 
@@ -112,64 +152,6 @@ export function analyseInsightsForCWV(
 					!(insights.model.LCPPhases instanceof Error) &&
 					insights.model.LCPPhases
 				) {
-					const renderDelay = ((insights.model.LCPPhases.phases?.renderDelay ||
-						0) * 1000) as Micro;
-					const ttfb = ((insights.model.LCPPhases.phases?.ttfb || 0) *
-						1000) as Micro;
-					const lcpEvent = LCPEvent.ts;
-					const loadTime =
-						(insights.model.LCPPhases.phases?.loadTime || 0) * 1000;
-					const loadDelay =
-						(insights.model.LCPPhases.phases?.loadDelay || 0) * 1000;
-					const hasDelays = loadDelay !== 0 && loadTime !== 0;
-
-					const renderStart = lcpEvent - renderDelay;
-					const loadBegin = renderStart - loadTime;
-					const loadDelayStart = loadBegin - loadDelay;
-					const reqStart = hasDelays
-						? loadDelayStart - ttfb
-						: renderStart - ttfb;
-
-					const phases = !hasDelays
-						? [
-								{
-									name: 'TTFB',
-									start: reqStart as Micro,
-									end: renderStart as Micro,
-								},
-								{
-									name: 'Render Delay',
-									start: renderStart as Micro,
-									end: lcpEvent as Micro,
-								},
-							]
-						: [
-								{
-									name: 'TTFB',
-									start: reqStart as Micro,
-									end: loadDelayStart as Micro,
-								},
-								{
-									name: 'Resource Load Delay',
-									start: loadDelayStart as Micro,
-									end: loadBegin as Micro,
-								},
-								{
-									name: 'Download Time',
-									start: loadBegin as Micro,
-									end: renderStart as Micro,
-								},
-								{
-									name: 'Render Delay',
-									start: renderStart as Micro,
-									end: lcpEvent as Micro,
-								},
-							];
-
-					const lcpRequest = insights.model.LCPPhases.lcpRequest;
-					const documentRequest =
-						insights.model.DocumentLatency.data?.documentRequest?.ts || 0;
-
 					_lcp.metricBreakdown = [];
 					Array.from(
 						Object.entries(insights.model.LCPPhases.phases || {}),
@@ -303,26 +285,6 @@ export function analyseInsightsForCWV(
 
 			const processing = processingEnd - processingStart;
 
-			const inpPhases = [
-				{
-					name: 'Input delay',
-					start: longestInteractionEvent.ts,
-					end: (longestInteractionEvent.ts +
-						longestInteractionEvent.inputDelay) as Micro,
-				},
-				{
-					name: 'Processing',
-					start: longestInteractionEvent.processingStart,
-					end: longestInteractionEvent.processingEnd,
-				},
-				{
-					name: 'Presentation delay',
-					start: longestInteractionEvent.processingEnd,
-					end: (longestInteractionEvent.processingEnd +
-						longestInteractionEvent.presentationDelay) as Micro,
-				},
-			];
-
 			INP = {
 				metric: 'INP',
 				metricValue: interactionDur,
@@ -365,6 +327,8 @@ export function analyseInsightsForCWV(
 			}
 		}
 	}
+
+	console.log({ LCP, CLS, INP }, 'METRICS');
 
 	return { LCP, CLS, INP };
 }

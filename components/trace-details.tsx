@@ -20,7 +20,12 @@ import {
 import { cn } from '@/lib/utils';
 import { FileInsightCard } from './trace-details/trace-insight-card';
 import { FrameHistogram } from './trace-details/trace-histogram';
-import { InsightsReport, MetricScoreClassification } from '@/lib/insights';
+import {
+	InsightsReport,
+	MetricScoreClassification,
+	metricsThresholds,
+	MetricType,
+} from '@/lib/insights';
 import { analyzeEvents, msOrSDisplay, TraceAnalysis } from '@/lib/trace';
 import { analyseInsightsForCWV } from '@/lib/insights';
 import { InteractionTimeline } from './trace-details/interaction-timeline';
@@ -34,6 +39,8 @@ import {
 } from './ui/select';
 import { SyntheticAnimationFramePair } from '@paulirish/trace_engine/models/trace/types/TraceEvents';
 import { Micro } from '@paulirish/trace_engine/models/trace/types/Timing';
+import { MetricGauge } from './trace-details/metric-gauge';
+import { LinePattern } from './line-pattern';
 interface AttachedFile {
 	id: string;
 	name: string;
@@ -304,8 +311,11 @@ export function FileContextSection({
 										title={
 											WebVitalsMetric[metric as keyof typeof WebVitalsMetric]
 										}
-										value={msOrSDisplay(metricValue?.metricValue || 0)}
-										unit="ms"
+										value={
+											metricValue?.metricType === MetricType.TIME
+												? msOrSDisplay(metricValue?.metricValue || 0)
+												: metricValue?.metricValue || 0
+										}
 										icon={metricIcon}
 										status={getMetricVariant(metricValue?.metricScore)}
 									>
@@ -316,49 +326,16 @@ export function FileContextSection({
 														'relative mr-1 h-2 w-2',
 														metricValue?.metricScore ===
 															MetricScoreClassification.BAD
-															? 'bg-red-200'
+															? 'bg-red-200 text-red-700'
 															: metricValue?.metricScore ===
 																  MetricScoreClassification.OK
-																? 'bg-amber-200'
-																: 'bg-green-200',
+																? 'bg-amber-200 text-amber-700'
+																: 'bg-green-200 text-green-700',
 													)}
 												>
-													<svg
-														className={cn(
-															'absolute inset-0 w-full opacity-50',
-															metricValue?.metricScore ===
-																MetricScoreClassification.BAD
-																? 'text-red-700'
-																: metricValue?.metricScore ===
-																	  MetricScoreClassification.OK
-																	? 'text-amber-700'
-																	: 'text-green-700',
-														)}
-														style={{ height: 'calc(100%)' }}
-														xmlns="http://www.w2.org/2000/svg"
-													>
-														<pattern
-															id={`metric-${metric}-${selectedNavigation}-lines`}
-															patternUnits="userSpaceOnUse"
-															width="2.5"
-															height="2.5"
-															patternTransform="rotate(45)"
-														>
-															<line
-																x1="0"
-																y1="0"
-																x2="0"
-																y2="10"
-																stroke="currentColor"
-																strokeWidth="2.5"
-															/>
-														</pattern>
-														<rect
-															width="100%"
-															height="100%"
-															fill={`url(#metric-${metric}-${selectedNavigation}-lines)`}
-														/>
-													</svg>
+													<LinePattern
+														id={`metric-${metric}-${selectedNavigation}-lines`}
+													/>
 												</div>
 												<span className="text-[10px] text-peppermint-600 dark:text-peppermint-400">
 													{metricValue?.metricScore ===
@@ -374,33 +351,41 @@ export function FileContextSection({
 												<span className="font-medium">Target: &lt;100ms</span>
 											</div>
 										</div>
+										<MetricGauge
+											value={metricValue?.metricValue || 0}
+											metricType={metricValue?.metricType}
+											thresholds={
+												metricsThresholds.get(metric) as {
+													good: number;
+													needsImprovement: number;
+												}
+											}
+										/>
+										{/* Add some extra insights here
+										
 										<div className="mt-1 text-[10px] text-peppermint-600 dark:text-peppermint-400">
 											<span className="font-medium">Slowest:</span> Click on
 											product-card (285.3ms)
-										</div>
+										</div> */}
 									</FileInsightCard>
 								);
 							})}
 						</div>
 					</div>
 
-					{/* Request Timeline - Updated with overlaid markers */}
+					{/* Request Timeline - Updated with overlaid markers 
 					<div className="mt-4">
 						<h4 className="mb-2 text-xs font-semibold text-peppermint-800 dark:text-peppermint-200">
 							Request Timeline
 						</h4>
 						<div className="rounded-lg border border-peppermint-200 bg-white p-3 transition-all duration-300 hover:-translate-y-1 hover:translate-x-1 hover:shadow-[-4px_4px_0_var(--border-color)] dark:border-peppermint-800 dark:bg-peppermint-900/30">
-							{/* Timeline container with relative positioning */}
 							<div className="relative">
-								{/* The timeline bars */}
 								<InteractionTimeline
 									events={timelineEvents}
 									totalDuration={1000}
 								/>
 
-								{/* Overlaid markers - positioned absolutely on top of the bars */}
 								<div className="absolute left-0 top-0 h-8 w-full">
-									{/* DOMContentLoaded marker */}
 									<div className="absolute top-0 h-8" style={{ left: '45%' }}>
 										<div className="absolute top-0 h-full w-[1px] bg-red-500"></div>
 										<div className="absolute -top-1 h-2 w-2 -translate-x-1/2 rounded-full bg-red-500"></div>
@@ -409,7 +394,6 @@ export function FileContextSection({
 										</div>
 									</div>
 
-									{/* Load marker */}
 									<div className="absolute top-0 h-8" style={{ left: '85%' }}>
 										<div className="absolute top-0 h-full w-[1px] bg-green-700"></div>
 										<div className="absolute -top-1 h-2 w-2 -translate-x-1/2 rounded-full bg-green-700"></div>
@@ -420,13 +404,11 @@ export function FileContextSection({
 								</div>
 							</div>
 
-							{/* Timeline scale */}
 							<div className="mt-6 flex justify-between text-[10px] text-peppermint-600 dark:text-peppermint-400">
 								<span>0ms</span>
 								<span>1000ms</span>
 							</div>
 
-							{/* Legend */}
 							<div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
 								<div className="flex items-center">
 									<div className="mr-1 h-2 w-2 bg-blue-500"></div>
@@ -460,28 +442,40 @@ export function FileContextSection({
 								</div>
 							</div>
 						</div>
-					</div>
+					</div>*/}
 
 					{/* Frame Histogram */}
 					<div className="mt-4">
 						<h4 className="mb-2 text-xs font-semibold text-peppermint-800 dark:text-peppermint-200">
 							Trace activity
 						</h4>
-						<div className="rounded-lg border border-peppermint-200 bg-white p-3 transition-all duration-300 hover:-translate-y-1 hover:translate-x-1 hover:shadow-[-4px_4px_0_hsl(var(--border-color))] dark:border-peppermint-800 dark:bg-peppermint-900/30">
+						<div className="rounded-lg border border-peppermint-200 bg-white p-3 dark:border-peppermint-800 dark:bg-peppermint-900/30">
 							<div className="h-24">
 								<FrameHistogram data={frameDurations} />
 							</div>
 							<div className="mt-2 flex justify-between text-[10px] text-peppermint-600 dark:text-peppermint-400">
 								<div className="flex items-center">
-									<div className="mr-1 h-2 w-2 bg-green-500"></div>
+									<div className="relative mr-1 h-2 w-2 bg-green-200 text-green-700">
+										<LinePattern
+											id={`histogram-${selectedNavigation}-lines-Good`}
+										/>
+									</div>
 									<span>&lt;200ms (Good)</span>
 								</div>
 								<div className="flex items-center">
-									<div className="mr-1 h-2 w-2 bg-amber-500"></div>
+									<div className="relative mr-1 h-2 w-2 bg-amber-200 text-amber-700">
+										<LinePattern
+											id={`histogram-${selectedNavigation}-lines-Improvement`}
+										/>
+									</div>
 									<span>200-500ms (Needs Improvement)</span>
 								</div>
 								<div className="flex items-center">
-									<div className="mr-1 h-2 w-2 bg-red-500"></div>
+									<div className="relative mr-1 h-2 w-2 bg-red-200 text-red-700">
+										<LinePattern
+											id={`histogram-${selectedNavigation}-lines-Poor`}
+										/>
+									</div>
 									<span>&gt;500ms (Poor)</span>
 								</div>
 							</div>
@@ -540,14 +534,18 @@ export function FileContextSection({
 									<div className="mt-1 flex items-center">
 										<div
 											className={cn(
-												'mr-1 h-2 w-2',
+												'relative mr-1 h-2 w-2',
 												longestAnimationFrameDuration > 500
-													? 'bg-red-500'
+													? 'bg-red-200 text-red-700'
 													: longestAnimationFrameDuration > 200
-														? 'bg-amber-500'
-														: 'bg-green-500',
+														? 'bg-amber-200 text-amber-700'
+														: 'bg-green-200 text-green-700',
 											)}
-										></div>
+										>
+											<LinePattern
+												id={`long-tasks-${selectedNavigation}-values`}
+											/>
+										</div>
 										<span className="text-[10px] text-peppermint-600 dark:text-peppermint-400">
 											Longest: {msOrSDisplay(longestAnimationFrameDuration)}ms
 										</span>
@@ -565,7 +563,11 @@ export function FileContextSection({
 								status="neutral"
 							>
 								<div className="mt-1 flex items-center">
-									<div className="mr-1 h-2 w-2 bg-slate-500"></div>
+									<div className="relative mr-1 h-2 w-2 bg-slate-200 text-slate-700">
+										<LinePattern
+											id={`interaction-events-${selectedNavigation}-values`}
+										/>
+									</div>
 									<span className="text-[10px] text-peppermint-600 dark:text-peppermint-400">
 										{interactionsClassification.clicks} click,{' '}
 										{interactionsClassification.pointers} pointer events
