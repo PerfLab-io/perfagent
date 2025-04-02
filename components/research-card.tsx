@@ -837,7 +837,7 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 												</Badge>
 											</div>
 
-											<div className="max-h-[900px] space-y-3 overflow-y-scroll">
+											<div className="max-h-[530px] space-y-3 overflow-y-scroll xl:max-h-[900px]">
 												{results.map((result) => (
 													<div
 														key={`${result.id}-${Math.random()}`}

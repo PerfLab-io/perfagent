@@ -458,7 +458,7 @@ export default function AiChatPage() {
 						{/* Left panel with chat */}
 						<div
 							className={cn(
-								'panel-left relative flex flex-col overflow-hidden',
+								'panel-left relative flex flex-col',
 								panelHeightClasses,
 							)}
 						>
@@ -513,7 +513,7 @@ export default function AiChatPage() {
 										'transition-all duration-500 ease-in-out',
 										chatStarted
 											? 'input-container-active'
-											: 'input-container-initial',
+											: 'input-container-initial translate-x-[25%] translate-y-[26%] xl:translate-y-[-50%]',
 									)}
 									style={{ transformOrigin: 'center bottom' }}
 								>

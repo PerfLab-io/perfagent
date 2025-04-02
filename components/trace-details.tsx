@@ -190,7 +190,7 @@ export function FileContextSection({
 	return (
 		<div
 			className={cn(
-				'mb-4 overflow-hidden rounded-lg bg-peppermint-50 transition-all duration-300 dark:bg-peppermint-950/30',
+				'z-50 mb-4 overflow-hidden rounded-lg bg-peppermint-50 transition-all duration-300 dark:bg-peppermint-950/30',
 				isExpanded
 					? 'max-h-[600px] overflow-y-auto border border-peppermint-300 dark:border-peppermint-900'
 					: 'max-h-[40px] border border-dashed border-peppermint-300 dark:border-peppermint-900',

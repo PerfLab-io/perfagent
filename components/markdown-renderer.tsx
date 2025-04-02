@@ -323,7 +323,6 @@ export function MarkdownRenderer({
 				<HoverCardContent
 					side="top"
 					align="start"
-					sideOffset={5}
 					className="w-48 overflow-hidden rounded-md border border-neutral-200 p-0 shadow-sm dark:border-neutral-700"
 				>
 					<LinkPreview href={href} />
