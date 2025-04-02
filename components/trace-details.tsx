@@ -100,7 +100,6 @@ export function FileContextSection({
 		}
 	}, [isVisible, isInitialRender]);
 
-	console.log({ traceAnalysis }, 'TRACE ANALYSIS');
 	if (!traceAnalysis || !true || !currentFile) {
 		return null;
 	}

@@ -166,7 +166,9 @@ export function analyseInsightsForCWV(
 							value: value,
 						});
 					});
-					_lcp.recommendations = [];
+					_lcp.recommendations = [
+						insights?.model.LCPDiscovery.strings.description,
+					];
 
 					if (
 						insights.model.LCPDiscovery.checklist &&
@@ -214,6 +216,7 @@ export function analyseInsightsForCWV(
 			metricScore: undefined,
 			metricBreakdown: [],
 			rawEvent: null,
+			recommendations: [insights?.model.CLSCulprits.strings.description],
 		} as InsightsReport;
 
 		const shiftType = {
@@ -289,6 +292,9 @@ export function analyseInsightsForCWV(
 				metric: 'INP',
 				metricValue: interactionDur,
 				metricType: MetricType.TIME,
+				recommendations: [
+					insights?.model.InteractionToNextPaint.strings.description,
+				],
 				metricScore:
 					interactionDur > 200
 						? interactionDur > 500
@@ -319,16 +325,8 @@ export function analyseInsightsForCWV(
 				)}.`,
 				rawEvent: longestInteractionEvent,
 			} as InsightsReport;
-
-			const _inpRecommendations: Array<string> = [];
-
-			if (_inpRecommendations.length > 0) {
-				INP.recommendations = _inpRecommendations;
-			}
 		}
 	}
-
-	console.log({ LCP, CLS, INP }, 'METRICS');
 
 	return { LCP, CLS, INP };
 }
@@ -429,11 +427,6 @@ export async function analyzeInsightsForTopic(
 
 				const { longestInteractionEvent: _longestInteractionEvent } =
 					userInteractions;
-
-				console.log(
-					{ longestInteractionEvent },
-					'########Longest Interaction Event##########',
-				);
 
 				if (_longestInteractionEvent) {
 					const interactionDur = microSecondsToMilliSeconds(

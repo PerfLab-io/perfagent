@@ -196,8 +196,6 @@ export default function AiChatPage() {
 		(e: React.FormEvent) => {
 			e.preventDefault();
 
-			console.log(traceAnalysis?.parsedTrace);
-
 			// Only proceed if there's input
 			if (input.trim()) {
 				originalHandleSubmit(e as any, {
@@ -423,7 +421,6 @@ export default function AiChatPage() {
 			return false;
 		});
 	}, [messages]);
-	console.log('memoizedMessages: ', memoizedMessages);
 
 	// Effect: Ensure proper scroll behavior when file section visibility changes
 	useEffect(() => {
