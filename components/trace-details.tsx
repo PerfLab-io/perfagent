@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import {
 	ChevronDown,
 	ChevronRight,
@@ -9,11 +9,9 @@ import {
 	Code,
 	File,
 	FileCode,
-	Layers,
 	Clock,
 	BarChart3,
 	Activity,
-	Cpu,
 	MousePointer,
 	Pointer,
 } from 'lucide-react';
@@ -21,14 +19,12 @@ import { cn } from '@/lib/utils';
 import { FileInsightCard } from './trace-details/trace-insight-card';
 import { FrameHistogram } from './trace-details/trace-histogram';
 import {
-	InsightsReport,
 	MetricScoreClassification,
 	metricsThresholds,
 	MetricType,
 } from '@/lib/insights';
-import { analyzeEvents, msOrSDisplay, TraceAnalysis } from '@/lib/trace';
+import { msOrSDisplay, TraceAnalysis } from '@/lib/trace';
 import { analyseInsightsForCWV } from '@/lib/insights';
-import { InteractionTimeline } from './trace-details/interaction-timeline';
 import { microSecondsToMilliSeconds } from '@paulirish/trace_engine/core/platform/Timing';
 import {
 	Select,
@@ -65,12 +61,14 @@ interface FileContextSectionProps {
 	currentFile: AttachedFile | null;
 	isVisible: boolean;
 	traceAnalysis: TraceAnalysis | null;
+	onTraceNavigationChange: (navigationId: string) => void;
 }
 
 export function FileContextSection({
 	currentFile,
 	isVisible,
 	traceAnalysis,
+	onTraceNavigationChange,
 }: FileContextSectionProps) {
 	// First, add a max-height to the main container when expanded
 	// Add a new state to track the initial animation
@@ -99,6 +97,17 @@ export function FileContextSection({
 			return () => clearTimeout(timer);
 		}
 	}, [isVisible, isInitialRender]);
+
+	useEffect(() => {
+		if (traceAnalysis) {
+			onTraceNavigationChange(selectedNavigation || __insights[0][0]);
+		}
+	}, [traceAnalysis, onTraceNavigationChange]);
+
+	const handleTraceNavigationChange = (navigationId: string) => {
+		setSelectedNavigation(navigationId);
+		onTraceNavigationChange(navigationId);
+	};
 
 	if (!traceAnalysis || !true || !currentFile) {
 		return null;
@@ -269,7 +278,7 @@ export function FileContextSection({
 						</div>
 						<Select
 							value={selectedNavigation || __insights[0][0]}
-							onValueChange={setSelectedNavigation}
+							onValueChange={handleTraceNavigationChange}
 						>
 							<SelectTrigger className="w-48 border border-dashed border-peppermint-400 text-peppermint-800 focus:ring-peppermint-300">
 								<SelectValue placeholder="Choose a navigation" />

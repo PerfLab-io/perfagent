@@ -16,6 +16,7 @@ import { ResearchProvider } from '@/components/research-card';
 import { useChat } from '@ai-sdk/react';
 import { analyzeTraceFromFile, TraceAnalysis } from '@/lib/trace';
 import { FileContextSection } from '@/components/trace-details';
+import { analyseInsightsForCWV } from '@/lib/insights';
 
 /**
  * Type definition for the report data structure
@@ -82,6 +83,9 @@ export default function AiChatPage() {
 	const [toolCallId, setToolCallId] = useState<string | undefined>(undefined);
 	const [activeReportId, setActiveReportId] = useState<string | null>(null);
 	const [reportsMap, setReportsMap] = useState<Record<string, Report>>({});
+	const [currentNavigation, setCurrentNavigation] = useState<string | null>(
+		null,
+	);
 
 	const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
 	const [suggestionsLoading, setSuggestionsLoading] = useState(false);
@@ -189,6 +193,13 @@ export default function AiChatPage() {
 		[setAttachedFiles, setSuggestions, setSuggestionsLoading],
 	);
 
+	const handleTraceNavigationChange = useCallback(
+		(navigationId: string) => {
+			setCurrentNavigation(navigationId);
+		},
+		[setCurrentNavigation],
+	);
+
 	/**
 	 * Handles submission of chat messages
 	 */
@@ -200,7 +211,13 @@ export default function AiChatPage() {
 			if (input.trim()) {
 				originalHandleSubmit(e as any, {
 					body: {
-						insights: Array.from(traceAnalysis?.insights ?? []),
+						insights: traceAnalysis
+							? analyseInsightsForCWV(
+									traceAnalysis?.insights ?? new Map(),
+									traceAnalysis?.parsedTrace ?? {},
+									currentNavigation ?? '',
+								)
+							: [],
 						userInteractions: traceAnalysis?.parsedTrace.UserInteractions,
 					},
 				});
@@ -467,6 +484,7 @@ export default function AiChatPage() {
 							>
 								{/* File context section */}
 								<FileContextSection
+									onTraceNavigationChange={handleTraceNavigationChange}
 									currentFile={currentContextFile}
 									isVisible={showContextFile}
 									traceAnalysis={traceAnalysis}

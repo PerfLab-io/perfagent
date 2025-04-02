@@ -14,7 +14,7 @@ import {
 import { type InsightSet } from '@paulirish/trace_engine/models/trace/insights/types';
 import { createOpenAI } from '@ai-sdk/openai';
 import dedent from 'dedent';
-import { analyzeInsightsForTopic } from '@/lib/insights';
+import { analyseInsightsForCWV, analyzeInsightsForTopic } from '@/lib/insights';
 import { TraceTopic } from '@/lib/trace';
 import { z } from 'zod';
 import { baseSystemPrompt, toolUsagePrompt } from '@/lib/ai/model';
@@ -148,7 +148,7 @@ const tavlyResearchTool = tool({
 const requestSchema = z.object({
 	messages: z.array(z.any()).default([]),
 	files: z.array(z.any()).default([]),
-	insights: z.array(z.any()).default([]),
+	insights: z.any().default(null),
 	userInteractions: z.any().default(null),
 	model: z.string().default('default_model'),
 });
@@ -162,7 +162,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 		const body = c.req.valid('json');
 		const messages = convertToCoreMessages(body.messages);
 		const files = body.files;
-		const insights: [string, InsightSet][] = body.insights;
+		const insights: ReturnType<typeof analyseInsightsForCWV> = body.insights;
 		const userInteractions: UserInteractionsData = body.userInteractions;
 		const model = body.model;
 
@@ -572,13 +572,15 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 					},
 				});
 
-				if (insights.length) {
+				if (insights) {
 					const { object: insightTopic } = await generateObject({
 						model: perfAgent.languageModel('topics_model'),
 						temperature: 0,
 						messages,
 						schema: z.object({
-							topic: z.nativeEnum(TraceTopic).describe('Topic of the trace'),
+							topic: z
+								.enum(['LCP', 'CLS', 'INP'])
+								.describe('Topic of the trace'),
 							researchQuery: z
 								.string()
 								.describe(
@@ -622,13 +624,29 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 						'userInteractions ',
 						userInteractions.longestInteractionEvent,
 					);
-					console.log('insights ', insights.length);
+					console.log('insights ', insights);
 
-					const insightsForTopic = await analyzeInsightsForTopic(
-						insights,
-						userInteractions,
-						insightTopic.topic,
-					);
+					const insightsForTopic = ((topic) => {
+						if (topic === 'LCP') {
+							return insights.LCP;
+						}
+						if (topic === 'CLS') {
+							return insights.CLS;
+						}
+						if (topic === 'INP') {
+							return insights.INP;
+						}
+					})(insightTopic.topic);
+
+					console.log('insightsForTopic ', insightsForTopic);
+
+					if (!insightsForTopic) {
+						throw new Error('No insights for topic', {
+							cause: {
+								insightTopic,
+							},
+						});
+					}
 
 					const traceReportStream = streamText({
 						model: perfAgent.languageModel(model),
@@ -645,11 +663,11 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 							 */
 							traceAnalysisTool: tool({
 								description:
-									'Gives a user a list of actionable insights based on the trace data',
+									'Gives a user a list of actionable insights based on the trace data. Use only for LCP, CLS and INP related questions.',
 								parameters: traceAnalysisToolSchema,
 								execute: async ({ topic }) => {
 									try {
-										if (!insights || !insights.length) {
+										if (!insightsForTopic) {
 											return {
 												type: 'trace_analysis',
 												error: 'No trace data provided',
@@ -674,17 +692,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 												type: 'trace-insight',
 												status: 'completed',
 												topic,
-												traceInsight: {
-													metric: insightsForTopic.metric,
-													metricValue: insightsForTopic.metricValue,
-													metricType: insightsForTopic.metricType,
-													metricScore: insightsForTopic.metricScore as
-														| 'good'
-														| 'average'
-														| 'poor',
-													metricBreakdown: insightsForTopic.metricBreakdown,
-													infoContent: insightsForTopic.infoContent,
-												},
+												traceInsight: insightsForTopic,
 												timestamp: Date.now(),
 											},
 										});
