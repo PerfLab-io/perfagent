@@ -1,4 +1,3 @@
-import { type NextRequest } from 'next/server';
 import { serverEnv } from '@/lib/env/server';
 import { tavily } from '@tavily/core';
 import {
@@ -11,10 +10,9 @@ import {
 	simulateStreamingMiddleware,
 	generateObject,
 } from 'ai';
-import { type InsightSet } from '@paulirish/trace_engine/models/trace/insights/types';
 import { createOpenAI } from '@ai-sdk/openai';
 import dedent from 'dedent';
-import { analyseInsightsForCWV, analyzeInsightsForTopic } from '@/lib/insights';
+import { analyseInsightsForCWV } from '@/lib/insights';
 import { TraceTopic } from '@/lib/trace';
 import { z } from 'zod';
 import { baseSystemPrompt, toolUsagePrompt } from '@/lib/ai/model';
