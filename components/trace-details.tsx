@@ -338,7 +338,7 @@ export function FileContextSection({
 														xmlns="http://www.w2.org/2000/svg"
 													>
 														<pattern
-															id="diagonal-lines"
+															id={`metric-${metric}-${selectedNavigation}-lines`}
 															patternUnits="userSpaceOnUse"
 															width="2.5"
 															height="2.5"
@@ -356,7 +356,7 @@ export function FileContextSection({
 														<rect
 															width="100%"
 															height="100%"
-															fill="url(#diagonal-lines)"
+															fill={`url(#metric-${metric}-${selectedNavigation}-lines)`}
 														/>
 													</svg>
 												</div>
@@ -465,7 +465,7 @@ export function FileContextSection({
 					{/* Frame Histogram */}
 					<div className="mt-4">
 						<h4 className="mb-2 text-xs font-semibold text-peppermint-800 dark:text-peppermint-200">
-							AnimationFrame metrics distribution
+							Trace activity
 						</h4>
 						<div className="rounded-lg border border-peppermint-200 bg-white p-3 transition-all duration-300 hover:-translate-y-1 hover:translate-x-1 hover:shadow-[-4px_4px_0_hsl(var(--border-color))] dark:border-peppermint-800 dark:bg-peppermint-900/30">
 							<div className="h-24">

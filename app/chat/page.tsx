@@ -147,7 +147,6 @@ export default function AiChatPage() {
 
 				setTimeout(() => {
 					analyzeTraceFromFile(file).then((trace) => {
-						console.log('trace', trace);
 						setTraceAnalysis(trace);
 
 						setCurrentContextFile(newFile);
