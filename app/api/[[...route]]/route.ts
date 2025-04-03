@@ -206,9 +206,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 
 						try {
 							// Determine the research query by adding context if needed
-							const researchQuery = query.toLowerCase().includes('performance')
-								? query
-								: `${query} web performance optimization`;
+							const researchQuery = query;
 
 							let tav;
 							// Configure Tavily API
@@ -265,6 +263,8 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 									completedSteps: 0,
 								},
 							});
+
+							console.log('researchQuery ', researchQuery);
 
 							// Now generate the research plan
 							const { object: researchPlan } = await generateObject({
@@ -409,11 +409,23 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 									},
 								});
 
+								const startTime = new Date();
+
 								const webResults = await tav.search(step.query.query, {
 									searchDepth: depth,
 									includeAnswer: true,
 									includeDomains: trustedDomains,
 									maxResults: Math.min(6 - step.query.priority, 10),
+								});
+
+								langfuse.span({
+									name: `search-web`,
+									metadata: {
+										query: step.query.query,
+									},
+									traceId: parentTraceId,
+									startTime,
+									endTime: new Date(),
 								});
 
 								searchResults.push({
@@ -612,6 +624,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 				});
 
 				if (insights) {
+					console.log('insights ', insights);
 					const { object: insightTopic } = await generateObject({
 						model: perfAgent.languageModel('topics_model'),
 						temperature: 0,

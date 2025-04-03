@@ -217,7 +217,7 @@ export default function AiChatPage() {
 									traceAnalysis?.parsedTrace ?? {},
 									currentNavigation ?? '',
 								)
-							: [],
+							: null,
 						userInteractions: traceAnalysis?.parsedTrace.UserInteractions,
 					},
 				});
