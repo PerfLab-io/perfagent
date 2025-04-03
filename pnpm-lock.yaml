@@ -191,6 +191,9 @@ importers:
       input-otp:
         specifier: 1.4.1
         version: 1.4.1(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
+      langfuse-vercel:
+        specifier: ^3.37.1
+        version: 3.37.1(ai@4.2.0(react@19.0.0)(zod@3.24.2))
       lucide-react:
         specifier: ^0.454.0
         version: 0.454.0(react@19.0.0)
@@ -5061,6 +5064,20 @@ packages:
     resolution: {integrity: sha512-eTIzlVOSUR+JxdDFepEYcBMtZ9Qqdef+rnzWdRZuMbOywu5tO2w2N7rqjoANZ5k9vywhL6Br1VRjUIgTQx4E8w==}
     engines: {node: '>=6'}
 
+  langfuse-core@3.37.1:
+    resolution: {integrity: sha512-YfCegzOmy8Ex1SQg2eCO5a77YwVAJZ7hVUUbfIx+ncREEM9Smk4FrveNG0bOKS3n9C4TJZpX12DfQ+819gmHtw==}
+    engines: {node: '>=18'}
+
+  langfuse-vercel@3.37.1:
+    resolution: {integrity: sha512-vqp8pM7x2gvRfvw2JeO1vxo/zayDJ7or8iIKUXD5CLMEQ4wnyN+sHFZDkK5Y5dgLfIJ8rF+DmSJ0PDjRVvD3Hw==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      ai: '>=3.2.44'
+
+  langfuse@3.37.1:
+    resolution: {integrity: sha512-U+Jbbpeqaqb10k/xuEkXWvK0Jsh/vVRGOl5j3jIOl0K71V1oeDGRym2PI1kF7dJyIARyGUxBVSbeSIQFM32cxQ==}
+    engines: {node: '>=18'}
+
   language-subtag-registry@0.3.23:
     resolution: {integrity: sha512-0K65Lea881pHotoGEa5gDlMxt3pctLi2RplBb7Ezh4rRdLEOtgi7n4EwK9lamnUCkKBqaeKRVebTq6BAxSkpXQ==}
 
@@ -5407,6 +5424,10 @@ packages:
 
   ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
+
+  mustache@4.2.0:
+    resolution: {integrity: sha512-71ippSywq5Yb7/tVYyGbkBggbU8H3u5Rz56fH60jGFgr8uHwxs+aSKeqmluIVzM0m0kB7xQjKS6qPfd0b2ZoqQ==}
+    hasBin: true
 
   mz@2.7.0:
     resolution: {integrity: sha512-z81GNO7nnYMEhrGh9LeymoE4+Yr0Wn5McHIZMK5cfQCl+NDX08sCZgUc9/6MHni9IWuFLm1Z3HTCXu2z9fN62Q==}
@@ -12591,6 +12612,20 @@ snapshots:
 
   kleur@3.0.3: {}
 
+  langfuse-core@3.37.1:
+    dependencies:
+      mustache: 4.2.0
+
+  langfuse-vercel@3.37.1(ai@4.2.0(react@19.0.0)(zod@3.24.2)):
+    dependencies:
+      ai: 4.2.0(react@19.0.0)(zod@3.24.2)
+      langfuse: 3.37.1
+      langfuse-core: 3.37.1
+
+  langfuse@3.37.1:
+    dependencies:
+      langfuse-core: 3.37.1
+
   language-subtag-registry@0.3.23: {}
 
   language-tags@1.0.9:
@@ -12998,6 +13033,8 @@ snapshots:
   ms@2.0.0: {}
 
   ms@2.1.3: {}
+
+  mustache@4.2.0: {}
 
   mz@2.7.0:
     dependencies:

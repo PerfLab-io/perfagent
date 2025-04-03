@@ -71,6 +71,7 @@
     "expo-gl": "latest",
     "hono": "^4.7.5",
     "input-otp": "1.4.1",
+    "langfuse-vercel": "^3.37.1",
     "lucide-react": "^0.454.0",
     "marked-react": "^3.0.0",
     "next": "^15.2.3",
