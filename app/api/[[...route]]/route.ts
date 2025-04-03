@@ -80,7 +80,11 @@ const traceAnalysisToolSchema = z.object({
 });
 
 const researchToolSchema = z.object({
-	query: z.string().describe('Research query based on the user message'),
+	query: z
+		.string()
+		.describe(
+			'Research query based on the given user prompt and the context from your previous responses to perform the most relevant research',
+		),
 });
 
 /**
@@ -194,7 +198,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 
 				const researchTool = tool({
 					description:
-						'Performs research on web performance optimization topics',
+						'Performs research on web performance optimization topics based on the user query and the provided context',
 					parameters: researchToolSchema,
 					execute: async ({ query }) => {
 						// Create a unique toolCallId
@@ -295,7 +299,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 										.max(4),
 								}),
 								prompt: dedent`
-									Create a focused research plan for the topic: "${researchQuery}".
+									Create a research plan for the topic: "${researchQuery}".
 
 									Today's date and day of the week: ${new Date().toLocaleDateString('en-US', {
 										weekday: 'long',
@@ -305,9 +309,10 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 									})}
 
 									Keep the plan concise but comprehensive, with:
-									- maximum 5targeted search queries (each can use web as source. Focus on web.dev as main source whenever possible)
+									- maximum 5 targeted search queries
+									- Each query should be focused on a specific aspect of the topic to provide the best value
 									- 2-4 key analyses to perform
-									- Prioritize the most important aspects to investigate
+									- Prioritize the most important aspects to investigate based on the user query and the context
 
 									Available sources:
 									- "web": General web search
@@ -794,6 +799,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 							}),
 							researchTool,
 						},
+						// maxSteps: 3,
 						onFinish(event) {
 							console.log(
 								'######################### traceReportStream onFinish #################################',
@@ -858,6 +864,8 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 
 		c.header('X-Vercel-AI-Data-Stream', 'v1');
 		c.header('Content-Type', 'text/plain; charset=utf-8');
+
+		await langfuse.flushAsync();
 
 		return stream(c, (stream) =>
 			stream.pipe(dataStream.pipeThrough(new TextEncoderStream())),
