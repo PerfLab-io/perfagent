@@ -13,9 +13,12 @@ import {
 import { createOpenAI } from '@ai-sdk/openai';
 import dedent from 'dedent';
 import { analyseInsightsForCWV } from '@/lib/insights';
-import { TraceTopic } from '@/lib/trace';
 import { z } from 'zod';
-import { baseSystemPrompt, toolUsagePrompt } from '@/lib/ai/model';
+import {
+	baseSystemPrompt,
+	largeModelSystemPrompt,
+	toolUsagePrompt,
+} from '@/lib/ai/model';
 import { Hono } from 'hono';
 import { handle } from 'hono/vercel';
 import { stream } from 'hono/streaming';
@@ -76,7 +79,12 @@ const langfuse = new Langfuse({
 
 // Define tool schemas
 const traceAnalysisToolSchema = z.object({
-	topic: z.nativeEnum(TraceTopic).describe('Insight topic to analyze'),
+	topic: z
+		.enum(['LCP', 'CLS', 'INP'])
+		.describe(
+			'Insight topic to analyze. Only use for the given topic list. The list reffers to CLS, INP and LCP related queries',
+		),
+	traceFile: z.string().describe('The trace file to analyze'),
 });
 
 const researchToolSchema = z.object({
@@ -162,6 +170,7 @@ const requestSchema = z.object({
 	insights: z.any().default(null),
 	userInteractions: z.any().default(null),
 	model: z.string().default('default_model'),
+	traceFile: z.any().default(null),
 });
 
 // Create Hono app for chat API
@@ -176,6 +185,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 		const insights: ReturnType<typeof analyseInsightsForCWV> = body.insights;
 		const userInteractions: UserInteractionsData = body.userInteractions;
 		const model = body.model;
+		const traceFile = body.traceFile;
 		const parentTraceId = randomUUID();
 
 		langfuse.trace({
@@ -629,90 +639,8 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 
 				if (insights) {
 					console.log('insights ', insights);
-					const { object: insightTopic } = await generateObject({
-						model: perfAgent.languageModel('topics_model'),
-						temperature: 0,
-						experimental_telemetry: {
-							isEnabled: true,
-							functionId: `research-plan-llm-call-creation`,
-							metadata: {
-								langfuseTraceId: parentTraceId,
-								langfuseUpdateParent: false, // Do not update the parent trace with execution results
-							},
-						},
-						messages,
-						schema: z.object({
-							topic: z
-								.enum(['LCP', 'CLS', 'INP'])
-								.describe('Topic of the trace'),
-							researchQuery: z
-								.string()
-								.describe(
-									"Optimized research query based on the user's query and the topic of the trace",
-								),
-						}),
-						system: dedent`
-							You are a web performance analysis expert specializing in Core Web Vitals. Your task is to analyze user queries about web performance issues, classify them into relevant categories.
-							Pick a topic from the schema given based on the user's message.
-							Use only the list of topics provided in the schema.
 
-							Those topics represent different aspects of a performance trace.
-
-							Core Web Vitals Context
-							Core Web Vitals are Google's metrics for measuring web page experience:
-
-							Loading (LCP): Largest Contentful Paint - measures loading performance (2.5s or less is good)
-							Interactivity (INP): Interaction to Next Paint - measures responsiveness (100ms or less is good)
-							Visual Stability (CLS): Cumulative Layout Shift - measures visual stability (0.1 or less is good)
-
-							Additional important metrics include:
-
-							TTFB (Time to First Byte)
-							FCP (First Contentful Paint)
-							TTI (Time to Interactive)
-							TBT (Total Blocking Time)
-							Resource optimization (JS, CSS, images, fonts)
-							Network performance (caching, compression)
-
-							Your Process
-
-							Analyze the user's query about web performance
-							Classify it into relevant web vitals categories
-
-							IMPORTANT: Use only the list of topics provided in the schema.
-						`,
-					});
-
-					console.log('insightTopic: ', insightTopic);
-					console.log(
-						'userInteractions ',
-						userInteractions.longestInteractionEvent,
-					);
-					console.log('insights ', insights);
-
-					const insightsForTopic = ((topic) => {
-						if (topic === 'LCP') {
-							return insights.LCP;
-						}
-						if (topic === 'CLS') {
-							return insights.CLS;
-						}
-						if (topic === 'INP') {
-							return insights.INP;
-						}
-					})(insightTopic.topic);
-
-					console.log('insightsForTopic ', insightsForTopic);
-
-					if (!insightsForTopic) {
-						throw new Error('No insights for topic', {
-							cause: {
-								insightTopic,
-							},
-						});
-					}
-
-					const traceReportStream = streamText({
+					const traceInsightStream = streamText({
 						model: perfAgent.languageModel(model),
 						temperature: 0,
 						experimental_telemetry: {
@@ -724,10 +652,11 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 							},
 						},
 						messages,
-						system: dedent`${baseSystemPrompt}
+						system: dedent`${largeModelSystemPrompt}
 						
-						${toolUsagePrompt}`,
-						toolChoice: 'required',
+						${traceFile ? `Trace file in context: ${JSON.stringify(traceFile, null, 2)}` : 'No trace file provided'}
+						`,
+						maxSteps: 2,
 						tools: {
 							/**
 							 * Trace Analysis Tool
@@ -735,9 +664,22 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 							 */
 							traceAnalysisTool: tool({
 								description:
-									'Gives a user a list of actionable insights based on the trace data. Use only for LCP, CLS and INP related questions.',
+									'Gives a user a list of actionable insights based on the trace provided.',
 								parameters: traceAnalysisToolSchema,
 								execute: async ({ topic }) => {
+									const insightsForTopic = ((topic) => {
+										if (topic === 'LCP') {
+											return insights.LCP;
+										}
+										if (topic === 'CLS') {
+											return insights.CLS;
+										}
+										if (topic === 'INP') {
+											return insights.INP;
+										}
+									})(topic);
+
+									console.log('insightsForTopic ', insightsForTopic);
 									try {
 										if (!insightsForTopic) {
 											return {
@@ -831,7 +773,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 						},
 					});
 
-					traceReportStream.mergeIntoDataStream(dataStreamWriter, {
+					traceInsightStream.mergeIntoDataStream(dataStreamWriter, {
 						sendReasoning: true,
 						sendSources: true,
 					});
@@ -850,7 +792,10 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 						messages,
 						system: dedent`${baseSystemPrompt}
 						
-						${toolUsagePrompt}`,
+						${toolUsagePrompt}
+						
+						No trace file provided.
+						`,
 						tools: {
 							researchTool,
 						},

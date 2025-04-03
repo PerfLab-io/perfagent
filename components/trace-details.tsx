@@ -33,8 +33,8 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from './ui/select';
-import { SyntheticAnimationFramePair } from '@paulirish/trace_engine/models/trace/types/TraceEvents';
-import { Micro } from '@paulirish/trace_engine/models/trace/types/Timing';
+import { type SyntheticAnimationFramePair } from '@paulirish/trace_engine/models/trace/types/TraceEvents';
+import { type Micro } from '@paulirish/trace_engine/models/trace/types/Timing';
 import { MetricGauge } from './trace-details/metric-gauge';
 import { LinePattern } from './line-pattern';
 interface AttachedFile {

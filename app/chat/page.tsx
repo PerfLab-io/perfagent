@@ -219,11 +219,11 @@ export default function AiChatPage() {
 								)
 							: null,
 						userInteractions: traceAnalysis?.parsedTrace.UserInteractions,
+						traceFile: currentContextFile,
 					},
 				});
 				// Hide file section after submission
 				setShowFileSection(false);
-				setCurrentContextFile(attachedFiles[0]);
 				setShowContextFile(true);
 				setAttachedFiles([]);
 				// Clear suggestions when submitting a message
