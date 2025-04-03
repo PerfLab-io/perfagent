@@ -173,7 +173,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 				dataStreamWriter.writeData('initialized call');
 				console.log(
 					'######################### traceReportStream #################################',
-					insights.length,
+					insights,
 					userInteractions?.interactionEvents?.length,
 				);
 
@@ -203,10 +203,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 									query,
 									results: [
 										{
-											title: 'No Tavily API key configured',
-											content:
-												'Please configure a Tavily API key to enable research functionality.',
-											url: 'https://tavily.com',
+											title: 'Error initializing research tool',
 										},
 									],
 								};
@@ -254,6 +251,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 							const { object: researchPlan } = await generateObject({
 								model: perfAgent.languageModel(model),
 								temperature: 0,
+								experimental_telemetry: { isEnabled: true },
 								schema: z.object({
 									search_queries: z
 										.array(
@@ -462,6 +460,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 								const { object: analysisResult } = await generateObject({
 									model: perfAgent.languageModel(model),
 									temperature: 0.5,
+									experimental_telemetry: { isEnabled: true },
 									schema: z.object({
 										findings: z
 											.array(
@@ -519,6 +518,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 							const researchReport = streamText({
 								model: perfAgent.languageModel(model),
 								temperature: 0,
+								experimental_telemetry: { isEnabled: true },
 								system: dedent`${baseSystemPrompt}
 
 								Generate a markdown report based on the research plan, search results and analysis results.`,
@@ -574,6 +574,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 					const { object: insightTopic } = await generateObject({
 						model: perfAgent.languageModel('topics_model'),
 						temperature: 0,
+						experimental_telemetry: { isEnabled: true },
 						messages,
 						schema: z.object({
 							topic: z
@@ -649,6 +650,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 					const traceReportStream = streamText({
 						model: perfAgent.languageModel(model),
 						temperature: 0,
+						experimental_telemetry: { isEnabled: true },
 						messages,
 						system: dedent`${baseSystemPrompt}
 						
@@ -703,6 +705,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 										const generatedReport = streamText({
 											model: perfAgent.languageModel(model),
 											temperature: 0,
+											experimental_telemetry: { isEnabled: true },
 											messages,
 											system: dedent`${baseSystemPrompt}
 
@@ -756,6 +759,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 					const traceReportStream = streamText({
 						model: perfAgent.languageModel(model),
 						temperature: 0,
+						experimental_telemetry: { isEnabled: true },
 						messages,
 						system: dedent`${baseSystemPrompt}
 						
