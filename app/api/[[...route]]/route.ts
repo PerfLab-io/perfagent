@@ -181,6 +181,10 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 		langfuse.trace({
 			id: parentTraceId,
 			name: 'chat-api-call',
+			metadata: {
+				model,
+				environment: process.env.NODE_ENV,
+			},
 		});
 
 		if (messages.length === 0) {
