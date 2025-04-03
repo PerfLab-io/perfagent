@@ -22,6 +22,9 @@ import { stream } from 'hono/streaming';
 import { zValidator } from '@hono/zod-validator';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { UserInteractionsData } from '@paulirish/trace_engine/models/trace/handlers/UserInteractionsHandler';
+import { Langfuse } from 'langfuse';
+import { randomUUID } from 'crypto';
+
 export const runtime = 'nodejs';
 
 const local = createOpenAI({
@@ -63,6 +66,12 @@ const perfAgent = customProvider({
 	languageModels:
 		// process.env.NODE_ENV === 'development' ? localModels : googleModels,
 		googleModels,
+});
+
+const langfuse = new Langfuse({
+	secretKey: serverEnv.LANGFUSE_SECRET_KEY,
+	publicKey: serverEnv.LANGFUSE_PUBLIC_KEY,
+	baseUrl: serverEnv.LANGFUSE_BASEURL,
 });
 
 // Define tool schemas
@@ -163,6 +172,12 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 		const insights: ReturnType<typeof analyseInsightsForCWV> = body.insights;
 		const userInteractions: UserInteractionsData = body.userInteractions;
 		const model = body.model;
+		const parentTraceId = randomUUID();
+
+		langfuse.trace({
+			id: parentTraceId,
+			name: 'chat-api-call',
+		});
 
 		if (messages.length === 0) {
 			return c.json({ error: 'No messages provided' }, 400);
@@ -183,7 +198,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 					parameters: researchToolSchema,
 					execute: async ({ query }) => {
 						// Create a unique toolCallId
-						const toolCallId = `research-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+						const toolCallId = randomUUID();
 
 						try {
 							// Determine the research query by adding context if needed
@@ -251,7 +266,14 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 							const { object: researchPlan } = await generateObject({
 								model: perfAgent.languageModel(model),
 								temperature: 0,
-								experimental_telemetry: { isEnabled: true },
+								experimental_telemetry: {
+									isEnabled: true,
+									functionId: `research-plan-llm-call`,
+									metadata: {
+										langfuseTraceId: parentTraceId,
+										langfuseUpdateParent: false, // Do not update the parent trace with execution results
+									},
+								},
 								schema: z.object({
 									search_queries: z
 										.array(
@@ -460,7 +482,14 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 								const { object: analysisResult } = await generateObject({
 									model: perfAgent.languageModel(model),
 									temperature: 0.5,
-									experimental_telemetry: { isEnabled: true },
+									experimental_telemetry: {
+										isEnabled: true,
+										functionId: `analysis-${step.analysis.type}-llm-call`,
+										metadata: {
+											langfuseTraceId: parentTraceId,
+											langfuseUpdateParent: false, // Do not update the parent trace with execution results
+										},
+									},
 									schema: z.object({
 										findings: z
 											.array(
@@ -518,7 +547,14 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 							const researchReport = streamText({
 								model: perfAgent.languageModel(model),
 								temperature: 0,
-								experimental_telemetry: { isEnabled: true },
+								experimental_telemetry: {
+									isEnabled: true,
+									functionId: `research-report-llm-call`,
+									metadata: {
+										langfuseTraceId: parentTraceId,
+										langfuseUpdateParent: false, // Do not update the parent trace with execution results
+									},
+								},
 								system: dedent`${baseSystemPrompt}
 
 								Generate a markdown report based on the research plan, search results and analysis results.`,
@@ -574,7 +610,14 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 					const { object: insightTopic } = await generateObject({
 						model: perfAgent.languageModel('topics_model'),
 						temperature: 0,
-						experimental_telemetry: { isEnabled: true },
+						experimental_telemetry: {
+							isEnabled: true,
+							functionId: `research-plan-llm-call-creation`,
+							metadata: {
+								langfuseTraceId: parentTraceId,
+								langfuseUpdateParent: false, // Do not update the parent trace with execution results
+							},
+						},
 						messages,
 						schema: z.object({
 							topic: z
@@ -650,7 +693,14 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 					const traceReportStream = streamText({
 						model: perfAgent.languageModel(model),
 						temperature: 0,
-						experimental_telemetry: { isEnabled: true },
+						experimental_telemetry: {
+							isEnabled: true,
+							functionId: `trace-analysis-llm-call`,
+							metadata: {
+								langfuseTraceId: parentTraceId,
+								langfuseUpdateParent: false, // Do not update the parent trace with execution results
+							},
+						},
 						messages,
 						system: dedent`${baseSystemPrompt}
 						
@@ -705,7 +755,14 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 										const generatedReport = streamText({
 											model: perfAgent.languageModel(model),
 											temperature: 0,
-											experimental_telemetry: { isEnabled: true },
+											experimental_telemetry: {
+												isEnabled: true,
+												functionId: `trace-analysis-llm-call`,
+												metadata: {
+													langfuseTraceId: parentTraceId,
+													langfuseUpdateParent: false, // Do not update the parent trace with execution results
+												},
+											},
 											messages,
 											system: dedent`${baseSystemPrompt}
 
@@ -759,7 +816,14 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 					const traceReportStream = streamText({
 						model: perfAgent.languageModel(model),
 						temperature: 0,
-						experimental_telemetry: { isEnabled: true },
+						experimental_telemetry: {
+							isEnabled: true,
+							functionId: `trace-report-llm-call`,
+							metadata: {
+								langfuseTraceId: parentTraceId,
+								langfuseUpdateParent: false, // Do not update the parent trace with execution results
+							},
+						},
 						messages,
 						system: dedent`${baseSystemPrompt}
 						
