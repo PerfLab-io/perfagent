@@ -112,7 +112,7 @@ export default function AiChatPage() {
 	 * Smoothly scrolls to the bottom of the chat messages
 	 */
 	const scrollToBottom = useCallback(() => {
-		messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+		// messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
 	}, []);
 
 	const processFiles = useCallback(
