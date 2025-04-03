@@ -71,7 +71,9 @@ export function MetricGauge({
 						status !== 'needs-improvement' && 'opacity-40',
 					)}
 				>
-					<span className="text-xs text-amber-700">Needs Improvement</span>
+					<span className="truncate px-2 text-xs text-amber-700">
+						Needs Improvement
+					</span>
 					{status !== 'needs-improvement' && (
 						<LinePattern
 							id={`gauge-${metricType}-${status}-${unit}-lines-needs-improvement`}

@@ -181,13 +181,13 @@ export function FileContextSection({
 	);
 
 	// Mock timeline events
-	const timelineEvents = [
-		{ type: 'HTML', startTime: 0, duration: 120, color: 'bg-blue-500/70' },
-		{ type: 'CSS', startTime: 100, duration: 180, color: 'bg-purple-500/70' },
-		{ type: 'JS', startTime: 250, duration: 350, color: 'bg-yellow-500/70' },
-		{ type: 'Images', startTime: 550, duration: 250, color: 'bg-green-500/70' },
-		{ type: 'Other', startTime: 750, duration: 150, color: 'bg-gray-500/70' },
-	];
+	// const timelineEvents = [
+	// 	{ type: 'HTML', startTime: 0, duration: 120, color: 'bg-blue-500/70' },
+	// 	{ type: 'CSS', startTime: 100, duration: 180, color: 'bg-purple-500/70' },
+	// 	{ type: 'JS', startTime: 250, duration: 350, color: 'bg-yellow-500/70' },
+	// 	{ type: 'Images', startTime: 550, duration: 250, color: 'bg-green-500/70' },
+	// 	{ type: 'Other', startTime: 750, duration: 150, color: 'bg-gray-500/70' },
+	// ];
 
 	const getMetricVariant = (
 		metricScore: MetricScoreClassification | undefined,
@@ -307,7 +307,7 @@ export function FileContextSection({
 								})?.[1]?.url?.href
 							}
 						</h4>
-						<div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+						<div className="grid grid-cols-1 gap-3 md:grid-cols-3 lg:gap-6">
 							{Object.keys(metrics).map((metric) => {
 								const metricValue = metrics[metric as keyof typeof metrics];
 								const metricIcon =
@@ -327,7 +327,7 @@ export function FileContextSection({
 										icon={metricIcon}
 										status={getMetricVariant(metricValue?.metricScore)}
 									>
-										<div className="mt-1 flex items-center justify-between">
+										{/* <div className="mt-1 flex items-center justify-between">
 											<div className="flex items-center">
 												<div
 													className={cn(
@@ -358,7 +358,7 @@ export function FileContextSection({
 											<div className="text-[10px] text-peppermint-600 dark:text-peppermint-400">
 												<span className="font-medium">Target: &lt;100ms</span>
 											</div>
-										</div>
+										</div> */}
 										<MetricGauge
 											value={metricValue?.metricValue || 0}
 											metricType={metricValue?.metricType}

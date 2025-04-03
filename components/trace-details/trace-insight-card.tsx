@@ -40,6 +40,7 @@ export function FileInsightCard({
 				'rounded-lg border border-peppermint-200 bg-white dark:border-peppermint-800 dark:bg-peppermint-950/30',
 				'transition-all duration-300 hover:-translate-y-1 hover:translate-x-1 hover:shadow-[-4px_4px_0_hsl(var(--border-color))]',
 				'metric-context-appear p-3',
+				'flex flex-col gap-2',
 				className,
 			)}
 		>
@@ -62,7 +63,7 @@ export function FileInsightCard({
 					{value}
 				</span>
 			</div>
-			{children && <div className="mt-2">{children}</div>}
+			{children}
 		</div>
 	);
 }
