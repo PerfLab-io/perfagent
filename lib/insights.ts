@@ -17,7 +17,7 @@ enum LCPMetricPhases {
 
 export enum MetricScoreClassification {
 	GOOD = 'good',
-	OK = 'ok',
+	OK = 'needs improvement',
 	BAD = 'bad',
 	UNCLASSIFIED = 'unclassified',
 }
