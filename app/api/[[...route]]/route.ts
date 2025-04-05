@@ -27,6 +27,7 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { UserInteractionsData } from '@paulirish/trace_engine/models/trace/handlers/UserInteractionsHandler';
 import { Langfuse } from 'langfuse';
 import { randomUUID } from 'crypto';
+import { mastra } from '@/lib/ai/mastra';
 
 export const runtime = 'nodejs';
 
@@ -637,8 +638,27 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 					},
 				});
 
+				const insightsWorkflow = mastra.getWorkflow('insightsWorkflow');
+
 				if (insights) {
 					console.log('insights ', insights);
+
+					const run = insightsWorkflow.createRun();
+
+					const unsubscribe = run.watch((event) => {
+						console.log('========== event', event);
+					});
+
+					const _run = await run.start({
+						triggerData: {
+							insights,
+							dataStream: dataStreamWriter,
+							messages,
+						},
+					});
+
+					console.log('run', _run);
+					unsubscribe();
 
 					const traceInsightStream = streamText({
 						model: perfAgent.languageModel(model),
@@ -652,113 +672,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 							},
 						},
 						messages,
-						system: dedent`${largeModelSystemPrompt}
-						
-						${traceFile ? `Trace file in context: ${JSON.stringify(traceFile, null, 2)}` : 'No trace file provided'}
-						`,
-						maxSteps: 2,
-						tools: {
-							/**
-							 * Trace Analysis Tool
-							 * Analyzes trace data for specific topics
-							 */
-							traceAnalysisTool: tool({
-								description:
-									'Gives a user a list of actionable insights based on the trace provided.',
-								parameters: traceAnalysisToolSchema,
-								execute: async ({ topic }) => {
-									const insightsForTopic = ((topic) => {
-										if (topic === 'LCP') {
-											return insights.LCP;
-										}
-										if (topic === 'CLS') {
-											return insights.CLS;
-										}
-										if (topic === 'INP') {
-											return insights.INP;
-										}
-									})(topic);
-
-									console.log('insightsForTopic ', insightsForTopic);
-									try {
-										if (!insightsForTopic) {
-											return {
-												type: 'trace_analysis',
-												error: 'No trace data provided',
-											};
-										}
-
-										dataStreamWriter.writeMessageAnnotation({
-											type: 'trace_analysis_update',
-											data: {
-												id: 'trace-insights',
-												type: 'trace-insight',
-												status: 'started',
-												topic,
-												timestamp: Date.now(),
-											},
-										});
-
-										dataStreamWriter.writeMessageAnnotation({
-											type: 'trace_analysis_update',
-											data: {
-												id: 'trace-insights',
-												type: 'trace-insight',
-												status: 'completed',
-												topic,
-												traceInsight: insightsForTopic,
-												timestamp: Date.now(),
-											},
-										});
-
-										console.log(
-											'insightsForTopic complete: ',
-											insightsForTopic.metric,
-										);
-
-										const generatedReport = streamText({
-											model: perfAgent.languageModel(model),
-											temperature: 0,
-											experimental_telemetry: {
-												isEnabled: true,
-												functionId: `trace-analysis-llm-call`,
-												metadata: {
-													langfuseTraceId: parentTraceId,
-													langfuseUpdateParent: false, // Do not update the parent trace with execution results
-												},
-											},
-											messages,
-											system: dedent`${baseSystemPrompt}
-
-											Here's the trace analysis for the report to be generated (DO NOT INCLUDE THIS DATA IN THE RESPONSE. USE IT TO WRITE THE REPORT SECTION ON THE TRACE ANALYSIS):
-											\`\`\`json
-											${JSON.stringify(insightsForTopic, null, 2)}
-											\`\`\``,
-										});
-
-										generatedReport.mergeIntoDataStream(dataStreamWriter, {
-											sendReasoning: true,
-											sendSources: true,
-											experimental_sendStart: true,
-										});
-
-										return {
-											type: 'trace_analysis',
-											topic,
-											insightsForTopic,
-										};
-									} catch (error) {
-										console.error('Error in trace analysis tool:', error);
-										return {
-											type: 'trace_analysis',
-											error: error.message || 'Failed to analyze trace data',
-										};
-									}
-								},
-							}),
-							researchTool,
-						},
-						// maxSteps: 3,
+						system: largeModelSystemPrompt,
 						onFinish(event) {
 							console.log(
 								'######################### traceReportStream onFinish #################################',
