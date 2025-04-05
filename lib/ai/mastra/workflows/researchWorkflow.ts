@@ -1,9 +1,4 @@
-import {
-	CoreMessage,
-	coreMessageSchema,
-	DataStreamWriter,
-	streamText,
-} from 'ai';
+import { CoreMessage, coreMessageSchema, DataStreamWriter } from 'ai';
 
 import { Step, Workflow } from '@mastra/core/workflows';
 import { z } from 'zod';

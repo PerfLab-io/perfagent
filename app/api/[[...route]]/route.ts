@@ -1,20 +1,7 @@
-import { serverEnv } from '@/lib/env/server';
-import { tavily } from '@tavily/core';
-import {
-	convertToCoreMessages,
-	streamText,
-	createDataStream,
-	tool,
-	generateObject,
-} from 'ai';
-import dedent from 'dedent';
+import { convertToCoreMessages, streamText, createDataStream } from 'ai';
 import { analyseInsightsForCWV } from '@/lib/insights';
 import { z } from 'zod';
-import {
-	baseSystemPrompt,
-	largeModelSystemPrompt,
-	toolUsagePrompt,
-} from '@/lib/ai/prompts';
+import { largeModelSystemPrompt } from '@/lib/ai/prompts';
 import { Hono } from 'hono';
 import { handle } from 'hono/vercel';
 import { stream } from 'hono/streaming';
