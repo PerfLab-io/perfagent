@@ -7,6 +7,7 @@ try {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+	serverExternalPackages: ['@mastra/*'],
 	eslint: {
 		ignoreDuringBuilds: true,
 	},
