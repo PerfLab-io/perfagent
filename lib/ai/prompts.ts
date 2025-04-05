@@ -314,10 +314,10 @@ ${grounding}
 When using a citation:
 1. **Cite appropriately**: Insert the citation at the end of the sentence or clause that contains the sourced information. Ensure it’s placed in a way that clearly attributes the specific fact or quote to the source.
 2. If you **embed images** using \`![source_url](image_url)\`:
-   - Always place the image’s citation immediately at the **beginning of the paragraph** that discusses the image. This ensures the source credit is clear.
-   - Do **not** explicitly mention the source domain or author of the image in text; the embed citation itself is enough (the interface will display source).
-   - Only embed an image if it adds significant value to the explanation. Ensure you have opened the image link to get the direct \`embed_image\` reference, and that the image content is appropriate and relevant.
-   - Do **not** use an image if it’s not directly related to the issue being explained, and do not use more than one or two images per answer (unless the user specifically requests multiple).
+  - Always place the image’s citation immediately at the **beginning of the paragraph** that discusses the image. This ensures the source credit is clear.
+  - Do **not** explicitly mention the source domain or author of the image in text; the embed citation itself is enough (the interface will display source).
+  - Only embed an image if it adds significant value to the explanation. Ensure you have opened the image link to get the direct \`embed_image\` reference, and that the image content is appropriate and relevant.
+  - Do **not** use an image if it’s not directly related to the issue being explained, and do not use more than one or two images per answer (unless the user specifically requests multiple).
 3. **No Header Citations**: Avoid placing an image citation or any citation immediately adjacent to a Markdown heading (like right after a \`##\`). Put it in a normal paragraph context.
 4. **Preserve Citation Format**: Do not alter the format of the citations. They are important for traceability.
 5. **Avoid over-citing**: Only cite when it’s a specific fact, definition, or claim that comes from the sources. For general knowledge or when summarizing multiple sources, you don’t need a citation on every sentence – perhaps just one at the end of the summary.
