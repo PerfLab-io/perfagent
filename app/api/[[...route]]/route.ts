@@ -15,14 +15,6 @@ import { routerOutputSchema } from '@/lib/ai/mastra/agents/router';
 
 export const runtime = 'nodejs';
 
-const researchToolSchema = z.object({
-	query: z
-		.string()
-		.describe(
-			'Research query based on the given user prompt and the context from your previous responses to perform the most relevant research',
-		),
-});
-
 // Define the request body schema
 const requestSchema = z.object({
 	messages: z.array(z.any()).default([]),
