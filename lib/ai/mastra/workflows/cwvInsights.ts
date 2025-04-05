@@ -188,7 +188,7 @@ const analyzeTrace = new Step({
 	},
 });
 
-const insightsWorkflow = new Workflow({
+const cwvInsightsWorkflow = new Workflow({
 	name: 'trace-analysis-workflow',
 	triggerSchema: z.object({
 		dataStream: z.object({
@@ -206,6 +206,6 @@ const insightsWorkflow = new Workflow({
 	.step(topicStep)
 	.then(analyzeTrace);
 
-insightsWorkflow.commit();
+cwvInsightsWorkflow.commit();
 
-export { insightsWorkflow };
+export { cwvInsightsWorkflow };

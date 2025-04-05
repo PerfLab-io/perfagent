@@ -539,7 +539,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 					});
 				} else {
 					switch (object.workflow) {
-						case 'insightsWorkflow':
+						case 'cwvInsightsWorkflow':
 							if (insights) {
 								const insightsWorkflow = mastra.getWorkflow('insightsWorkflow');
 								const run = insightsWorkflow.createRun();

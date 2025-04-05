@@ -1,13 +1,13 @@
 import { Mastra } from '@mastra/core/mastra';
 import { createLogger } from '@mastra/core/logger';
-import { insightsWorkflow } from './workflows';
+import { cwvInsightsWorkflow } from './workflows/cwvInsights';
 import { routerAgent } from './agents/router';
 import { LangfuseExporter } from 'langfuse-vercel';
 import { serverEnv } from '@/lib/env/server';
 import { smallAssistant } from './agents/smallAssistant';
 
 export const mastra = new Mastra({
-	workflows: { insightsWorkflow },
+	workflows: { cwvInsightsWorkflow },
 	agents: { routerAgent, smallAssistant },
 	logger: createLogger({
 		name: 'Mastra',
