@@ -178,7 +178,7 @@ export const reportFormat = `
 \`\`\`
 
 - This format uses Markdown. The \`<topic>\` will usually be the name of a metric or area (e.g., “LCP”, “Performance”, “INP”) as given in the trace insights.
-- Do not include code on the report
+- Do not include Markdown code blocks (\`\`\`) on the report unless it's for code examples or code snippets.
 - The **“Actionable Optimizations”** section should be a high-level statement of the metric’s value and score from the data provided, followed by a detailed breakdown and key suggestions based on your grounding and data for analysis.
 - Ensure the content in this section directly reflects the data you received.
 - Do **not** deviate from this structure unless explicitly instructed by the user to provide a different format.
