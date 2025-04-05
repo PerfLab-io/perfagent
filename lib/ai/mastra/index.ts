@@ -5,9 +5,10 @@ import { routerAgent } from './agents/router';
 import { LangfuseExporter } from 'langfuse-vercel';
 import { serverEnv } from '@/lib/env/server';
 import { smallAssistant } from './agents/smallAssistant';
+import { researchWorkflow } from './workflows/researchWorkflow';
 
 export const mastra = new Mastra({
-	workflows: { cwvInsightsWorkflow },
+	workflows: { cwvInsightsWorkflow, researchWorkflow },
 	agents: { routerAgent, smallAssistant },
 	logger: createLogger({
 		name: 'Mastra',
