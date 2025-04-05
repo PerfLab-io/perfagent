@@ -706,7 +706,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 									{
 										role: 'assistant',
 										content:
-											'Unclear user request, I should ask for clarification as I have no trace or metrics data to process',
+											'User request is missing required data for analysis, I should kindly prompt the user to attach the trace json file containing the data to process the request. I should remind the user that I only process Google Chrome trace files and refer to the official blog post: https://developer.chrome.com/blog/devtools-tips-39?hl=en.',
 									},
 								]);
 								stream.mergeIntoDataStream(dataStreamWriter);
