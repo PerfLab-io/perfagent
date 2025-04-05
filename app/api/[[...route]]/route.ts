@@ -24,6 +24,7 @@ import { randomUUID } from 'crypto';
 import { mastra } from '@/lib/ai/mastra';
 import { perflab } from '@/lib/ai/modelProvider';
 import { langfuse } from '@/lib/tools/langfuse';
+import { Agent } from '@mastra/core/agent';
 
 export const runtime = 'nodejs';
 
@@ -106,7 +107,10 @@ const tavlyResearchTool = tool({
 			return {
 				type: 'research',
 				query,
-				error: error.message || 'Failed to fetch research information',
+				error:
+					error instanceof Error
+						? error.message
+						: 'Failed to fetch research information',
 				results: [],
 			};
 		}
@@ -580,66 +584,133 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 								type: 'research',
 								toolCallId,
 								query,
-								error: error.message || 'Failed to perform research',
+								error:
+									error instanceof Error
+										? error.message
+										: 'Failed to perform research',
 								results: [],
 							};
 						}
 					},
 				});
 
-				const insightsWorkflow = mastra.getWorkflow('insightsWorkflow');
-
 				if (insights) {
 					console.log('insights ', insights);
 
-					const run = insightsWorkflow.createRun();
+					const routerAgent = new Agent({
+						name: 'PerfAgent router',
+						instructions: dedent`
+							You are a sentiment analysis and smart router that will analyse user messages and output a JSON object with the following fields:
+							- workflow: The workflow to use in case the user message requires any form of deeper analysis. Null if a simple response is sufficient.
+							- toolRequired: A number between 0 and 1 (0 - 100 percent) with the certainty of a need or not of a tool call based on the user sentiment and message, also taking in consideration the current context of previous messages.
 
-					const unsubscribe = run.watch((event) => {
-						console.log('========== event', event);
+							You have the following workflows available:
+							- insightsWorkflow: A workflow that will analyse a trace file or user's metrics data and provide insights about the performance. This workflow is not required for general questions about performance, only for use when user's message is related 'their' metrics or trace data.
+							- researchWorkflow: A workflow that will research a given topic and provide a report about the findings.
+
+							Example possible outcome:
+							{ // User asks about his own performance metrics but there's a medium level of uncertainty if you should use the insightsWorkflow or the researchWorkflow, so you preffer to choose the insightsWorkflow
+								workflow: 'insightsWorkflow',
+								toolRequired: 0.5,
+							}
+
+							{ // User asks about his own specific performance metric or trace related question
+								workflow: 'insightsWorkflow',
+								toolRequired: 1,
+							}
+
+							{ // User asks about a specific performance metric or trace related question but it is not related to the user's own metrics or trace data
+								workflow: 'researchWorkflow',
+								toolRequired: 1,
+							}
+
+							{ // User asks a general question, or a general question about performance metrics or traces, without mentioning his own metrics or trace data so we should reply with a general answer and not use any tool
+								workflow: null,
+								toolRequired: 0.8,
+							}
+
+							You can only pick one workflow when deeper analysis is required. The output will be used to route the user's request or ask for clarification if needed.
+						`,
+						model: perflab.languageModel('topics_model'),
 					});
 
-					const _run = await run.start({
-						triggerData: {
-							insights,
-							dataStream: dataStreamWriter,
-							messages,
-						},
+					const { object } = await routerAgent.generate(messages, {
+						output: z.object({
+							workflow: z
+								.enum(['insightsWorkflow', 'researchWorkflow'])
+								.nullable()
+								.describe(
+									'The workflow to use in case the user message requires any form of deeper analysis. Null if a simple response is sufficient.',
+								),
+							toolRequired: z
+								.number()
+								.min(0)
+								.max(1)
+								.describe(
+									'A number between 0 and 1 (0 - 100 percent) with the certainty of a need of a tool call based on the user sentiment and message, also taking in consideration the current context of previous messages.',
+								),
+						}),
 					});
 
-					console.log('run', _run);
-					unsubscribe();
+					console.log('object ', object);
 
-					const traceInsightStream = streamText({
-						model: perflab.languageModel(model),
-						temperature: 0,
-						experimental_telemetry: {
-							isEnabled: true,
-							functionId: `trace-analysis-llm-call`,
-							metadata: {
-								langfuseTraceId: parentTraceId,
-								langfuseUpdateParent: false, // Do not update the parent trace with execution results
+					if (object.workflow === 'insightsWorkflow') {
+						const insightsWorkflow = mastra.getWorkflow('insightsWorkflow');
+						const run = insightsWorkflow.createRun();
+
+						const unsubscribe = run.watch((event) => {
+							console.log('========== event', event);
+						});
+
+						const _run = await run.start({
+							triggerData: {
+								insights,
+								dataStream: dataStreamWriter,
+								messages,
 							},
-						},
-						messages,
-						system: largeModelSystemPrompt,
-						onFinish(event) {
-							console.log(
-								'######################### traceReportStream onFinish #################################',
-							);
-							console.log('Fin reason: ', event.finishReason);
-							console.log('Reasoning: ', event.reasoning);
-							console.log('reasoning details: ', event.reasoningDetails);
-							console.log('Messages: ', event.response.messages);
-						},
-						onError(event) {
-							console.log('Error: ', event.error);
-						},
-					});
+						});
 
-					traceInsightStream.mergeIntoDataStream(dataStreamWriter, {
-						sendReasoning: true,
-						sendSources: true,
-					});
+						console.log('run', _run);
+						unsubscribe();
+					} else if (object.workflow === 'researchWorkflow') {
+						// const researchWorkflow = mastra.getWorkflow('researchWorkflow');
+						// const run = researchWorkflow.createRun();
+						// const unsubscribe = run.watch((event) => {
+						// 	console.log('========== event', event);
+						// });
+					} else {
+						const traceInsightStream = streamText({
+							model: perflab.languageModel(model),
+							temperature: 0,
+							experimental_telemetry: {
+								isEnabled: true,
+								functionId: `trace-analysis-llm-call`,
+								metadata: {
+									langfuseTraceId: parentTraceId,
+									langfuseUpdateParent: false, // Do not update the parent trace with execution results
+								},
+							},
+							messages,
+							system: largeModelSystemPrompt,
+							onFinish(event) {
+								console.log(
+									'######################### traceReportStream onFinish #################################',
+								);
+								console.log('Fin reason: ', event.finishReason);
+								console.log('Reasoning: ', event.reasoning);
+								console.log('reasoning details: ', event.reasoningDetails);
+								console.log('Messages: ', event.response.messages);
+							},
+							onError(event) {
+								console.log('Error: ', event.error);
+							},
+						});
+
+						traceInsightStream.mergeIntoDataStream(dataStreamWriter, {
+							sendReasoning: true,
+							sendSources: true,
+						});
+					}
 				} else {
 					const traceReportStream = streamText({
 						model: perflab.languageModel(model),
@@ -698,15 +769,16 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 	} catch (error) {
 		console.error('Error in chat API:', error);
 
-		if (error.name === 'AbortError') {
+		if (error instanceof Error && error.name === 'AbortError') {
 			// Return a specific status code for aborted requests
 			console.log('Returning aborted response');
+			// @ts-expect-error - 499 status code is not standard, but it refers for user cancellation
 			return c.json({ error: 'Request aborted' }, 499);
 		}
 		return c.json(
 			{
 				error: 'Internal server error',
-				message: error.message || 'Unknown error',
+				message: error instanceof Error ? error.message : 'Unknown error',
 			},
 			500,
 		);
