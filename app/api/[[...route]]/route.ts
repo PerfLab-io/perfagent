@@ -594,163 +594,199 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 					},
 				});
 
-				if (insights) {
-					console.log('insights ', insights);
+				console.log('insights ', insights);
 
-					const routerAgent = new Agent({
-						name: 'PerfAgent router',
-						instructions: dedent`
-							You are a sentiment analysis and smart router that will analyse user messages and output a JSON object with the following fields:
+				const routerAgent = new Agent({
+					name: 'PerfAgent router',
+					instructions: dedent`
+							You are a sentiment analysis and smart router that will analyse user messages and requests about web performance and core web vitals and output a JSON object with the following fields:
 							- workflow: The workflow to use in case the user message requires any form of deeper analysis. Null if a simple response is sufficient.
-							- toolRequired: A number between 0 and 1 (0 - 100 percent) with the certainty of a need or not of a tool call based on the user sentiment and message, also taking in consideration the current context of previous messages.
+							- certainty: A number between 0 and 1 (0 - 100 percent) with the certainty of a need or not of a tool call based on the user sentiment and message, also taking in consideration the current context of previous messages.
 
 							You have the following workflows available:
 							- insightsWorkflow: A workflow that will analyse a trace file or user's metrics data and provide insights about the performance. This workflow is not required for general questions about performance, only for use when user's message is related 'their' metrics or trace data.
 							- researchWorkflow: A workflow that will research a given topic and provide a report about the findings.
 
 							Example possible outcome:
-							{ // User asks about his own performance metrics but there's a medium level of uncertainty if you should use the insightsWorkflow or the researchWorkflow, so you preffer to choose the insightsWorkflow
+							{ // I may need the insights workflow: User asks about his own performance metrics but there's a medium level of uncertainty if you should use the insightsWorkflow or the researchWorkflow, so you preffer to choose the insightsWorkflow
 								workflow: 'insightsWorkflow',
-								toolRequired: 0.5,
+								certainty: 0.5,
 							}
 
-							{ // User asks about his own specific performance metric or trace related question
+							{ // I need the insights workflow: User asks about his own specific performance metric or trace related question
 								workflow: 'insightsWorkflow',
-								toolRequired: 1,
+								certainty: 1,
 							}
 
-							{ // User asks about a specific performance metric or trace related question but it is not related to the user's own metrics or trace data
+							{ // I need the research workflow: User asks about a specific performance metric or trace related question but it is not related to the user's own metrics or trace data
 								workflow: 'researchWorkflow',
-								toolRequired: 1,
+								certainty: 1,
 							}
 
-							{ // User asks a general question, or a general question about performance metrics or traces, without mentioning his own metrics or trace data so we should reply with a general answer and not use any tool
+							{ // I don't need a workflow: User asks a general question or simply expresses some general sentiment, or a general question about performance metrics or traces, without mentioning his own metrics or trace data so we should reply with a general answer and not use any tool
 								workflow: null,
-								toolRequired: 0.8,
+								certainty: 0.8,
 							}
 
-							You can only pick one workflow when deeper analysis is required. The output will be used to route the user's request or ask for clarification if needed.
+							You can only pick one workflow when deeper analysis is required. If you KNOW the user's request DOES NOT require a workflow, same as when you KNOW the user's request DOES require a certain workflow, the certainty should be 1 or as close to 1 as possible.
+							The output will be used to route the user's request to the appropriate workflow or ask for clarification if needed.
 						`,
+					model: perflab.languageModel('topics_model'),
+				});
+
+				const { object } = await routerAgent.generate(messages, {
+					output: z.object({
+						workflow: z
+							.enum(['insightsWorkflow', 'researchWorkflow'])
+							.nullable()
+							.describe(
+								'The workflow to use in case the user message requires any form of deeper analysis. Null if a simple response is sufficient.',
+							),
+						certainty: z
+							.number()
+							.min(0)
+							.max(1)
+							.describe(
+								'A number between 0 and 1 (0 - 100 percent) with the certainty of a need or not of a workflow based on the user sentiment and message, also taking in consideration the current context of previous messages.',
+							),
+					}),
+				});
+
+				console.log('object ', object);
+
+				if (object.certainty < 0.5) {
+					const smallAssistant = new Agent({
+						name: 'PerfAgent assistant',
+						instructions: largeModelSystemPrompt,
 						model: perflab.languageModel('topics_model'),
 					});
 
-					const { object } = await routerAgent.generate(messages, {
-						output: z.object({
-							workflow: z
-								.enum(['insightsWorkflow', 'researchWorkflow'])
-								.nullable()
-								.describe(
-									'The workflow to use in case the user message requires any form of deeper analysis. Null if a simple response is sufficient.',
-								),
-							toolRequired: z
-								.number()
-								.min(0)
-								.max(1)
-								.describe(
-									'A number between 0 and 1 (0 - 100 percent) with the certainty of a need of a tool call based on the user sentiment and message, also taking in consideration the current context of previous messages.',
-								),
-						}),
-					});
-
-					console.log('object ', object);
-
-					if (object.workflow === 'insightsWorkflow') {
-						const insightsWorkflow = mastra.getWorkflow('insightsWorkflow');
-						const run = insightsWorkflow.createRun();
-
-						const unsubscribe = run.watch((event) => {
-							console.log('========== event', event);
-						});
-
-						const _run = await run.start({
-							triggerData: {
-								insights,
-								dataStream: dataStreamWriter,
-								messages,
-							},
-						});
-
-						console.log('run', _run);
-						unsubscribe();
-					} else if (object.workflow === 'researchWorkflow') {
-						// const researchWorkflow = mastra.getWorkflow('researchWorkflow');
-						// const run = researchWorkflow.createRun();
-						// const unsubscribe = run.watch((event) => {
-						// 	console.log('========== event', event);
-						// });
-					} else {
-						const traceInsightStream = streamText({
-							model: perflab.languageModel(model),
-							temperature: 0,
-							experimental_telemetry: {
-								isEnabled: true,
-								functionId: `trace-analysis-llm-call`,
-								metadata: {
-									langfuseTraceId: parentTraceId,
-									langfuseUpdateParent: false, // Do not update the parent trace with execution results
-								},
-							},
-							messages,
-							system: largeModelSystemPrompt,
-							onFinish(event) {
-								console.log(
-									'######################### traceReportStream onFinish #################################',
-								);
-								console.log('Fin reason: ', event.finishReason);
-								console.log('Reasoning: ', event.reasoning);
-								console.log('reasoning details: ', event.reasoningDetails);
-								console.log('Messages: ', event.response.messages);
-							},
-							onError(event) {
-								console.log('Error: ', event.error);
-							},
-						});
-
-						traceInsightStream.mergeIntoDataStream(dataStreamWriter, {
-							sendReasoning: true,
-							sendSources: true,
-						});
-					}
-				} else {
-					const traceReportStream = streamText({
-						model: perflab.languageModel(model),
-						temperature: 0,
-						experimental_telemetry: {
-							isEnabled: true,
-							functionId: `trace-report-llm-call`,
-							metadata: {
-								langfuseTraceId: parentTraceId,
-								langfuseUpdateParent: false, // Do not update the parent trace with execution results
-							},
+					const stream = await smallAssistant.stream([
+						...messages,
+						{
+							role: 'assistant',
+							content:
+								'Unclear user request, I should kindly ask for clarification and steer the conversation back on track.',
 						},
-						messages,
-						system: dedent`${baseSystemPrompt}
+					]);
+					stream.mergeIntoDataStream(dataStreamWriter, {
+						sendReasoning: true,
+						sendSources: true,
+					});
+				} else {
+					switch (object.workflow) {
+						case 'insightsWorkflow':
+							if (insights) {
+								const insightsWorkflow = mastra.getWorkflow('insightsWorkflow');
+								const run = insightsWorkflow.createRun();
+
+								const unsubscribe = run.watch((event) => {
+									console.log('========== event', event);
+								});
+
+								const _run = await run.start({
+									triggerData: {
+										insights,
+										dataStream: dataStreamWriter,
+										messages,
+									},
+								});
+
+								console.log('run', _run);
+								unsubscribe();
+							} else {
+								const smallAssistant = new Agent({
+									name: 'PerfAgent assistant',
+									instructions: largeModelSystemPrompt,
+									model: perflab.languageModel('topics_model'),
+								});
+
+								const stream = await smallAssistant.stream([
+									...messages,
+									{
+										role: 'assistant',
+										content:
+											'Unclear user request, I should ask for clarification as I have no trace or metrics data to process',
+									},
+								]);
+								stream.mergeIntoDataStream(dataStreamWriter);
+							}
+							break;
+						case 'researchWorkflow':
+							const traceReportStream = streamText({
+								model: perflab.languageModel(model),
+								temperature: 0,
+								experimental_telemetry: {
+									isEnabled: true,
+									functionId: `trace-report-llm-call`,
+									metadata: {
+										langfuseTraceId: parentTraceId,
+										langfuseUpdateParent: false, // Do not update the parent trace with execution results
+									},
+								},
+								messages,
+								system: dedent`${baseSystemPrompt}
 						
 						${toolUsagePrompt}
 						
 						No trace file provided.
 						`,
-						tools: {
-							researchTool,
-						},
-						onFinish(event) {
-							console.log(
-								'######################### traceReportStream onFinish #################################',
-							);
-							console.log('Fin reason: ', event.finishReason);
-							console.log('Reasoning: ', event.reasoning);
-							console.log('reasoning details: ', event.reasoningDetails);
-							console.log('Messages: ', event.response.messages);
-						},
-						onError(event) {
-							console.log('Error: ', event.error);
-						},
-					});
+								tools: {
+									researchTool,
+								},
+								onFinish(event) {
+									console.log(
+										'######################### traceReportStream onFinish #################################',
+									);
+									console.log('Fin reason: ', event.finishReason);
+									console.log('Reasoning: ', event.reasoning);
+									console.log('reasoning details: ', event.reasoningDetails);
+									console.log('Messages: ', event.response.messages);
+								},
+								onError(event) {
+									console.log('Error: ', event.error);
+								},
+							});
 
-					traceReportStream.mergeIntoDataStream(dataStreamWriter, {
-						sendReasoning: true,
-						sendSources: true,
-					});
+							traceReportStream.mergeIntoDataStream(dataStreamWriter, {
+								sendReasoning: true,
+								sendSources: true,
+							});
+							break;
+						default:
+							const traceInsightStream = streamText({
+								model: perflab.languageModel(model),
+								temperature: 0,
+								experimental_telemetry: {
+									isEnabled: true,
+									functionId: `trace-analysis-llm-call`,
+									metadata: {
+										langfuseTraceId: parentTraceId,
+										langfuseUpdateParent: false, // Do not update the parent trace with execution results
+									},
+								},
+								messages,
+								system: largeModelSystemPrompt,
+								onFinish(event) {
+									console.log(
+										'######################### traceReportStream onFinish #################################',
+									);
+									console.log('Fin reason: ', event.finishReason);
+									console.log('Reasoning: ', event.reasoning);
+									console.log('reasoning details: ', event.reasoningDetails);
+									console.log('Messages: ', event.response.messages);
+								},
+								onError(event) {
+									console.log('Error: ', event.error);
+								},
+							});
+
+							traceInsightStream.mergeIntoDataStream(dataStreamWriter, {
+								sendReasoning: true,
+								sendSources: true,
+							});
+							break;
+					}
 				}
 			},
 			onError: (error) => {
