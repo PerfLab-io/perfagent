@@ -8,7 +8,7 @@ import { serverEnv } from '@/lib/env/server';
 import { tavily, type TavilyClient } from '@tavily/core';
 import { Agent } from '@mastra/core/agent';
 import { langfuse } from '@/lib/tools/langfuse';
-import { largeModelSystemPrompt } from '../../prompts';
+import { largeModelSystemPrompt } from '@/lib/ai/prompts';
 
 const messageSchema = coreMessageSchema;
 
