@@ -1,19 +1,6 @@
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { Agent } from '@mastra/core/agent';
 import { weatherTool } from '../tools';
-
-const google = createGoogleGenerativeAI({
-	apiKey: 'AIzaSyD8CpDg19RmzKDYgQEPfJ7DUt4xFnVK8eA',
-});
-
-const googleModels = {
-	default_model: google('gemini-2.0-flash', {
-		structuredOutputs: true,
-	}),
-	topics_model: google('gemini-2.0-flash-lite', {
-		structuredOutputs: true,
-	}),
-};
+import { perflab } from '../../modelProvider';
 
 export const weatherAgent = new Agent({
 	name: 'Weather Agent',
@@ -29,6 +16,6 @@ export const weatherAgent = new Agent({
 
       Use the weatherTool to fetch current weather data.
 `,
-	model: googleModels.default_model,
+	model: perflab.languageModel('default_model'),
 	tools: { weatherTool },
 });

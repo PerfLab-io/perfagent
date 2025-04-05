@@ -2,15 +2,11 @@ import { serverEnv } from '@/lib/env/server';
 import { tavily } from '@tavily/core';
 import {
 	convertToCoreMessages,
-	customProvider,
 	streamText,
 	createDataStream,
 	tool,
-	wrapLanguageModel,
-	simulateStreamingMiddleware,
 	generateObject,
 } from 'ai';
-import { createOpenAI } from '@ai-sdk/openai';
 import dedent from 'dedent';
 import { analyseInsightsForCWV } from '@/lib/insights';
 import { z } from 'zod';
@@ -18,65 +14,18 @@ import {
 	baseSystemPrompt,
 	largeModelSystemPrompt,
 	toolUsagePrompt,
-} from '@/lib/ai/model';
+} from '@/lib/ai/prompts';
 import { Hono } from 'hono';
 import { handle } from 'hono/vercel';
 import { stream } from 'hono/streaming';
 import { zValidator } from '@hono/zod-validator';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { UserInteractionsData } from '@paulirish/trace_engine/models/trace/handlers/UserInteractionsHandler';
-import { Langfuse } from 'langfuse';
 import { randomUUID } from 'crypto';
 import { mastra } from '@/lib/ai/mastra';
+import { perflab } from '@/lib/ai/modelProvider';
+import { langfuse } from '@/lib/tools/langfuse';
 
 export const runtime = 'nodejs';
-
-const local = createOpenAI({
-	baseURL: 'http://localhost:11434/v1',
-	apiKey: 'ollama', // required but unused
-});
-
-const middleware = simulateStreamingMiddleware();
-
-const localModels = {
-	default_model: wrapLanguageModel({
-		model: local('qwen2.5-coder:14b', {
-			structuredOutputs: true,
-		}),
-		middleware,
-	}),
-	topics_model: wrapLanguageModel({
-		model: local('llama3.1:8b', {
-			structuredOutputs: true,
-		}),
-		middleware,
-	}),
-};
-
-const google = createGoogleGenerativeAI({
-	apiKey: serverEnv.GEMINI_API_KEY,
-});
-
-const googleModels = {
-	default_model: google('gemini-2.0-flash', {
-		structuredOutputs: true,
-	}),
-	topics_model: google('gemini-2.0-flash-lite', {
-		structuredOutputs: true,
-	}),
-};
-
-const perfAgent = customProvider({
-	languageModels:
-		// process.env.NODE_ENV === 'development' ? localModels : googleModels,
-		googleModels,
-});
-
-const langfuse = new Langfuse({
-	secretKey: serverEnv.LANGFUSE_SECRET_KEY,
-	publicKey: serverEnv.LANGFUSE_PUBLIC_KEY,
-	baseUrl: serverEnv.LANGFUSE_BASEURL,
-});
 
 // Define tool schemas
 const traceAnalysisToolSchema = z.object({
@@ -283,7 +232,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 
 							// Now generate the research plan
 							const { object: researchPlan } = await generateObject({
-								model: perfAgent.languageModel(model),
+								model: perflab.languageModel(model),
 								temperature: 0,
 								experimental_telemetry: {
 									isEnabled: true,
@@ -512,7 +461,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 								});
 
 								const { object: analysisResult } = await generateObject({
-									model: perfAgent.languageModel(model),
+									model: perflab.languageModel(model),
 									temperature: 0.5,
 									experimental_telemetry: {
 										isEnabled: true,
@@ -577,7 +526,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 							});
 
 							const researchReport = streamText({
-								model: perfAgent.languageModel(model),
+								model: perflab.languageModel(model),
 								temperature: 0,
 								experimental_telemetry: {
 									isEnabled: true,
@@ -661,7 +610,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 					unsubscribe();
 
 					const traceInsightStream = streamText({
-						model: perfAgent.languageModel(model),
+						model: perflab.languageModel(model),
 						temperature: 0,
 						experimental_telemetry: {
 							isEnabled: true,
@@ -693,7 +642,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 					});
 				} else {
 					const traceReportStream = streamText({
-						model: perfAgent.languageModel(model),
+						model: perflab.languageModel(model),
 						temperature: 0,
 						experimental_telemetry: {
 							isEnabled: true,

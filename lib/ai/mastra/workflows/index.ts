@@ -2,63 +2,14 @@ import {
 	grounding,
 	largeModelSystemPrompt,
 	reportFormat,
-} from '@/lib/ai/model';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import {
-	coreMessageSchema,
-	customProvider,
-	DataStreamWriter,
-	simulateStreamingMiddleware,
-	wrapLanguageModel,
-} from 'ai';
-import { serverEnv } from '@/lib/env/server';
-import { createOpenAI } from '@ai-sdk/openai';
+} from '@/lib/ai/prompts';
+import { coreMessageSchema, DataStreamWriter } from 'ai';
 
 import { Agent } from '@mastra/core/agent';
 import { Step, Workflow } from '@mastra/core/workflows';
 import { z } from 'zod';
 import dedent from 'dedent';
-
-const local = createOpenAI({
-	baseURL: 'http://localhost:11434/v1',
-	apiKey: 'ollama', // required but unused
-});
-
-const middleware = simulateStreamingMiddleware();
-
-const localModels = {
-	default_model: wrapLanguageModel({
-		model: local('qwen2.5-coder:14b', {
-			structuredOutputs: true,
-		}),
-		middleware,
-	}),
-	topics_model: wrapLanguageModel({
-		model: local('llama3.1:8b', {
-			structuredOutputs: true,
-		}),
-		middleware,
-	}),
-};
-
-const google = createGoogleGenerativeAI({
-	apiKey: serverEnv.GEMINI_API_KEY,
-});
-
-const googleModels = {
-	default_model: google('gemini-2.0-flash', {
-		structuredOutputs: true,
-	}),
-	topics_model: google('gemini-2.0-flash-lite', {
-		structuredOutputs: true,
-	}),
-};
-
-const perflab = customProvider({
-	languageModels:
-		// process.env.NODE_ENV === 'development' ? localModels : googleModels,
-		googleModels,
-});
+import { perflab } from '@/lib/ai/modelProvider';
 
 const topicsAgent = new Agent({
 	name: 'Web Performance Insights and Research Agent',
