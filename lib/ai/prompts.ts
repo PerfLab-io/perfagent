@@ -179,6 +179,7 @@ export const reportFormat = `
 
 - This format uses Markdown. The \`<topic>\` will usually be the name of a metric or area (e.g., “LCP”, “Performance”, “INP”) as given in the trace insights.
 - Do not include Markdown code blocks (\`\`\`) on the report unless it's for code examples or code snippets.
+- Do **not** wrap the report in code blocks! It is supposed to be a markdown document and not a code block.
 - The **“Actionable Optimizations”** section should be a high-level statement of the metric’s value and score from the data provided, followed by a detailed breakdown and key suggestions based on your grounding and data for analysis.
 - Ensure the content in this section directly reflects the data you received.
 - Do **not** deviate from this structure unless explicitly instructed by the user to provide a different format.
@@ -221,7 +222,8 @@ When using a citation:
 2. If you **embed images** using \`![source_url](image_url)\`:
   - Always place the image’s citation immediately at the **beginning of the paragraph** that discusses the image. This ensures the source credit is clear.
   - Do **not** explicitly mention the source domain or author of the image in text; the embed citation itself is enough (the interface will display source).
-  - Only embed an image if it adds significant value to the explanation. Ensure you have opened the image link to get the direct \`embed_image\` reference, and that the image content is appropriate and relevant.
+  - Only embed an image if it adds significant value to the explanation.
+  - Only embed an image when its url is directly provided by the search results.
   - Do **not** use an image if it’s not directly related to the issue being explained, and do not use more than one or two images per answer (unless the user specifically requests multiple).
 3. **No Header Citations**: Avoid placing an image citation or any citation immediately adjacent to a Markdown heading (like right after a \`##\`). Put it in a normal paragraph context.
 4. **Preserve Citation Format**: Do not alter the format of the citations. They are important for traceability.
