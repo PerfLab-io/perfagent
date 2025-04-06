@@ -3,12 +3,8 @@ import { CoreMessage, coreMessageSchema, DataStreamWriter } from 'ai';
 import { Step, Workflow } from '@mastra/core/workflows';
 import { z } from 'zod';
 import dedent from 'dedent';
-import { perflab } from '@/lib/ai/modelProvider';
 import { serverEnv } from '@/lib/env/server';
 import { tavily, type TavilyClient } from '@tavily/core';
-import { Agent } from '@mastra/core/agent';
-import { langfuse } from '@/lib/tools/langfuse';
-import { largeModelSystemPrompt } from '@/lib/ai/prompts';
 
 const messageSchema = coreMessageSchema;
 
@@ -233,10 +229,9 @@ const searchWeb = new Step({
 	id: 'search-web',
 	description:
 		'Searches the web based on the data from the research steps plan',
-	execute: async ({ context, runId: toolCallId }) => {
+	execute: async ({ context, runId: toolCallId, mastra }) => {
 		const triggerData = context?.getStepResult<{
 			dataStream: DataStreamWriter;
-			parentTraceId: string;
 		}>('trigger');
 		const researchStepsStepResult =
 			context?.getStepResult<z.infer<typeof researchStepsSchema>>(
@@ -246,12 +241,15 @@ const searchWeb = new Step({
 		if (!triggerData) {
 			throw new Error('Trigger data not found');
 		}
+		if (!mastra) {
+			throw new Error('Mastra not found');
+		}
 
 		if (!tav) {
 			throw new Error('Tavily client not found');
 		}
 
-		const { dataStream: dataStreamWriter, parentTraceId } = triggerData;
+		const { dataStream: dataStreamWriter } = triggerData;
 		const { stepIds, completedSteps, totalSteps } = researchStepsStepResult;
 
 		const searchResults: z.infer<typeof searchWebSchema>['searchResults'] = [];
@@ -273,23 +271,17 @@ const searchWeb = new Step({
 				},
 			});
 
-			const startTime = new Date();
+			const span = mastra.getTelemetry()?.tracer.startSpan('search-web');
+
+			if (span) {
+				span.setAttribute('query', step.query.query);
+			}
 
 			const webResults = await tav.search(step.query.query, {
 				searchDepth: depth,
 				includeAnswer: true,
 				includeDomains: [...trustedDomains],
 				maxResults: Math.min(6 - step.query.priority, 10),
-			});
-
-			langfuse.span({
-				name: `search-web`,
-				metadata: {
-					query: step.query.query,
-				},
-				traceId: parentTraceId,
-				startTime,
-				endTime: new Date(),
 			});
 
 			searchResults.push({
@@ -304,6 +296,10 @@ const searchWeb = new Step({
 			});
 
 			_newCompletedSteps++;
+
+			if (span) {
+				span.end();
+			}
 
 			// Send progress annotation for the search step
 			dataStreamWriter.writeMessageAnnotation({
@@ -562,7 +558,6 @@ const researchWorkflow = new Workflow({
 			),
 		}),
 		messages: z.array(messageSchema),
-		parentTraceId: z.string(),
 	}),
 })
 	.step(researchPlanning)

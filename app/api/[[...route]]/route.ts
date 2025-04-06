@@ -7,7 +7,6 @@ import { handle } from 'hono/vercel';
 import { stream } from 'hono/streaming';
 import { zValidator } from '@hono/zod-validator';
 import { UserInteractionsData } from '@paulirish/trace_engine/models/trace/handlers/UserInteractionsHandler';
-import { randomUUID } from 'crypto';
 import { mastra } from '@/lib/ai/mastra';
 import { perflab } from '@/lib/ai/modelProvider';
 import { langfuse } from '@/lib/tools/langfuse';
@@ -38,16 +37,6 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 		const userInteractions: UserInteractionsData = body.userInteractions;
 		const model = body.model;
 		const traceFile = body.traceFile;
-		const parentTraceId = randomUUID();
-
-		langfuse.trace({
-			id: parentTraceId,
-			name: 'chat-api-call',
-			metadata: {
-				model,
-				environment: process.env.NODE_ENV,
-			},
-		});
 
 		if (messages.length === 0) {
 			return c.json({ error: 'No messages provided' }, 400);
@@ -133,7 +122,6 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 								triggerData: {
 									messages,
 									dataStream: dataStreamWriter,
-									parentTraceId,
 								},
 							});
 
