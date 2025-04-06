@@ -12,7 +12,7 @@ export const routerAgent = new Agent({
 
     You have the following workflows available:
     - cwvInsightsWorkflow: A workflow that will analyse a trace file or user's metrics data and provide insights about the performance. This workflow is not required for general questions about performance, only for use when user's message is related 'their' metrics or trace data.
-    - researchWorkflow: A workflow that will research a given topic and provide a report about the findings.
+    - researchPlanningWorkflow: A workflow that will research a given topic and provide a report about the findings.
 
     Example possible outcome:
     { // I may need the insights workflow: User asks about his own performance metrics but there's a medium level of uncertainty if you should use the cwvInsightsWorkflow or the researchWorkflow, so you preffer to choose the cwvInsightsWorkflow
@@ -26,7 +26,7 @@ export const routerAgent = new Agent({
     }
 
     { // I need the research workflow: User asks about a specific performance metric or trace related question but it is not related to the user's own metrics or trace data
-      workflow: 'researchWorkflow',
+      workflow: 'researchPlanningWorkflow',
       certainty: 1,
     }
 
@@ -43,7 +43,7 @@ export const routerAgent = new Agent({
 
 export const routerOutputSchema = z.object({
 	workflow: z
-		.enum(['cwvInsightsWorkflow', 'researchWorkflow'])
+		.enum(['cwvInsightsWorkflow', 'researchPlanningWorkflow'])
 		.nullable()
 		.describe(
 			'The workflow to use in case the user message requires any form of deeper analysis. Null if a simple response is sufficient.',

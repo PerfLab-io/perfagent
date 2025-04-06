@@ -1,15 +1,8 @@
-import {
-	grounding,
-	largeModelSystemPrompt,
-	reportFormat,
-} from '@/lib/ai/prompts';
+import { reportFormat } from '../../../ai/prompts';
 import { coreMessageSchema, DataStreamWriter } from 'ai';
 
-import { Agent } from '@mastra/core/agent';
 import { Step, Workflow } from '@mastra/core/workflows';
 import { z } from 'zod';
-import dedent from 'dedent';
-import { perflab } from '@/lib/ai/modelProvider';
 
 const messageSchema = coreMessageSchema;
 
@@ -180,7 +173,7 @@ const analyzeTrace = new Step({
 });
 
 const cwvInsightsWorkflow = new Workflow({
-	name: 'trace-analysis-workflow',
+	name: 'cwvInsightsWorkflow',
 	triggerSchema: z.object({
 		dataStream: z.object({
 			writeMessageAnnotation: z.function().args(

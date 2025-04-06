@@ -33,7 +33,8 @@ import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { FeedbackButtons } from '@/components/feedback-buttons';
 import { filterProgressSteps } from '@/lib/filter-progress';
-
+import { researchStepsSchema } from '@/lib/ai/mastra/workflows/researchWorkflow';
+import { z } from 'zod';
 /**
  * Types and Interfaces
  */
@@ -119,6 +120,11 @@ interface ResearchCardProps {
 	};
 	annotations?: ResearchMessageAnnotation[];
 }
+export type ResearchApprovalEvent = {
+	approved: boolean;
+	requestId: string;
+	researchPlan: z.infer<typeof researchStepsSchema>;
+};
 
 /**
  * Context for sharing research data across components
@@ -127,10 +133,15 @@ const ResearchContext = React.createContext<{
 	state: ResearchContextState;
 	setState: React.Dispatch<React.SetStateAction<ResearchContextState>>;
 	onAbort?: (toolCallId?: string) => void;
+	onSubmitApproval?: (
+		approvalEvent: ResearchApprovalEvent,
+		e: React.FormEvent,
+	) => void;
 }>({
 	state: {},
 	setState: () => {},
 	onAbort: undefined,
+	onSubmitApproval: undefined,
 });
 
 /**
@@ -139,9 +150,14 @@ const ResearchContext = React.createContext<{
 export function ResearchProvider({
 	children,
 	onAbort,
+	onSubmitApproval,
 }: {
 	children: React.ReactNode;
 	onAbort?: (toolCallId?: string) => void;
+	onSubmitApproval?: (
+		approvalEvent: ResearchApprovalEvent,
+		e: React.FormEvent,
+	) => void;
 }) {
 	const [state, setState] = useState<ResearchContextState>({});
 
@@ -151,6 +167,7 @@ export function ResearchProvider({
 				state,
 				setState,
 				onAbort,
+				onSubmitApproval,
 			}}
 		>
 			{children}
@@ -162,7 +179,8 @@ export function ResearchProvider({
  * Custom hook for accessing and updating research state
  */
 function useResearch(id: string) {
-	const { state, setState, onAbort } = useContext(ResearchContext);
+	const { state, setState, onAbort, onSubmitApproval } =
+		useContext(ResearchContext);
 
 	const updateState = useCallback(
 		(update: Partial<ResearchInstance>) => {
@@ -181,6 +199,7 @@ function useResearch(id: string) {
 		data: state[id] || getInitialResearchState(),
 		updateState,
 		onAbort,
+		onSubmitApproval,
 	};
 }
 
@@ -323,7 +342,7 @@ const utils = {
  */
 export function ResearchCard({ query, annotations }: ResearchCardProps) {
 	// Context and state management
-	const { onAbort: contextOnAbort } = useResearch('asd');
+	const { onAbort: contextOnAbort, onSubmitApproval } = useResearch('asd');
 
 	const [isCardExpanded, setIsCardExpanded] = useState(true);
 	const [isCancelled, setIsCancelled] = useState(false);
@@ -455,6 +474,8 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 							? 'in-progress'
 							: 'pending';
 
+				console.log(data.stepsPlanned);
+
 				updates.steps[existingStepIndex] = {
 					...currentStep,
 					iteration: stepIteration,
@@ -476,6 +497,9 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 					message: data.message || currentStep.message,
 					status: newStatus,
 					expanded: newStatus !== 'complete',
+					// @ts-ignore
+					runId: toolCallId,
+					researchPlan: data.stepsPlanned,
 				};
 			}
 
@@ -704,6 +728,7 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 
 					<div className="space-y-3">
 						{steps.map((step, index) => {
+							console.log(step);
 							return (
 								<div
 									key={`${step.id}-${index}`}
@@ -756,6 +781,32 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 											{renderStepContent(step.id)}
 										</div>
 									)}
+
+									{step.id === 'research_plan' &&
+										step.status === 'complete' &&
+										// @ts-ignore
+										step.researchPlan && (
+											<Button
+												variant="outline"
+												size="sm"
+												className="mt-2"
+												onClick={(e) =>
+													onSubmitApproval?.(
+														// @ts-ignore
+														{
+															approved: true,
+															// @ts-ignore
+															requestId: step.runId,
+															// @ts-ignore
+															researchPlan: step.researchPlan,
+														},
+														e as React.FormEvent,
+													)
+												}
+											>
+												View Research Plan
+											</Button>
+										)}
 								</div>
 							);
 						})}

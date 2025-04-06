@@ -12,12 +12,16 @@ import { FileDropzone } from '@/components/file-dropzone';
 import { DataPanel } from '@/components/data-panel';
 import { MarkdownReport } from '@/components/markdown-report';
 import { cn, yieldToMain } from '@/lib/utils';
-import { ResearchProvider } from '@/components/research-card';
+import {
+	ResearchApprovalEvent,
+	ResearchProvider,
+} from '@/components/research-card';
 import { useChat } from '@ai-sdk/react';
 import { analyzeTraceFromFile, TraceAnalysis } from '@/lib/trace';
 import { FileContextSection } from '@/components/trace-details';
 import { analyseInsightsForCWV } from '@/lib/insights';
-
+import { researchPlanSchema } from '@/lib/ai/mastra/workflows/researchWorkflow';
+import { z } from 'zod';
 /**
  * Type definition for the report data structure
  */
@@ -198,6 +202,32 @@ export default function AiChatPage() {
 			setCurrentNavigation(navigationId);
 		},
 		[setCurrentNavigation],
+	);
+
+	const handleSubmitApproval = useCallback(
+		(approvalEvent: ResearchApprovalEvent, e: React.FormEvent) => {
+			e.preventDefault();
+			console.log('handleSubmitApproval', approvalEvent, e);
+			fetch('/api/chat', {
+				method: 'POST',
+				headers: {
+					Accept: 'application/json',
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({
+					researchApproved: approvalEvent.approved,
+					requestId: approvalEvent.requestId,
+					researchPlan: approvalEvent.researchPlan,
+				}),
+			});
+			// originalHandleSubmit(e as any, {
+			// 	body: {
+			// 		researchApproved: approvalEvent.approved,
+			// 		requestId: approvalEvent.requestId,
+			// 	},
+			// });
+		},
+		[],
 	);
 
 	/**
@@ -451,7 +481,10 @@ export default function AiChatPage() {
 		'min-h-[calc(70vh-200px)] max-h-[calc(90vh-200px)]';
 
 	return (
-		<ResearchProvider onAbort={handleAbortResearch}>
+		<ResearchProvider
+			onAbort={handleAbortResearch}
+			onSubmitApproval={handleSubmitApproval}
+		>
 			<div className="flex min-h-screen flex-col bg-background">
 				<div className="relative mb-20 bg-peppermint-200 dark:bg-background">
 					<Header />

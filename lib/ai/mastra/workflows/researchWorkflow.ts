@@ -3,7 +3,7 @@ import { CoreMessage, coreMessageSchema, DataStreamWriter } from 'ai';
 import { Step, Workflow } from '@mastra/core/workflows';
 import { z } from 'zod';
 import dedent from 'dedent';
-import { serverEnv } from '@/lib/env/server';
+import { serverEnv } from '../../../env/server';
 import { tavily, type TavilyClient } from '@tavily/core';
 
 const messageSchema = coreMessageSchema;
@@ -27,7 +27,7 @@ const trustedDomains = [
 
 const depth = 'advanced' as const;
 
-const researchPlanSchema = z.object({
+export const researchPlanSchema = z.object({
 	topic: z.string(),
 	searchQueries: z
 		.array(
@@ -127,6 +127,21 @@ const researchPlanning = new Step({
 				output: researchPlanSchema,
 			});
 
+		dataStreamWriter.writeMessageAnnotation({
+			type: 'research_update',
+			toolCallId,
+			data: {
+				id: `research-plan`,
+				type: 'research_plan',
+				status: 'in-progress',
+				title: 'Research Plan',
+				message: 'Research plan suggestion in progress...',
+				timestamp: Date.now(),
+				researchPlan,
+				completedSteps: 0,
+			},
+		});
+
 		return researchPlan;
 	},
 });
@@ -143,7 +158,8 @@ const analysisSchema = z.object({
 	importance: z.number(),
 });
 
-const researchStepsSchema = z.object({
+export const researchStepsSchema = z.object({
+	researchPlan: researchPlanSchema,
 	stepIds: z.object({
 		searchSteps: z.array(
 			z.object({
@@ -201,8 +217,12 @@ const researchSteps = new Step({
 				title: 'Research Plan',
 				message: 'Research plan created',
 				timestamp: Date.now(),
-				completedSteps,
-				totalSteps,
+				stepsPlanned: {
+					stepIds,
+					completedSteps,
+					totalSteps,
+					researchPlan,
+				},
 			},
 		});
 
@@ -210,6 +230,7 @@ const researchSteps = new Step({
 			stepIds,
 			completedSteps,
 			totalSteps,
+			researchPlan,
 		};
 	},
 });
@@ -232,11 +253,8 @@ const searchWeb = new Step({
 	execute: async ({ context, runId: toolCallId, mastra }) => {
 		const triggerData = context?.getStepResult<{
 			dataStream: DataStreamWriter;
+			researchPlan: z.infer<typeof researchStepsSchema>;
 		}>('trigger');
-		const researchStepsStepResult =
-			context?.getStepResult<z.infer<typeof researchStepsSchema>>(
-				'research-steps',
-			);
 
 		if (!triggerData) {
 			throw new Error('Trigger data not found');
@@ -249,8 +267,8 @@ const searchWeb = new Step({
 			throw new Error('Tavily client not found');
 		}
 
-		const { dataStream: dataStreamWriter } = triggerData;
-		const { stepIds, completedSteps, totalSteps } = researchStepsStepResult;
+		const { dataStream: dataStreamWriter, researchPlan } = triggerData;
+		const { stepIds, completedSteps, totalSteps } = researchPlan;
 
 		const searchResults: z.infer<typeof searchWebSchema>['searchResults'] = [];
 		let _newCompletedSteps = completedSteps;
@@ -370,11 +388,9 @@ const analyzeResults = new Step({
 	execute: async ({ context, runId: toolCallId, mastra }) => {
 		const triggerData = context?.getStepResult<{
 			dataStream: DataStreamWriter;
+			researchPlan: z.infer<typeof researchStepsSchema>;
 		}>('trigger');
-		const researchStepsStepResult =
-			context?.getStepResult<z.infer<typeof researchStepsSchema>>(
-				'research-steps',
-			);
+
 		const searchWebStepResult =
 			context?.getStepResult<z.infer<typeof searchWebSchema>>('search-web');
 
@@ -385,9 +401,9 @@ const analyzeResults = new Step({
 			throw new Error('Mastra not found');
 		}
 
-		const { dataStream: dataStreamWriter } = triggerData;
+		const { dataStream: dataStreamWriter, researchPlan } = triggerData;
 		const { searchResults, completedSteps } = searchWebStepResult;
-		const { stepIds, totalSteps } = researchStepsStepResult;
+		const { stepIds, totalSteps } = researchPlan;
 
 		// Perform analyses
 		const _analysisResults: z.infer<typeof analysisResultSchema> = [];
@@ -478,15 +494,9 @@ const researchReport = new Step({
 	execute: async ({ context, runId: toolCallId, mastra }) => {
 		const triggerData = context?.getStepResult<{
 			dataStream: DataStreamWriter;
+			researchPlan: z.infer<typeof researchStepsSchema>;
 		}>('trigger');
-		const researchPlan =
-			context?.getStepResult<z.infer<typeof researchPlanSchema>>(
-				'research-planning',
-			);
-		const researchStepsStepResult =
-			context?.getStepResult<z.infer<typeof researchStepsSchema>>(
-				'research-steps',
-			);
+
 		const searchWebStepResult =
 			context?.getStepResult<z.infer<typeof searchWebSchema>>('search-web');
 		const analyzeResultsStepResult =
@@ -501,18 +511,17 @@ const researchReport = new Step({
 			throw new Error('Mastra not found');
 		}
 
-		const { dataStream: dataStreamWriter } = triggerData;
+		const { dataStream: dataStreamWriter, researchPlan } = triggerData;
 		const { searchResults } = searchWebStepResult;
-		const { totalSteps } = researchStepsStepResult;
 		const { analysisResults } = analyzeResultsStepResult;
-
+		const { totalSteps } = researchPlan;
 		const reportStream = await mastra.getAgent('largeAssistant').stream([
 			{
 				role: 'user',
 				content: dedent`
           Generate a markdown report based on the research plan, search results and analysis results.
 
-          Research plan: ${JSON.stringify(researchPlan)}
+          Research plan: ${JSON.stringify(researchPlan.researchPlan)}
           Search results: ${JSON.stringify(searchResults)}
           Analysis results: ${JSON.stringify(analysisResults)}
           `,
@@ -546,8 +555,8 @@ const researchReport = new Step({
 	},
 });
 
-const researchWorkflow = new Workflow({
-	name: 'research-workflow',
+const researchPlanningWorkflow = new Workflow({
+	name: 'researchPlanningWorkflow',
 	triggerSchema: z.object({
 		dataStream: z.object({
 			writeMessageAnnotation: z.function().args(
@@ -561,11 +570,27 @@ const researchWorkflow = new Workflow({
 	}),
 })
 	.step(researchPlanning)
-	.then(researchSteps)
-	.then(searchWeb)
+	.then(researchSteps);
+
+researchPlanningWorkflow.commit();
+
+const researchExecutionWorkflow = new Workflow({
+	name: 'researchExecutionWorkflow',
+	triggerSchema: z.object({
+		dataStream: z.object({
+			writeMessageAnnotation: z.function().args(
+				z.object({
+					type: z.string(),
+					data: z.any(),
+				}),
+			),
+		}),
+		researchPlan: researchStepsSchema,
+	}),
+})
+	.step(searchWeb)
 	.then(analyzeResults)
 	.then(researchReport);
 
-researchWorkflow.commit();
-
-export { researchWorkflow };
+researchExecutionWorkflow.commit();
+export { researchPlanningWorkflow, researchExecutionWorkflow };

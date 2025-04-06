@@ -8,9 +8,9 @@ import { stream } from 'hono/streaming';
 import { zValidator } from '@hono/zod-validator';
 import { UserInteractionsData } from '@paulirish/trace_engine/models/trace/handlers/UserInteractionsHandler';
 import { mastra } from '@/lib/ai/mastra';
-import { perflab } from '@/lib/ai/modelProvider';
 import { langfuse } from '@/lib/tools/langfuse';
 import { routerOutputSchema } from '@/lib/ai/mastra/agents/router';
+import { researchStepsSchema } from '@/lib/ai/mastra/workflows/researchWorkflow';
 
 export const runtime = 'nodejs';
 
@@ -22,6 +22,9 @@ const requestSchema = z.object({
 	userInteractions: z.any().default(null),
 	model: z.string().default('default_model'),
 	traceFile: z.any().default(null),
+	researchApproved: z.boolean().nullable().default(null),
+	requestId: z.string().nullable().default(null),
+	researchPlan: researchStepsSchema.nullable().default(null),
 });
 
 // Create Hono app for chat API
@@ -35,13 +38,10 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 		const files = body.files;
 		const insights: ReturnType<typeof analyseInsightsForCWV> = body.insights;
 		const userInteractions: UserInteractionsData = body.userInteractions;
-		const model = body.model;
 		const traceFile = body.traceFile;
-
-		if (messages.length === 0) {
-			return c.json({ error: 'No messages provided' }, 400);
-		}
-
+		const researchApproved = body.researchApproved;
+		const requestId = body.requestId;
+		const researchPlan = body.researchPlan;
 		const dataStream = createDataStream({
 			execute: async (dataStreamWriter) => {
 				dataStreamWriter.writeData('initialized call');
@@ -52,37 +52,103 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 				);
 
 				console.log('insights ', insights);
+				console.log('researchApproved ', researchApproved);
+				console.log('requestId ', requestId);
+				console.log('researchPlan ', researchPlan);
 
-				const routerAgent = mastra.getAgent('routerAgent');
-
-				const { object } = await routerAgent.generate(messages, {
-					output: routerOutputSchema,
-				});
-
-				console.log('object ', object);
-				const smallAssistant = mastra.getAgent('smallAssistant');
-
-				if (object.certainty < 0.5) {
-					const stream = await smallAssistant.stream([
-						...messages,
-						{
-							role: 'assistant',
-							content:
-								'Unclear user request, I should kindly ask for clarification and steer the conversation back on track.',
-						},
-					]);
-					stream.mergeIntoDataStream(dataStreamWriter, {
-						sendReasoning: true,
-						sendSources: true,
+				if (messages.length === 0) {
+					if (!researchPlan) {
+						throw new Error('Research plan is required');
+					}
+					const researchWorkflow = mastra.getWorkflow(
+						'researchExecutionWorkflow',
+					);
+					const run = researchWorkflow.createRun({
+						runId: requestId ?? undefined,
 					});
+
+					console.log('run ', run);
+
+					const unsubscribe = run?.watch((event) => {
+						console.log('========== event', event);
+					});
+
+					const _run = await run.start({
+						triggerData: {
+							researchPlan,
+							dataStream: dataStreamWriter,
+						},
+					});
+
+					console.log('run', _run);
+					unsubscribe?.();
 				} else {
-					switch (object.workflow) {
-						case 'cwvInsightsWorkflow':
-							if (insights) {
-								const insightsWorkflow = mastra.getWorkflow(
-									'cwvInsightsWorkflow',
+					if (messages.length === 0) {
+						// return c.json({ error: 'No messages provided' }, 400);
+						throw new Error('No messages provided');
+					}
+
+					const routerAgent = mastra.getAgent('routerAgent');
+					const { object } = await routerAgent.generate(messages, {
+						output: routerOutputSchema,
+					});
+
+					console.log('object ', object);
+					const smallAssistant = mastra.getAgent('smallAssistant');
+
+					if (object.certainty < 0.5) {
+						const stream = await smallAssistant.stream([
+							...messages,
+							{
+								role: 'assistant',
+								content:
+									'Unclear user request, I should kindly ask for clarification and steer the conversation back on track.',
+							},
+						]);
+						stream.mergeIntoDataStream(dataStreamWriter, {
+							sendReasoning: true,
+							sendSources: true,
+						});
+					} else {
+						switch (object.workflow) {
+							case 'cwvInsightsWorkflow':
+								if (insights) {
+									const insightsWorkflow = mastra.getWorkflow(
+										'cwvInsightsWorkflow',
+									);
+									const run = insightsWorkflow.createRun();
+
+									const unsubscribe = run.watch((event) => {
+										console.log('========== event', event);
+									});
+
+									const _run = await run.start({
+										triggerData: {
+											insights,
+											dataStream: dataStreamWriter,
+											messages,
+										},
+									});
+
+									console.log('run', _run);
+									unsubscribe();
+								} else {
+									const stream = await smallAssistant.stream([
+										...messages,
+										{
+											role: 'assistant',
+											content:
+												'User request is missing required data for analysis, I should kindly prompt the user to attach the trace json file containing the data to process the request. I should remind the user that I only process Google Chrome trace files and refer to the official blog post: https://developer.chrome.com/blog/devtools-tips-39?hl=en.',
+										},
+									]);
+									stream.mergeIntoDataStream(dataStreamWriter);
+								}
+								break;
+							case 'researchPlanningWorkflow':
+								const researchWorkflow = mastra.getWorkflow(
+									'researchPlanningWorkflow',
 								);
-								const run = insightsWorkflow.createRun();
+								const run = researchWorkflow.createRun();
 
 								const unsubscribe = run.watch((event) => {
 									console.log('========== event', event);
@@ -90,77 +156,26 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 
 								const _run = await run.start({
 									triggerData: {
-										insights,
-										dataStream: dataStreamWriter,
 										messages,
+										dataStream: dataStreamWriter,
 									},
 								});
 
 								console.log('run', _run);
 								unsubscribe();
-							} else {
-								const stream = await smallAssistant.stream([
-									...messages,
-									{
-										role: 'assistant',
-										content:
-											'User request is missing required data for analysis, I should kindly prompt the user to attach the trace json file containing the data to process the request. I should remind the user that I only process Google Chrome trace files and refer to the official blog post: https://developer.chrome.com/blog/devtools-tips-39?hl=en.',
-									},
-								]);
-								stream.mergeIntoDataStream(dataStreamWriter);
-							}
-							break;
-						case 'researchWorkflow':
-							const researchWorkflow = mastra.getWorkflow('researchWorkflow');
-							const run = researchWorkflow.createRun();
-
-							const unsubscribe = run.watch((event) => {
-								console.log('========== event', event);
-							});
-
-							const _run = await run.start({
-								triggerData: {
-									messages,
-									dataStream: dataStreamWriter,
-								},
-							});
-
-							console.log('run', _run);
-							unsubscribe();
-							break;
-						default:
-							const traceInsightStream = streamText({
-								model: perflab.languageModel(model),
-								temperature: 0,
-								experimental_telemetry: {
-									isEnabled: true,
-									functionId: `trace-analysis-llm-call`,
-									metadata: {
-										langfuseTraceId: parentTraceId,
-										langfuseUpdateParent: false, // Do not update the parent trace with execution results
-									},
-								},
-								messages,
-								system: largeModelSystemPrompt,
-								onFinish(event) {
-									console.log(
-										'######################### traceReportStream onFinish #################################',
-									);
-									console.log('Fin reason: ', event.finishReason);
-									console.log('Reasoning: ', event.reasoning);
-									console.log('reasoning details: ', event.reasoningDetails);
-									console.log('Messages: ', event.response.messages);
-								},
-								onError(event) {
-									console.log('Error: ', event.error);
-								},
-							});
-
-							traceInsightStream.mergeIntoDataStream(dataStreamWriter, {
-								sendReasoning: true,
-								sendSources: true,
-							});
-							break;
+								break;
+							default:
+								const stream = await mastra
+									.getAgent('largeAssistant')
+									.stream(messages, {
+										system: largeModelSystemPrompt,
+									});
+								stream.mergeIntoDataStream(dataStreamWriter, {
+									sendReasoning: true,
+									sendSources: true,
+								});
+								break;
+						}
 					}
 				}
 			},

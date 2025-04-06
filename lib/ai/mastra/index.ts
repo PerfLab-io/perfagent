@@ -3,16 +3,23 @@ import { createLogger } from '@mastra/core/logger';
 import { cwvInsightsWorkflow } from './workflows/cwvInsights';
 import { routerAgent } from './agents/router';
 import { LangfuseExporter } from 'langfuse-vercel';
-import { serverEnv } from '@/lib/env/server';
+import { serverEnv } from '../../env/server';
 import { smallAssistant } from './agents/smallAssistant';
-import { researchWorkflow } from './workflows/researchWorkflow';
+import {
+	researchPlanningWorkflow,
+	researchExecutionWorkflow,
+} from './workflows/researchWorkflow';
 import { topicsAgent } from './agents/perfTopics';
 import { largeAssistant } from './agents/largeAssistant';
 import { researchPlanner } from './agents/researchPlanner';
 import { researchAnalyst } from './agents/researchAnalist';
 
 export const mastra = new Mastra({
-	workflows: { cwvInsightsWorkflow, researchWorkflow },
+	workflows: {
+		cwvInsightsWorkflow,
+		researchPlanningWorkflow,
+		researchExecutionWorkflow,
+	},
 	agents: {
 		smallAssistant,
 		largeAssistant,
