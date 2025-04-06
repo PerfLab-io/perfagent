@@ -11,24 +11,6 @@ import { z } from 'zod';
 import dedent from 'dedent';
 import { perflab } from '@/lib/ai/modelProvider';
 
-const topicsAgent = new Agent({
-	name: 'Web Performance Insights and Research Agent',
-	model: perflab.languageModel('topics_model'),
-	instructions: dedent`
-  You are a Web Performance Insights and Research expert
-
-  Your role is to pick a topic based on your grounding knowledge here and the user prompt for research and analysis.
-
-  ${grounding}
-  `,
-});
-
-const reportAgent = new Agent({
-	name: 'Web Performance Report Agent',
-	model: perflab.languageModel('default_model'),
-	instructions: largeModelSystemPrompt,
-});
-
 const messageSchema = coreMessageSchema;
 
 const topicStep = new Step({
@@ -44,20 +26,26 @@ const topicStep = new Step({
 				'Insight topic to analyze based on the user prompt. The list reffers to CLS, INP and LCP related queries',
 			),
 	}),
-	execute: async ({ context }) => {
+	execute: async ({ context, mastra }) => {
 		const triggerData = context.getStepResult<{
 			messages: z.infer<typeof messageSchema>[];
 		}>('trigger');
 
-		const response = await topicsAgent.generate(triggerData?.messages, {
-			output: z.object({
-				topic: z
-					.enum(['LCP', 'CLS', 'INP'])
-					.describe(
-						'Insight topic to analyze based on the user prompt. The list reffers to CLS, INP and LCP related queries',
-					),
-			}),
-		});
+		if (!mastra) {
+			throw new Error('Mastra not found');
+		}
+
+		const response = await mastra
+			.getAgent('topicsAgent')
+			.generate(triggerData?.messages, {
+				output: z.object({
+					topic: z
+						.enum(['LCP', 'CLS', 'INP'])
+						.describe(
+							'Insight topic to analyze based on the user prompt. The list reffers to CLS, INP and LCP related queries',
+						),
+				}),
+			});
 
 		return {
 			topic: response.object.topic,
@@ -84,7 +72,7 @@ const insightsSchema = z.object({
 const analyzeTrace = new Step({
 	id: 'analyze-trace',
 	description: 'Analyzes a trace insights',
-	execute: async ({ context }) => {
+	execute: async ({ context, mastra }) => {
 		const triggerData = context?.getStepResult<{
 			insights: z.infer<typeof insightsSchema>;
 			dataStream: DataStreamWriter;
@@ -95,6 +83,9 @@ const analyzeTrace = new Step({
 
 		if (!triggerData) {
 			throw new Error('Trigger data not found');
+		}
+		if (!mastra) {
+			throw new Error('Mastra not found');
 		}
 
 		const { dataStream: dataStreamWriter, insights } = triggerData;
@@ -153,7 +144,7 @@ const analyzeTrace = new Step({
 
 			console.log('insightsForTopic complete: ', insightsForTopic.metric);
 
-			const agentStream = await reportAgent.stream([
+			const agentStream = await mastra.getAgent('largeAssistant').stream([
 				{
 					role: 'user',
 					content: `Data for the report: ${JSON.stringify(insightsForTopic)}`,

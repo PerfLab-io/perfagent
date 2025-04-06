@@ -6,10 +6,21 @@ import { LangfuseExporter } from 'langfuse-vercel';
 import { serverEnv } from '@/lib/env/server';
 import { smallAssistant } from './agents/smallAssistant';
 import { researchWorkflow } from './workflows/researchWorkflow';
+import { topicsAgent } from './agents/perfTopics';
+import { largeAssistant } from './agents/largeAssistant';
+import { researchPlanner } from './agents/researchPlanner';
+import { researchAnalyst } from './agents/researchAnalist';
 
 export const mastra = new Mastra({
 	workflows: { cwvInsightsWorkflow, researchWorkflow },
-	agents: { routerAgent, smallAssistant },
+	agents: {
+		smallAssistant,
+		largeAssistant,
+		topicsAgent,
+		routerAgent,
+		researchPlanner,
+		researchAnalyst,
+	},
 	logger: createLogger({
 		name: 'Mastra',
 		level: 'info',

@@ -31,97 +31,6 @@ const trustedDomains = [
 
 const depth = 'advanced' as const;
 
-const researchPlanner = new Agent({
-	model: perflab.languageModel('default_model'),
-	instructions: dedent`
-      You are a research planner for web performance related topics
-
-      Your task is to create a research plan based on the user's query and the context.
-
-      Today's date and day of the week: ${new Date().toLocaleDateString(
-				'en-US',
-				{
-					weekday: 'long',
-					year: 'numeric',
-					month: 'long',
-					day: 'numeric',
-				},
-			)}
-
-      Keep the plan concise but comprehensive, with:
-      - maximum 5 targeted search queries
-      - Each query should be focused on a specific aspect of the user query to provide the best value
-      - 2-4 key analyses to perform
-      - Prioritize the most important aspects to investigate based on the user query and the context
-
-      Do not use floating numbers, use whole numbers only in the priority field!!
-      Do not keep the numbers too low or high, make them reasonable in between.
-      Do not use 0 in the priority field.
-
-      Consider related topics, but maintain focus on the core aspects.
-      Here's the list of possible topics representing different aspects of a performance trace.
-
-      Core Web Vitals - key metrics for measuring web page experience:
-
-      - Loading (LCP): Largest Contentful Paint - measures loading performance (2.5s or less is good)
-      - Interactivity (INP): Interaction to Next Paint - measures responsiveness (100ms or less is good)
-      - Visual Stability (CLS): Cumulative Layout Shift - measures visual stability (0.1 or less is good)
-
-      Additional important metrics include:
-
-      - TTFB (Time to First Byte)
-      - FCP (First Contentful Paint)
-      - TTI (Time to Interactive)
-      - TBT (Total Blocking Time)
-
-      Other possible topics:
-      - Critical rendering path (also related to LCP and CLS, possibly related to INP as first interaction may be impacted)
-      - Resource optimization (JS, CSS, images, fonts - Also related to critical rendering path)
-      - Speculation rules for faster page load metrics (Related to LCP and Critical rendering path)
-      - BFCache (Back/Forward Cache - similar to Speculation rules)
-      - Network performance (caching, compression, preloading, lazy loading - related to LCP and Critical rendering path)
-
-      Ensure the total number of steps (searches + analyses) does not exceed 10.
-
-      Return an optimized research plan and the chosen topic.
-
-      OBEY THE GIVEN SCHEMA!
-      Schema:
-      \`\`\`typescript
-      type ResearchPlan = {
-        topic: string,
-        searchQueries: {
-            query: string,
-            rationale: string,
-            priority: number, // between 1 and 5 (1 is the least important, 5 is the most important)
-          }[],
-        requiredAnalyses: {
-            type: string,
-            description: string,
-            importance: number, // between 1 and 5 (1 is the least important, 5 is the most important)
-          }[],
-      }
-      \`\`\`
-  `,
-	name: 'research-planner',
-});
-
-const researchAnalyst = new Agent({
-	model: perflab.languageModel('default_model'),
-	name: 'research-analyst',
-	instructions: dedent`
-    Perform an analysis based on the given analysis type, description and search results presented.
-    Consider all sources and their reliability.
-    IMPORTANT: ENSURE TO RETURN CONFIDENCE SCORES BETWEEN 0 AND 1. And max 3 findings.
-  `,
-});
-
-const researchReportGenerator = new Agent({
-	model: perflab.languageModel('default_model'),
-	name: 'research-report-generator',
-	instructions: largeModelSystemPrompt,
-});
-
 const researchPlanSchema = z.object({
 	topic: z.string(),
 	searchQueries: z
@@ -174,7 +83,7 @@ const researchPlanning = new Step({
 		messages: z.array(messageSchema),
 	}),
 	outputSchema: researchPlanSchema,
-	execute: async ({ context, runId: toolCallId }) => {
+	execute: async ({ context, runId: toolCallId, mastra }) => {
 		const triggerData = context?.getStepResult<{
 			dataStream: DataStreamWriter;
 			messages: CoreMessage[];
@@ -182,6 +91,9 @@ const researchPlanning = new Step({
 
 		if (!triggerData) {
 			throw new Error('Trigger data not found');
+		}
+		if (!mastra) {
+			throw new Error('Mastra not found');
 		}
 
 		const { dataStream: dataStreamWriter, messages } = triggerData;
@@ -213,9 +125,11 @@ const researchPlanning = new Step({
 			},
 		});
 
-		const { object: researchPlan } = await researchPlanner.generate(messages, {
-			output: researchPlanSchema,
-		});
+		const { object: researchPlan } = await mastra
+			.getAgent('researchPlanner')
+			.generate(messages, {
+				output: researchPlanSchema,
+			});
 
 		return researchPlan;
 	},
@@ -457,7 +371,7 @@ const analyzeResults = new Step({
 		analysisResults: analysisResultSchema,
 		completedSteps: z.number(),
 	}),
-	execute: async ({ context, runId: toolCallId }) => {
+	execute: async ({ context, runId: toolCallId, mastra }) => {
 		const triggerData = context?.getStepResult<{
 			dataStream: DataStreamWriter;
 		}>('trigger');
@@ -470,6 +384,9 @@ const analyzeResults = new Step({
 
 		if (!triggerData) {
 			throw new Error('Trigger data not found');
+		}
+		if (!mastra) {
+			throw new Error('Mastra not found');
 		}
 
 		const { dataStream: dataStreamWriter } = triggerData;
@@ -497,23 +414,25 @@ const analyzeResults = new Step({
 				},
 			});
 
-			const { object: analysisResult } = await researchAnalyst.generate(
-				[
-					{
-						role: 'user',
-						content: dedent`
+			const { object: analysisResult } = await mastra
+				.getAgent('researchAnalyst')
+				.generate(
+					[
+						{
+							role: 'user',
+							content: dedent`
               Analysis type: ${step.analysis.type}
               Analysis description: ${step.analysis.description}
               Search results: ${JSON.stringify(searchResults)}
             `,
+						},
+					],
+					{
+						output: z.object({
+							findings: analysisResultSchema,
+						}),
 					},
-				],
-				{
-					output: z.object({
-						findings: analysisResultSchema,
-					}),
-				},
-			);
+				);
 
 			_analysisResults.push(...analysisResult.findings);
 			_completedSteps++;
@@ -560,7 +479,7 @@ const analyzeResults = new Step({
 const researchReport = new Step({
 	id: 'research-report',
 	description: 'Generates a research report based on the results and analysis',
-	execute: async ({ context, runId: toolCallId }) => {
+	execute: async ({ context, runId: toolCallId, mastra }) => {
 		const triggerData = context?.getStepResult<{
 			dataStream: DataStreamWriter;
 		}>('trigger');
@@ -582,13 +501,16 @@ const researchReport = new Step({
 		if (!triggerData) {
 			throw new Error('Trigger data not found');
 		}
+		if (!mastra) {
+			throw new Error('Mastra not found');
+		}
 
 		const { dataStream: dataStreamWriter } = triggerData;
 		const { searchResults } = searchWebStepResult;
 		const { totalSteps } = researchStepsStepResult;
 		const { analysisResults } = analyzeResultsStepResult;
 
-		const reportStream = await researchReportGenerator.stream([
+		const reportStream = await mastra.getAgent('largeAssistant').stream([
 			{
 				role: 'user',
 				content: dedent`
