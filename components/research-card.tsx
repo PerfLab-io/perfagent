@@ -91,6 +91,7 @@ interface ResearchResult {
 	source: 'web' | 'analysis';
 	sourceIcon: string | React.ReactNode;
 	url?: string;
+	query?: string;
 }
 
 /**
@@ -501,7 +502,7 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 				if (!updates.results) updates.results = [];
 
 				// Process function to add results
-				const processItems = (items: any[], source: string) => {
+				const processItems = (items: any[], source: 'web' | 'analysis') => {
 					if (!items || !Array.isArray(items) || items.length === 0) return;
 
 					const sourceIcon = source === 'web' ? 'Globe' : 'BarChart';
@@ -518,6 +519,7 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 										? item.evidence.join('\n')
 										: item.evidence || '',
 							source,
+							query: source === 'web' ? data.query : undefined,
 							sourceIcon: utils.getIconComponent(sourceIcon),
 							url: item.url,
 							findingType: data.analysisType
@@ -655,7 +657,7 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 										step.status === 'complete' &&
 											'border-peppermint-500 data-[state=open]:bg-white dark:border-peppermint-900',
 										step.status === 'in-progress' &&
-											'border-midnight-400 data-[state=open]:bg-midnight-50 dark:border-midnight-900',
+											'border-midnight-500 data-[state=open]:bg-midnight-50 dark:border-midnight-900',
 									)}
 								>
 									<CollapsibleTrigger
@@ -712,7 +714,7 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 										step.status === 'complete' &&
 											'border-peppermint-500 data-[state=open]:bg-white dark:border-peppermint-900',
 										step.status === 'in-progress' &&
-											'border-midnight-400 data-[state=open]:bg-midnight-50 dark:border-midnight-900',
+											'border-midnight-500 data-[state=open]:bg-midnight-50 dark:border-midnight-900',
 									)}
 								>
 									<CollapsibleTrigger
@@ -768,47 +770,153 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 					)}
 					{results
 						.filter((result) => result.source === stepId)
-						.reduce((results, result) => {
-							if (
-								results.length &&
-								result.findingType &&
-								results.find((r) => r.findingType === result.findingType)
-							) {
+						.reduce(
+							(results, result) => {
+								if (result.query) {
+									const existing = results.find(
+										(r) => r.query === result.query,
+									);
+									if (existing) {
+										existing.results.push(result);
+									} else {
+										results.push({ query: result.query, results: [result] });
+									}
+								} else {
+									const existing = results.find(
+										(r) => r.query === 'global-group',
+									);
+									if (existing) {
+										if (
+											!Boolean(
+												result.findingType &&
+													existing.results.find(
+														(r) => r.findingType === result.findingType,
+													),
+											)
+										) {
+											existing.results.push(result);
+										}
+									} else {
+										results.push({ query: 'global-group', results: [result] });
+									}
+								}
 								return results;
-							}
-
-							results.push(result);
-							return results;
-						}, [] as ResearchResult[])
-						.map((result) => (
-							<li
-								key={result.id}
-								className="flex list-none items-center gap-1 px-0 py-1 text-sm"
-							>
-								<div className="flex items-start gap-3">
-									<div
+							},
+							[] as { query: string; results: ResearchResult[] }[],
+						)
+						.map((result) =>
+							result.query === 'global-group' ? (
+								<>
+									{result.results.map((r) => (
+										<li
+											key={r.id}
+											className="flex list-none items-center gap-1 px-0 py-1 text-sm"
+										>
+											<div className="flex items-start gap-3">
+												<div
+													className={cn(
+														'relative flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md',
+														step.status === 'complete' &&
+															'bg-peppermint-200 dark:bg-peppermint-900',
+														step.status === 'in-progress' &&
+															'bg-midnight-200 dark:bg-midnight-900',
+													)}
+												>
+													<StepIcon
+														className={cn(
+															step.id === 'web' ? 'h-3.5 w-3.5' : 'h-3 w-3',
+															step.status === 'complete' &&
+																'text-peppermint-600 dark:text-peppermint-400',
+															step.status === 'in-progress' &&
+																'text-midnight-600 dark:text-midnight-400',
+														)}
+													/>
+												</div>
+											</div>
+											{r.findingType || r.title}
+										</li>
+									))}
+								</>
+							) : (
+								<li
+									key={result.query}
+									className="flex list-none items-center gap-1 px-0 py-1 text-sm"
+								>
+									<Collapsible
 										className={cn(
-											'relative flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md',
+											'group w-full rounded-md border border-dashed p-2 data-[state=open]:border-solid',
 											step.status === 'complete' &&
-												'bg-peppermint-200 dark:bg-peppermint-900',
+												'border-peppermint-500 data-[state=open]:bg-white dark:border-peppermint-900',
 											step.status === 'in-progress' &&
-												'bg-midnight-200 dark:bg-midnight-900',
+												'border-midnight-500 data-[state=open]:bg-midnight-50 dark:border-midnight-900',
 										)}
 									>
-										<StepIcon
+										<CollapsibleTrigger
 											className={cn(
-												step.id === 'web' ? 'h-3.5 w-3.5' : 'h-3 w-3',
+												'flex w-full items-center justify-between gap-1',
 												step.status === 'complete' &&
-													'text-peppermint-600 dark:text-peppermint-400',
+													'text-peppermint-700 dark:text-peppermint-300',
 												step.status === 'in-progress' &&
-													'text-midnight-600 dark:text-midnight-400',
+													'text-midnight-700 dark:text-midnight-300',
 											)}
-										/>
-									</div>
-								</div>
-								{result.findingType || result.title}
-							</li>
-						))}
+										>
+											<div className="flex w-full items-center justify-between gap-1">
+												<span className="font-semibold">{result.query}</span>
+												<div className="flex items-center space-x-1 rounded border border-dashed border-peppermint-500 bg-transparent p-2 px-2 py-0.5 text-xs group-data-[state=open]:border-solid dark:bg-peppermint-900 dark:group-data-[state=open]:bg-white">
+													<span className="text-peppermint-700 dark:text-peppermint-300">
+														{result.results.length > 1
+															? `${result.results.length} results`
+															: '1 result'}
+													</span>
+												</div>
+											</div>
+											<ChevronDown className="h-3 w-3" />
+										</CollapsibleTrigger>
+										<CollapsibleContent>
+											<Separator
+												orientation="horizontal"
+												className="my-2 w-full bg-peppermint-300 dark:bg-peppermint-900"
+											/>
+											<ul>
+												{result.results.map((r) => (
+													<li
+														key={r.id}
+														className="flex list-none items-start gap-2 px-0 py-1 text-sm"
+													>
+														<div className="flex items-start gap-3">
+															<div
+																className={cn(
+																	'relative flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md',
+																	step.status === 'complete' &&
+																		'bg-peppermint-200 dark:bg-peppermint-900',
+																	step.status === 'in-progress' &&
+																		'bg-midnight-200 dark:bg-midnight-900',
+																)}
+															>
+																<StepIcon
+																	className={cn(
+																		step.id === 'web'
+																			? 'h-3.5 w-3.5'
+																			: 'h-3 w-3',
+																		step.status === 'complete' &&
+																			'text-peppermint-600 dark:text-peppermint-400',
+																		step.status === 'in-progress' &&
+																			'text-midnight-600 dark:text-midnight-400',
+																	)}
+																/>
+															</div>
+														</div>
+														<div className="flex flex-col gap-1">
+															<span className="font-semibold">{r.title}</span>
+														</div>
+													</li>
+												))}
+											</ul>
+										</CollapsibleContent>
+									</Collapsible>
+								</li>
+							),
+						)}
 				</ul>
 			);
 		},
@@ -873,9 +981,9 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 
 				<CardContent
 					className={cn(
-						'overflow-hidden transition-all duration-300',
+						'overflow-y-scroll transition-all duration-300',
 						isCardExpanded
-							? 'max-h-[1000px] p-4 opacity-100'
+							? 'max-h-[600px] p-4 opacity-100'
 							: 'max-h-0 p-0 opacity-0',
 					)}
 				>
