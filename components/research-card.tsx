@@ -27,13 +27,22 @@ import {
 	Loader2,
 	ChevronUp,
 	X,
+	BrainCircuit,
+	Check,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { FeedbackButtons } from '@/components/feedback-buttons';
 import { filterProgressSteps } from '@/lib/filter-progress';
-
+import { researchPlanSchema } from '@/lib/ai/mastra/workflows/researchWorkflow';
+import { z } from 'zod';
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from './ui/collapsible';
+import { Separator } from './ui/separator';
 /**
  * Types and Interfaces
  */
@@ -95,6 +104,7 @@ interface ResearchStep {
 	icon: string | React.ReactNode;
 	status: 'complete' | 'in-progress' | 'pending';
 	expanded?: boolean;
+	researchPlan?: z.infer<typeof researchPlanSchema>;
 }
 
 /**
@@ -440,6 +450,7 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 								? 'in-progress'
 								: 'pending',
 					expanded: data.status === 'in-progress',
+					researchPlan: data.researchPlan,
 				};
 
 				updates.steps.push(newStep);
@@ -476,6 +487,7 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 					message: data.message || currentStep.message,
 					status: newStatus,
 					expanded: newStatus !== 'complete',
+					researchPlan: data.researchPlan,
 				};
 			}
 
@@ -605,8 +617,155 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 			const step = steps.find((step) => step.id === stepId);
 			if (!step) return null;
 
+			const StepIcon = step.id === 'web' ? Check : BrainCircuit;
+
 			return (
 				<ul className="list-disc">
+					{step.researchPlan && (
+						<li className="flex list-none items-start gap-1 px-0 py-1 text-sm">
+							<div className="flex items-start gap-3">
+								<div
+									className={cn(
+										'relative flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md',
+										step.status === 'complete' &&
+											'bg-peppermint-200 dark:bg-peppermint-900',
+										step.status === 'in-progress' &&
+											'bg-midnight-200 dark:bg-midnight-900',
+									)}
+								>
+									<Search
+										className={cn(
+											step.id === 'web' ? 'h-3.5 w-3.5' : 'h-3 w-3',
+											step.status === 'complete' &&
+												'text-peppermint-600 dark:text-peppermint-400',
+											step.status === 'in-progress' &&
+												'text-midnight-600 dark:text-midnight-400',
+										)}
+									/>
+								</div>
+							</div>
+							<p className="flex w-5/6 flex-col gap-2">
+								<div className="flex flex-col gap-1">
+									<strong>Topic</strong>
+									{step.researchPlan.topic}
+								</div>
+								<Collapsible
+									className={cn(
+										'w-full rounded-md border border-dashed p-2 data-[state=open]:border-solid',
+										step.status === 'complete' &&
+											'border-peppermint-500 data-[state=open]:bg-white dark:border-peppermint-900',
+										step.status === 'in-progress' &&
+											'border-midnight-400 data-[state=open]:bg-midnight-50 dark:border-midnight-900',
+									)}
+								>
+									<CollapsibleTrigger
+										className={cn(
+											'flex w-full items-center justify-between gap-1',
+											step.status === 'complete' &&
+												'text-peppermint-700 dark:text-peppermint-300',
+											step.status === 'in-progress' &&
+												'text-midnight-700 dark:text-midnight-300',
+										)}
+									>
+										<div className="flex items-center gap-1">
+											<Globe className="h-3 w-3" />
+											<span className="font-semibold">Search Queries</span>
+										</div>
+										<ChevronDown className="h-3 w-3" />
+									</CollapsibleTrigger>
+									<CollapsibleContent>
+										<Separator
+											orientation="horizontal"
+											className="my-2 w-full bg-peppermint-300 dark:bg-peppermint-900"
+										/>
+										<ul>
+											{step.researchPlan.searchQueries.map((query) => (
+												<li
+													key={query.query}
+													className="flex list-none items-start gap-2 px-0 py-1 text-sm"
+												>
+													<div className="flex items-start gap-3">
+														<div
+															className={cn(
+																'relative mt-1 h-3.5 w-3.5 flex-shrink-0 rounded-sm border border-solid',
+																step.status === 'complete' &&
+																	'border-peppermint-300 bg-peppermint-50 dark:border-peppermint-900',
+																step.status === 'in-progress' &&
+																	'border-midnight-300 bg-midnight-50 dark:border-midnight-900',
+															)}
+														/>
+													</div>
+													<div className="flex flex-col gap-1">
+														<span className="font-semibold">{query.query}</span>
+														<span className="text-sm text-foreground/70">
+															{query.rationale}
+														</span>
+													</div>
+												</li>
+											))}
+										</ul>
+									</CollapsibleContent>
+								</Collapsible>
+								<Collapsible
+									className={cn(
+										'w-full rounded-md border border-dashed p-2 data-[state=open]:border-solid',
+										step.status === 'complete' &&
+											'border-peppermint-500 data-[state=open]:bg-white dark:border-peppermint-900',
+										step.status === 'in-progress' &&
+											'border-midnight-400 data-[state=open]:bg-midnight-50 dark:border-midnight-900',
+									)}
+								>
+									<CollapsibleTrigger
+										className={cn(
+											'flex w-full items-center justify-between gap-1',
+											step.status === 'complete' &&
+												'text-peppermint-700 dark:text-peppermint-300',
+											step.status === 'in-progress' &&
+												'text-midnight-700 dark:text-midnight-300',
+										)}
+									>
+										<div className="flex items-center gap-1">
+											<BarChart className="h-3 w-3" />
+											<strong>Required Analyses</strong>
+										</div>
+										<ChevronDown className="h-3 w-3 text-peppermint-700 dark:text-peppermint-300" />
+									</CollapsibleTrigger>
+									<CollapsibleContent>
+										<Separator
+											orientation="horizontal"
+											className="my-2 w-full bg-peppermint-300 dark:bg-peppermint-900"
+										/>
+										<ul>
+											{step.researchPlan.requiredAnalyses.map((analysis) => (
+												<li
+													key={analysis.type}
+													className="flex list-none items-start gap-2 px-0 py-1 text-sm"
+												>
+													<div
+														className={cn(
+															'relative mt-1 h-3.5 w-3.5 flex-shrink-0 rounded-sm border border-solid',
+															step.status === 'complete' &&
+																'border-peppermint-300 bg-peppermint-50 dark:border-peppermint-900',
+															step.status === 'in-progress' &&
+																'border-midnight-300 bg-midnight-50 dark:border-midnight-900',
+														)}
+													/>
+													<div className="flex flex-col gap-1">
+														<span className="font-semibold">
+															{analysis.type}
+														</span>
+														<span className="text-sm text-foreground/70">
+															{analysis.description}
+														</span>
+													</div>
+												</li>
+											))}
+										</ul>
+									</CollapsibleContent>
+								</Collapsible>
+							</p>
+						</li>
+					)}
 					{results
 						.filter((result) => result.source === stepId)
 						.reduce((results, result) => {
@@ -626,72 +785,26 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 								key={result.id}
 								className="flex list-none items-center gap-1 px-0 py-1 text-sm"
 							>
-								<div className="relative h-4 w-4 flex-shrink-0">
-									{step.id === 'web' ? (
-										<svg
-											className="absolute inset-0"
-											viewBox="0 0 20 20"
-											fill="none"
-											xmlns="http://www.w3.org/2000/svg"
-										>
-											<rect
-												width="20"
-												height="20"
-												rx="4"
-												className={cn(
-													step.status === 'complete' &&
-														'fill-peppermint-200 dark:fill-peppermint-900',
-													step.status === 'in-progress' &&
-														'fill-midnight-200 dark:fill-midnight-900',
-												)}
-											/>
-											<path
-												d="M5 10L8 13L15 7"
-												stroke="currentColor"
-												strokeWidth="1.5"
-												strokeLinecap="round"
-												strokeLinejoin="round"
-												className={cn(
-													step.status === 'complete' &&
-														'text-peppermint-600 dark:text-peppermint-400',
-													step.status === 'in-progress' &&
-														'text-midnight-600 dark:text-midnight-400',
-												)}
-											/>
-										</svg>
-									) : (
-										<svg
-											className="absolute inset-0"
-											viewBox="0 0 20 20"
-											fill="none"
-											xmlns="http://www.w3.org/2000/svg"
-										>
-											<rect
-												width="20"
-												height="20"
-												rx="4"
-												className={cn(
-													step.status === 'complete' &&
-														'fill-peppermint-200 dark:fill-peppermint-900',
-													step.status === 'in-progress' &&
-														'fill-midnight-200 dark:fill-midnight-900',
-												)}
-											/>
-											<path
-												d="M10 5V15M5 10H15"
-												stroke="currentColor"
-												strokeWidth="1.5"
-												strokeLinecap="round"
-												strokeLinejoin="round"
-												className={cn(
-													step.status === 'complete' &&
-														'text-peppermint-600 dark:text-peppermint-400',
-													step.status === 'in-progress' &&
-														'text-midnight-600 dark:text-midnight-400',
-												)}
-											/>
-										</svg>
-									)}
+								<div className="flex items-start gap-3">
+									<div
+										className={cn(
+											'relative flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md',
+											step.status === 'complete' &&
+												'bg-peppermint-200 dark:bg-peppermint-900',
+											step.status === 'in-progress' &&
+												'bg-midnight-200 dark:bg-midnight-900',
+										)}
+									>
+										<StepIcon
+											className={cn(
+												step.id === 'web' ? 'h-3.5 w-3.5' : 'h-3 w-3',
+												step.status === 'complete' &&
+													'text-peppermint-600 dark:text-peppermint-400',
+												step.status === 'in-progress' &&
+													'text-midnight-600 dark:text-midnight-400',
+											)}
+										/>
+									</div>
 								</div>
 								{result.findingType || result.title}
 							</li>
@@ -703,7 +816,7 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 	);
 
 	return (
-		<div className="mt-4 w-4/6 space-y-4">
+		<div className="mt-4 w-full space-y-4">
 			{/* Research Progress Card */}
 			<Card className="group relative rounded-lg border border-border bg-card transition-all duration-300">
 				<CardHeader

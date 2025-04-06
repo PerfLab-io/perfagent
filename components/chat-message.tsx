@@ -400,7 +400,7 @@ export function ChatMessage({
 		),
 
 		// Tool section header style
-		toolHeader: 'mb-1 flex items-center justify-between gap-32',
+		toolHeader: 'mb-1 flex items-center justify-between w-full',
 
 		// Tool toggle button style
 		toolToggleButton:
@@ -458,7 +458,7 @@ export function ChatMessage({
 		if (!messageTools.hasReportTool) return null;
 
 		return (
-			<div className="mt-1 flex min-w-96 flex-col flex-wrap items-start">
+			<div className="mt-1">
 				{renderToolHeader('Report')}
 
 				{expanded && (
@@ -568,7 +568,7 @@ export function ChatMessage({
 				: 'performance metrics');
 
 		return (
-			<div className="mt-1">
+			<div className="mt-1 flex w-[500px] flex-col flex-wrap items-start xl:w-[650px]">
 				{renderToolHeader('Research Results')}
 
 				{expanded && (

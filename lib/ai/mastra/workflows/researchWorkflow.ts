@@ -27,7 +27,7 @@ const trustedDomains = [
 
 const depth = 'advanced' as const;
 
-const researchPlanSchema = z.object({
+export const researchPlanSchema = z.object({
 	topic: z.string(),
 	searchQueries: z
 		.array(
@@ -127,6 +127,20 @@ const researchPlanning = new Step({
 				output: researchPlanSchema,
 			});
 
+		dataStreamWriter.writeMessageAnnotation({
+			type: 'research_update',
+			toolCallId,
+			data: {
+				id: `research-plan`,
+				type: 'research_plan',
+				status: 'in-progress',
+				title: 'Research Plan created',
+				message: 'Creating research steps...',
+				timestamp: Date.now(),
+				researchPlan,
+				completedSteps: 0,
+			},
+		});
 		return researchPlan;
 	},
 });
@@ -201,6 +215,7 @@ const researchSteps = new Step({
 				title: 'Research Plan',
 				message: 'Research plan created',
 				timestamp: Date.now(),
+				researchPlan,
 				completedSteps,
 				totalSteps,
 			},
