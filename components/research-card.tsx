@@ -352,9 +352,9 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 	 * Scroll to the bottom of the component
 	 */
 	const scrollToBottom = useCallback(() => {
-		setTimeout(() => {
-			bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-		}, 50);
+		// setTimeout(() => {
+		// 	bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+		// }, 50);
 	}, []);
 
 	/**
@@ -622,7 +622,79 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 							return results;
 						}, [] as ResearchResult[])
 						.map((result) => (
-							<li key={result.id}>{result.findingType || result.title}</li>
+							<li
+								key={result.id}
+								className="flex list-none items-center gap-1 px-0 py-1 text-sm"
+							>
+								<div className="relative h-4 w-4 flex-shrink-0">
+									{step.id === 'web' ? (
+										<svg
+											className="absolute inset-0"
+											viewBox="0 0 20 20"
+											fill="none"
+											xmlns="http://www.w3.org/2000/svg"
+										>
+											<rect
+												width="20"
+												height="20"
+												rx="4"
+												className={cn(
+													step.status === 'complete' &&
+														'fill-peppermint-200 dark:fill-peppermint-900',
+													step.status === 'in-progress' &&
+														'fill-midnight-200 dark:fill-midnight-900',
+												)}
+											/>
+											<path
+												d="M5 10L8 13L15 7"
+												stroke="currentColor"
+												strokeWidth="1.5"
+												strokeLinecap="round"
+												strokeLinejoin="round"
+												className={cn(
+													step.status === 'complete' &&
+														'text-peppermint-600 dark:text-peppermint-400',
+													step.status === 'in-progress' &&
+														'text-midnight-600 dark:text-midnight-400',
+												)}
+											/>
+										</svg>
+									) : (
+										<svg
+											className="absolute inset-0"
+											viewBox="0 0 20 20"
+											fill="none"
+											xmlns="http://www.w3.org/2000/svg"
+										>
+											<rect
+												width="20"
+												height="20"
+												rx="4"
+												className={cn(
+													step.status === 'complete' &&
+														'fill-peppermint-200 dark:fill-peppermint-900',
+													step.status === 'in-progress' &&
+														'fill-midnight-200 dark:fill-midnight-900',
+												)}
+											/>
+											<path
+												d="M10 5V15M5 10H15"
+												stroke="currentColor"
+												strokeWidth="1.5"
+												strokeLinecap="round"
+												strokeLinejoin="round"
+												className={cn(
+													step.status === 'complete' &&
+														'text-peppermint-600 dark:text-peppermint-400',
+													step.status === 'in-progress' &&
+														'text-midnight-600 dark:text-midnight-400',
+												)}
+											/>
+										</svg>
+									)}
+								</div>
+								{result.findingType || result.title}
+							</li>
 						))}
 				</ul>
 			);
@@ -631,7 +703,7 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 	);
 
 	return (
-		<div className="mt-4 space-y-4">
+		<div className="mt-4 w-4/6 space-y-4">
 			{/* Research Progress Card */}
 			<Card className="group relative rounded-lg border border-border bg-card transition-all duration-300">
 				<CardHeader
@@ -718,7 +790,7 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 										className="flex cursor-pointer items-start justify-between"
 										onClick={() => toggleStepExpansion(step.id)}
 									>
-										<div className="flex items-start gap-3">
+										<div className="flex items-start gap-3 truncate">
 											<div className={utils.getStepIconStyle(step.status)}>
 												{step.status === 'in-progress' ? (
 													<div className="animate-spin">
@@ -728,7 +800,7 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 													step.icon
 												)}
 											</div>
-											<div>
+											<div className="shrink">
 												<h3
 													className={cn(
 														'font-medium',

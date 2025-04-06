@@ -135,12 +135,12 @@ export function MarkdownReport({
 	 * Scroll to bottom of the report
 	 */
 	const scrollToBottom = useCallback(() => {
-		if (reportRef.current) {
-			reportRef.current.scrollTo({
-				top: reportRef.current.scrollHeight,
-				behavior: 'smooth',
-			});
-		}
+		// if (reportRef.current) {
+		// 	reportRef.current.scrollTo({
+		// 		top: reportRef.current.scrollHeight,
+		// 		behavior: 'smooth',
+		// 	});
+		// }
 	}, []);
 
 	/**

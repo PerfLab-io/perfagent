@@ -400,7 +400,7 @@ export function ChatMessage({
 		),
 
 		// Tool section header style
-		toolHeader: 'mb-1 flex items-center justify-between',
+		toolHeader: 'mb-1 flex items-center justify-between gap-32',
 
 		// Tool toggle button style
 		toolToggleButton:
@@ -458,7 +458,7 @@ export function ChatMessage({
 		if (!messageTools.hasReportTool) return null;
 
 		return (
-			<div className="mt-1">
+			<div className="mt-1 flex min-w-96 flex-col flex-wrap items-start">
 				{renderToolHeader('Report')}
 
 				{expanded && (
