@@ -60,6 +60,16 @@ const config = {
 					'900': 'hsl(var(--midnight-900) / <alpha-value>)',
 					'950': 'hsl(var(--midnight-950) / <alpha-value>)',
 				},
+				sidebar: {
+					DEFAULT: 'hsl(var(--peppermint-200))',
+					foreground: 'hsl(var(--peppermint-950))',
+					primary: 'hsl(var(--peppermint-500))',
+					'primary-foreground': 'hsl(var(--peppermint-50))',
+					accent: 'hsl(var(--peppermint-500))',
+					'accent-foreground': 'hsl(var(--peppermint-50))',
+					border: 'hsl(var(--peppermint-500))',
+					ring: 'hsl(var(--peppermint-50))',
+				},
 				border: 'hsl(var(--border) / <alpha-value>)',
 				input: 'hsl(var(--input) / <alpha-value>)',
 				ring: 'hsl(var(--ring) / <alpha-value>)',
@@ -102,7 +112,10 @@ const config = {
 			},
 		},
 	},
-	plugins: [require('tailwindcss-animate')],
+	plugins: [
+		require('tailwindcss-animate'),
+		require('@tailwindcss/container-queries'),
+	],
 } satisfies Config;
 
 export default config;

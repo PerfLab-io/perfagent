@@ -31,8 +31,6 @@
 		--merino-950: 16 35% 15%;
 
 		/* Midnight palette */
-
-		/* Midnight palette */
 		--midnight-50: 212 100% 97%;
 		--midnight-100: 210 100% 94%;
 		--midnight-200: 213 100% 89%;
@@ -66,7 +64,7 @@
 		--destructive: 0 84.2% 60.2%;
 		--destructive-foreground: 210 40% 98%;
 
-		--border: var(--midnight-950);
+		--border: var(--peppermint-400);
 		--input: 214.3 31.8% 91.4%;
 		--ring: 222.2 84% 4.9%;
 
