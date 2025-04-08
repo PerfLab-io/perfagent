@@ -43,11 +43,11 @@
 		--midnight-900: 227 50% 34%;
 		--midnight-950: 228 49% 12%;
 
-		--card: 0 0% 100%;
-		--card-foreground: 222.2 84% 4.9%;
+		--card: var(--midnight-50);
+		--card-foreground: var(--midnight-900);
 
-		--popover: 0 0% 100%;
-		--popover-foreground: 222.2 84% 4.9%;
+		--popover: 0 0% 100%; /* white */
+		--popover-foreground: var(--merino-900);
 
 		--primary: var(--peppermint-200);
 		--primary-foreground: var(--peppermint-900);
@@ -55,8 +55,8 @@
 		--secondary: var(--midnight-200);
 		--secondary-foreground: var(--midnight-900);
 
-		--muted: var(--merino-200);
-		--muted-foreground: 215.4 16.3% 46.9%;
+		--muted: 0 0% 96.1%; /* gray */
+		--muted-foreground: 0 0% 45.1%; /* gray */
 
 		--accent: var(--merino-200);
 		--accent-foreground: var(--merino-900);
