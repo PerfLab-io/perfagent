@@ -446,12 +446,9 @@ export default function AiChatPage() {
 		}
 	}, [showFileSection, attachedFiles?.length, messages.length, scrollToBottom]);
 
-	// Common height classes for both panels
-	const panelHeightClasses = 'min-h-[calc(70vh-2rem)] max-h-[calc(90vh-2rem)]';
-
 	return (
 		<ResearchProvider onAbort={handleAbortResearch}>
-			<main className="container relative mx-auto flex min-h-[500px] flex-1 flex-col px-4 py-6 md:min-h-[600px] lg:min-h-[700px]">
+			<main className="container relative mx-auto flex h-full flex-1 flex-col px-4">
 				{/* Dual panel container */}
 				<div
 					className={cn(
@@ -464,12 +461,7 @@ export default function AiChatPage() {
 					)}
 				>
 					{/* Left panel with chat */}
-					<div
-						className={cn(
-							'panel-left relative flex flex-col',
-							panelHeightClasses,
-						)}
-					>
+					<div className={cn('panel-left relative flex flex-col')}>
 						{/* Outer main container with dropzone */}
 						<FileDropzone
 							onFilesDrop={handleFilesDrop}
@@ -626,7 +618,7 @@ export default function AiChatPage() {
 					</div>
 
 					{/* Right panel container */}
-					<div className={panelHeightClasses}>
+					<div>
 						{panelContentType === 'data' ? (
 							<DataPanel
 								visible={showSidePanel && panelAnimationComplete}
