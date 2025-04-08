@@ -256,7 +256,7 @@ const utils = {
 
 		return phase === 'complete'
 			? 'bg-peppermint-100 text-peppermint-800 dark:bg-peppermint-800 dark:text-peppermint-100'
-			: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-800 dark:text-indigo-100';
+			: 'bg-midnight-100 text-midnight-800 dark:bg-midnight-800 dark:text-midnight-100';
 	},
 
 	/**
@@ -265,7 +265,7 @@ const utils = {
 	getStatusColor: (status: 'complete' | 'in-progress' | 'pending'): string => {
 		const statusColors = {
 			complete: 'text-peppermint-600 dark:text-peppermint-300',
-			'in-progress': 'text-indigo-600 dark:text-indigo-200',
+			'in-progress': 'text-merino-600 dark:text-merino-200',
 			pending: 'text-foreground/50 dark:text-foreground/70',
 		};
 
@@ -277,9 +277,9 @@ const utils = {
 	 */
 	getSourceColor: (source: string): string => {
 		const sourceColors = {
-			web: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-800 dark:text-indigo-100',
+			web: 'bg-midnight-200 text-midnight-800 dark:bg-midnight-800 dark:text-midnight-200',
 			analysis:
-				'bg-merino-100 text-merino-800 dark:bg-merino-800 dark:text-merino-100',
+				'bg-merino-200 text-merino-800 dark:bg-merino-800 dark:text-merino-200',
 			default: 'bg-muted text-muted-foreground',
 		};
 
@@ -296,8 +296,8 @@ const utils = {
 			'rounded-lg border border-border/20 p-3',
 			'transition-all duration-300 ease-in-out',
 			step.status === 'in-progress' &&
-				'-translate-y-1 translate-x-1 bg-accent/10 shadow-[-4px_4px_0_hsl(var(--border-color))]',
-			step.status === 'complete' && 'bg-background',
+				'-translate-y-1 translate-x-1 bg-accent/10 text-merino-900 shadow-[-4px_4px_0_hsl(var(--merino-900))]',
+			step.status === 'complete' && 'bg-background text-base',
 		);
 	},
 
@@ -310,9 +310,9 @@ const utils = {
 		return cn(
 			'rounded-full p-2 transition-colors duration-300',
 			status === 'complete'
-				? 'bg-peppermint-100 text-peppermint-800 dark:bg-peppermint-800 dark:text-peppermint-100'
+				? 'bg-peppermint-200 text-peppermint-800 dark:bg-peppermint-800 dark:text-peppermint-100'
 				: status === 'in-progress'
-					? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200'
+					? 'bg-merino-200 text-merino-800 dark:bg-merino-900 dark:text-merino-200'
 					: 'bg-muted text-muted-foreground dark:bg-muted/80 dark:text-muted-foreground/90',
 		);
 	},
@@ -323,7 +323,9 @@ const utils = {
 	getResultContainerStyle: (isExpanded: boolean): string => {
 		return cn(
 			'rounded-lg border border-border/20 p-3 transition-all duration-200',
-			isExpanded ? 'bg-accent' : 'bg-background hover:bg-accent/10',
+			isExpanded
+				? 'bg-accent text-accent-foreground'
+				: 'bg-white hover:bg-primary',
 		);
 	},
 };
@@ -819,7 +821,7 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 														step.status === 'complete' &&
 															'bg-peppermint-200 dark:bg-peppermint-900',
 														step.status === 'in-progress' &&
-															'bg-midnight-200 dark:bg-midnight-900',
+															'bg-merino-200 dark:bg-merino-900',
 													)}
 												>
 													<StepIcon
@@ -828,7 +830,7 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 															step.status === 'complete' &&
 																'text-peppermint-600 dark:text-peppermint-400',
 															step.status === 'in-progress' &&
-																'text-midnight-600 dark:text-midnight-400',
+																'text-merino-600 dark:text-merino-400',
 														)}
 													/>
 												</div>
@@ -848,7 +850,7 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 											step.status === 'complete' &&
 												'border-peppermint-500 data-[state=open]:bg-white dark:border-peppermint-900',
 											step.status === 'in-progress' &&
-												'border-midnight-500 data-[state=open]:bg-midnight-50 dark:border-midnight-900',
+												'border-merino-500 data-[state=open]:bg-merino-50 dark:border-merino-900',
 										)}
 									>
 										<CollapsibleTrigger
@@ -857,13 +859,28 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 												step.status === 'complete' &&
 													'text-peppermint-700 dark:text-peppermint-300',
 												step.status === 'in-progress' &&
-													'text-midnight-700 dark:text-midnight-300',
+													'text-merino-700 dark:text-merino-300',
 											)}
 										>
 											<div className="flex w-full items-center justify-between gap-1">
 												<span className="font-semibold">{result.query}</span>
-												<div className="flex items-center space-x-1 rounded border border-dashed border-peppermint-500 bg-transparent p-2 px-2 py-0.5 text-xs group-data-[state=open]:border-solid dark:bg-peppermint-900 dark:group-data-[state=open]:bg-white">
-													<span className="text-peppermint-700 dark:text-peppermint-300">
+												<div
+													className={cn(
+														'flex items-center space-x-1 rounded border border-dashed bg-transparent p-2 px-2 py-0.5 text-xs group-data-[state=open]:border-solid dark:group-data-[state=open]:bg-white',
+														step.status === 'complete' &&
+															'border-peppermint-500 dark:bg-peppermint-900',
+														step.status === 'in-progress' &&
+															'border-merino-500 dark:bg-merino-900',
+													)}
+												>
+													<span
+														className={cn(
+															step.status === 'complete' &&
+																'text-peppermint-700 dark:text-peppermint-300',
+															step.status === 'in-progress' &&
+																'text-merino-700 dark:text-merino-300',
+														)}
+													>
 														{result.results.length > 1
 															? `${result.results.length} results`
 															: '1 result'}
@@ -890,7 +907,7 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 																	step.status === 'complete' &&
 																		'bg-peppermint-200 dark:bg-peppermint-900',
 																	step.status === 'in-progress' &&
-																		'bg-midnight-200 dark:bg-midnight-900',
+																		'bg-merino-200 dark:bg-merino-900',
 																)}
 															>
 																<StepIcon
@@ -901,7 +918,7 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 																		step.status === 'complete' &&
 																			'text-peppermint-600 dark:text-peppermint-400',
 																		step.status === 'in-progress' &&
-																			'text-midnight-600 dark:text-midnight-400',
+																			'text-merino-600 dark:text-merino-400',
 																	)}
 																/>
 															</div>
@@ -1030,7 +1047,7 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 												>
 													{step.title}
 												</h3>
-												<p className="text-sm text-foreground/70">
+												<p className="text-text-current/70 text-sm">
 													{step.message}
 												</p>
 											</div>
@@ -1070,135 +1087,133 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 					</DialogTrigger>
 					<DialogContent className="w-9/12 max-w-screen-lg">
 						<DialogHeader>
-							<DialogDescription className="my-8">
-								<Card
-									className={cn(
-										'group relative w-full rounded-xl border-border bg-background',
-										'animate-in fade-in slide-in-from-bottom-5',
-									)}
-								>
-									<CardHeader className="flex flex-row items-center justify-between p-4 pb-2">
-										<div className="flex items-center gap-2">
-											<Search className="h-4 w-4 text-foreground/70" />
-											<CardTitle className="text-lg font-bold text-foreground">
-												Research Results: {query}
-											</CardTitle>
-										</div>
-										<div className="flex items-center gap-2">
+							<Card
+								className={cn(
+									'group relative mt-4 w-full rounded-xl border-border bg-white',
+									'animate-in fade-in slide-in-from-bottom-5',
+								)}
+							>
+								<CardHeader className="flex flex-row items-center justify-between p-4 pb-2">
+									<div className="flex items-center gap-2">
+										<Search className="h-4 w-4 text-foreground/70" />
+										<CardTitle className="text-lg font-bold text-foreground">
+											Research Results: {query}
+										</CardTitle>
+									</div>
+									<div className="flex items-center gap-2">
+										<Badge
+											variant="outline"
+											className="bg-peppermint-100/50 text-peppermint-800 dark:bg-peppermint-800/50 dark:text-peppermint-100"
+										>
+											Complete
+										</Badge>
+										<FeedbackButtons
+											messageId={`research-${annotations?.[0]?.toolCallId}`}
+											source="research"
+										/>
+									</div>
+								</CardHeader>
+
+								<CardContent className="p-4 pt-2">
+									<div className="space-y-4">
+										<div className="mb-2 flex flex-wrap gap-2">
 											<Badge
 												variant="outline"
-												className="bg-peppermint-100/50 text-peppermint-800 dark:bg-peppermint-800/50 dark:text-peppermint-100"
+												className="bg-background text-foreground/70 hover:bg-accent"
 											>
-												Complete
+												{results.length} results
 											</Badge>
-											<FeedbackButtons
-												messageId={`research-${annotations?.[0]?.toolCallId}`}
-												source="research"
-											/>
+											<Badge
+												variant="outline"
+												className="bg-midnight-100/50 text-midnight-800 hover:bg-midnight-100 dark:bg-midnight-800/50 dark:text-midnight-100 dark:hover:bg-midnight-700"
+											>
+												<Globe className="mr-1 h-3 w-3" /> Web:{' '}
+												{
+													results.filter((result) => result.source === 'web')
+														.length
+												}
+											</Badge>
+											<Badge
+												variant="outline"
+												className="bg-merino-100/50 text-merino-800 hover:bg-merino-100 dark:bg-merino-800/50 dark:text-merino-100 dark:hover:bg-merino-700"
+											>
+												<BarChart className="mr-1 h-3 w-3" /> Analysis:{' '}
+												{
+													results.filter(
+														(result) => result.source === 'analysis',
+													).length
+												}
+											</Badge>
 										</div>
-									</CardHeader>
 
-									<CardContent className="p-4 pt-2">
-										<div className="space-y-4">
-											<div className="mb-2 flex flex-wrap gap-2">
-												<Badge
-													variant="outline"
-													className="bg-background text-foreground/70 hover:bg-accent"
+										<div className="max-h-[65dvh] space-y-3 overflow-y-scroll">
+											{results.map((result) => (
+												<div
+													key={`${result.id}-${Math.random()}`}
+													className={utils.getResultContainerStyle(
+														expandedResult === result.id,
+													)}
 												>
-													{results.length} results
-												</Badge>
-												<Badge
-													variant="outline"
-													className="bg-indigo-100/50 text-indigo-800 hover:bg-indigo-100 dark:bg-indigo-800/50 dark:text-indigo-100 dark:hover:bg-indigo-700"
-												>
-													<Globe className="mr-1 h-3 w-3" /> Web:{' '}
-													{
-														results.filter((result) => result.source === 'web')
-															.length
-													}
-												</Badge>
-												<Badge
-													variant="outline"
-													className="bg-merino-100/50 text-merino-800 hover:bg-merino-100 dark:bg-merino-800/50 dark:text-merino-100 dark:hover:bg-merino-700"
-												>
-													<BarChart className="mr-1 h-3 w-3" /> Analysis:{' '}
-													{
-														results.filter(
-															(result) => result.source === 'analysis',
-														).length
-													}
-												</Badge>
-											</div>
-
-											<div className="max-h-[530px] space-y-3 overflow-y-scroll xl:max-h-[900px]">
-												{results.map((result) => (
 													<div
-														key={`${result.id}-${Math.random()}`}
-														className={utils.getResultContainerStyle(
-															expandedResult === result.id,
-														)}
+														className="flex cursor-pointer items-start justify-between"
+														onClick={() => toggleResultExpansion(result.id)}
 													>
-														<div
-															className="flex cursor-pointer items-start justify-between"
-															onClick={() => toggleResultExpansion(result.id)}
-														>
-															<div className="flex items-start gap-3">
-																<div
-																	className={cn(
-																		'rounded-md p-2',
-																		utils.getSourceColor(result.source),
-																	)}
-																>
-																	{result.sourceIcon}
-																</div>
-																<div>
-																	<h3 className="font-medium text-foreground">
-																		{result.title}
-																	</h3>
-																	{expandedResult !== result.id && (
-																		<p className="line-clamp-1 text-sm text-foreground/70">
-																			{result.content}
-																		</p>
-																	)}
-																</div>
-															</div>
-															<button
-																type="button"
-																className="mt-1 flex-shrink-0"
+														<div className="flex items-start gap-3">
+															<div
+																className={cn(
+																	'rounded-md p-2',
+																	utils.getSourceColor(result.source),
+																)}
 															>
-																{expandedResult === result.id ? (
-																	<ChevronDown className="h-4 w-4 text-foreground/60" />
-																) : (
-																	<ChevronRight className="h-4 w-4 text-foreground/60" />
-																)}
-															</button>
-														</div>
-
-														{expandedResult === result.id && (
-															<div className="mt-2 pl-12">
-																<p className="mb-2 text-sm text-foreground/80">
-																	{result.content}
-																</p>
-																{result.url && (
-																	<a
-																		href={result.url}
-																		target="_blank"
-																		rel="noopener noreferrer"
-																		className="inline-flex items-center gap-1 text-xs text-indigo-600 hover:underline dark:text-indigo-400"
-																	>
-																		View source{' '}
-																		<ChevronRight className="h-3 w-3" />
-																	</a>
+																{result.sourceIcon}
+															</div>
+															<div>
+																<h3 className="font-medium text-current">
+																	{result.title}
+																</h3>
+																{expandedResult !== result.id && (
+																	<p className="text-current/70 line-clamp-1 text-sm">
+																		{result.content}
+																	</p>
 																)}
 															</div>
-														)}
+														</div>
+														<button
+															type="button"
+															className="mt-1 flex-shrink-0"
+														>
+															{expandedResult === result.id ? (
+																<ChevronDown className="text-current/60 h-4 w-4" />
+															) : (
+																<ChevronRight className="text-current/60 h-4 w-4" />
+															)}
+														</button>
 													</div>
-												))}
-											</div>
+
+													{expandedResult === result.id && (
+														<div className="mt-2 pl-12">
+															<p className="text-current/80 mb-2 text-sm">
+																{result.content}
+															</p>
+															{result.url && (
+																<a
+																	href={result.url}
+																	target="_blank"
+																	rel="noopener noreferrer"
+																	className="inline-flex items-center gap-1 text-xs text-midnight-600 hover:underline dark:text-midnight-400"
+																>
+																	View source{' '}
+																	<ChevronRight className="h-3 w-3" />
+																</a>
+															)}
+														</div>
+													)}
+												</div>
+											))}
 										</div>
-									</CardContent>
-								</Card>
-							</DialogDescription>
+									</div>
+								</CardContent>
+							</Card>
 						</DialogHeader>
 					</DialogContent>
 				</Dialog>

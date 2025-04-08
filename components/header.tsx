@@ -1,8 +1,7 @@
 'use client';
 import { cn } from '@/lib/utils';
 import { SimpleThemeToggle } from './simple-theme-toggle';
-import { useState } from 'react';
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 
 export function Header() {
 	const [scrolled, setScrolled] = useState(false);

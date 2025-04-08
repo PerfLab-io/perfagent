@@ -129,34 +129,12 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 							unsubscribe();
 							break;
 						default:
-							const traceInsightStream = streamText({
-								model: perflab.languageModel(model),
-								temperature: 0,
-								experimental_telemetry: {
-									isEnabled: true,
-									functionId: `trace-analysis-llm-call`,
-									metadata: {
-										langfuseTraceId: parentTraceId,
-										langfuseUpdateParent: false, // Do not update the parent trace with execution results
-									},
-								},
-								messages,
-								system: largeModelSystemPrompt,
-								onFinish(event) {
-									console.log(
-										'######################### traceReportStream onFinish #################################',
-									);
-									console.log('Fin reason: ', event.finishReason);
-									console.log('Reasoning: ', event.reasoning);
-									console.log('reasoning details: ', event.reasoningDetails);
-									console.log('Messages: ', event.response.messages);
-								},
-								onError(event) {
-									console.log('Error: ', event.error);
-								},
-							});
-
-							traceInsightStream.mergeIntoDataStream(dataStreamWriter, {
+							const stream = await mastra
+								.getAgent('largeAssistant')
+								.stream(messages, {
+									system: largeModelSystemPrompt,
+								});
+							stream.mergeIntoDataStream(dataStreamWriter, {
 								sendReasoning: true,
 								sendSources: true,
 							});

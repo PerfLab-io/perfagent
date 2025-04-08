@@ -49,22 +49,22 @@
 		--popover: 0 0% 100%;
 		--popover-foreground: 222.2 84% 4.9%;
 
-		--primary: 222.2 47.4% 11.2%;
-		--primary-foreground: 210 40% 98%;
+		--primary: var(--peppermint-200);
+		--primary-foreground: var(--peppermint-900);
 
-		--secondary: 210 40% 96.1%;
-		--secondary-foreground: 222.2 47.4% 11.2%;
+		--secondary: var(--midnight-200);
+		--secondary-foreground: var(--midnight-900);
 
-		--muted: 210 40% 96.1%;
+		--muted: var(--merino-200);
 		--muted-foreground: 215.4 16.3% 46.9%;
 
-		--accent: 210 40% 96.1%;
-		--accent-foreground: 222.2 47.4% 11.2%;
+		--accent: var(--merino-200);
+		--accent-foreground: var(--merino-900);
 
 		--destructive: 0 84.2% 60.2%;
 		--destructive-foreground: 210 40% 98%;
 
-		--border: var(--peppermint-400);
+		--border: var(--peppermint-950);
 		--input: 214.3 31.8% 91.4%;
 		--ring: 222.2 84% 4.9%;
 
@@ -79,7 +79,7 @@
 		--popover-foreground: 210 40% 98%;
 
 		--primary: 210 40% 98%;
-		--primary-foreground: 222.2 47.4% 11.2%;
+		--primary-foreground: var(--merino-900);
 
 		--secondary: 217.2 32.6% 17.5%;
 		--secondary-foreground: 210 40% 98%;
@@ -112,14 +112,14 @@
 :root {
 	/* Use peppermint-25 for background */
 	--bg-color: var(--peppermint-50);
-	/* Use midnight-950 for text */
-	--text-color: var(--midnight-950);
+	/* Use peppermint-950 for text */
+	--text-color: var(--peppermint-950);
 	/* Use merino-200 for accent */
 	--accent-color: var(--merino-200);
 	/* Use white for card background */
 	--card-bg: 0 0% 100%;
-	/* Use midnight-950 for border */
-	--border-color: var(--midnight-950);
+	/* Use peppermint-400 for border */
+	--border-color: var(--peppermint-950);
 }
 
 /* Dark mode */

@@ -65,8 +65,8 @@ const config = {
 					foreground: 'hsl(var(--peppermint-950))',
 					primary: 'hsl(var(--peppermint-500))',
 					'primary-foreground': 'hsl(var(--peppermint-50))',
-					accent: 'hsl(var(--peppermint-500))',
-					'accent-foreground': 'hsl(var(--peppermint-50))',
+					accent: 'hsl(var(--peppermint-50))',
+					'accent-foreground': 'hsl(var(--peppermint-900))',
 					border: 'hsl(var(--peppermint-500))',
 					ring: 'hsl(var(--peppermint-50))',
 				},
@@ -93,7 +93,7 @@ const config = {
 				},
 				accent: {
 					DEFAULT: 'hsl(var(--accent-color) / <alpha-value>)',
-					foreground: 'var(--text-color)',
+					foreground: 'hsl(var(--accent-foreground) / <alpha-value>)',
 				},
 				popover: {
 					DEFAULT: 'hsl(var(--popover) / <alpha-value>)',

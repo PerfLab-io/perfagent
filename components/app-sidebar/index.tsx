@@ -32,6 +32,7 @@ import {
 	SidebarMenuButton,
 	SidebarMenuItem,
 } from '@/components/ui/sidebar';
+import { SimpleThemeToggle } from '../simple-theme-toggle';
 
 const data = {
 	user: {
@@ -155,13 +156,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 		<Sidebar collapsible="offcanvas" {...props}>
 			<SidebarHeader>
 				<SidebarMenu>
-					<SidebarMenuItem>
+					<SidebarMenuItem className="flex items-center justify-between">
 						<a
 							href="#"
 							className="hover:bg-none data-[slot=sidebar-menu-button]:!p-1.5"
 						>
-							<span className="text-xl font-bold text-primary">PerfAgent</span>
+							<span className="text-xl font-bold text-primary-foreground">
+								PerfAgent
+							</span>
 						</a>
+						<SimpleThemeToggle />
 					</SidebarMenuItem>
 				</SidebarMenu>
 			</SidebarHeader>

@@ -447,8 +447,7 @@ export default function AiChatPage() {
 	}, [showFileSection, attachedFiles?.length, messages.length, scrollToBottom]);
 
 	// Common height classes for both panels
-	const panelHeightClasses =
-		'min-h-[calc(70vh-200px)] max-h-[calc(90vh-200px)]';
+	const panelHeightClasses = 'min-h-[calc(70vh-2rem)] max-h-[calc(90vh-2rem)]';
 
 	return (
 		<ResearchProvider onAbort={handleAbortResearch}>
@@ -612,7 +611,7 @@ export default function AiChatPage() {
 														isLoading ||
 														(!input.trim() && attachedFiles?.length === 0)
 													}
-													variant="default"
+													variant="secondary"
 													title="Send message"
 													size="icon"
 												>

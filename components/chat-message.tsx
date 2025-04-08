@@ -384,7 +384,7 @@ export function ChatMessage({
 		messageBubble: cn(
 			'rounded-lg p-3',
 			message.role === 'user'
-				? 'bg-indigo-600 text-white'
+				? 'bg-midnight-600 text-white'
 				: 'group relative border border-border bg-background text-foreground transition-all duration-300 hover:-translate-y-1 hover:translate-x-1 hover:shadow-[-4px_4px_0_hsl(var(--border-color))]',
 			isStreaming &&
 				message.role === 'assistant' &&
@@ -395,7 +395,7 @@ export function ChatMessage({
 		timestamp: cn(
 			'text-xs',
 			message.role === 'user'
-				? 'text-indigo-100'
+				? 'text-midnight-100'
 				: 'text-foreground dark:text-foreground',
 		),
 
@@ -606,8 +606,8 @@ export function ChatMessage({
 		<div className={styles.messageContainer}>
 			{/* Bot avatar */}
 			{!isUser && (
-				<div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-700">
-					<Bot className="h-5 w-5 text-indigo-600 dark:text-indigo-100" />
+				<div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-merino-100 dark:bg-merino-700">
+					<Bot className="h-5 w-5 text-merino-600 dark:text-merino-100" />
 				</div>
 			)}
 
@@ -653,7 +653,7 @@ export function ChatMessage({
 
 			{/* User avatar */}
 			{isUser && (
-				<div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-indigo-600">
+				<div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-midnight-600">
 					<User className="h-5 w-5 text-white" />
 				</div>
 			)}
