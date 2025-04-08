@@ -2,8 +2,8 @@
 
 import * as React from 'react';
 import {
-	ArrowUpCircleIcon,
 	BarChartIcon,
+	BotMessageSquareIcon,
 	CameraIcon,
 	ClipboardListIcon,
 	DatabaseIcon,
@@ -12,7 +12,6 @@ import {
 	FileTextIcon,
 	FolderIcon,
 	HelpCircleIcon,
-	LayoutDashboardIcon,
 	ListIcon,
 	SearchIcon,
 	SettingsIcon,
@@ -29,42 +28,21 @@ import {
 	SidebarFooter,
 	SidebarHeader,
 	SidebarMenu,
-	SidebarMenuButton,
 	SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { SimpleThemeToggle } from '../simple-theme-toggle';
 
 const data = {
 	user: {
-		name: 'shadcn',
-		email: 'm@example.com',
+		name: 'vinicius',
+		email: 'vinicius@example.com',
 		avatar: '/avatars/shadcn.jpg',
 	},
 	navMain: [
 		{
-			title: 'Dashboard',
+			title: 'Agent insights',
 			url: '#',
-			icon: LayoutDashboardIcon,
-		},
-		{
-			title: 'Lifecycle',
-			url: '#',
-			icon: ListIcon,
-		},
-		{
-			title: 'Analytics',
-			url: '#',
-			icon: BarChartIcon,
-		},
-		{
-			title: 'Projects',
-			url: '#',
-			icon: FolderIcon,
-		},
-		{
-			title: 'Team',
-			url: '#',
-			icon: UsersIcon,
+			icon: BotMessageSquareIcon,
 		},
 	],
 	navClouds: [
@@ -126,27 +104,17 @@ const data = {
 			url: '#',
 			icon: HelpCircleIcon,
 		},
-		{
-			title: 'Search',
-			url: '#',
-			icon: SearchIcon,
-		},
 	],
 	documents: [
 		{
-			name: 'Data Library',
+			name: 'Saved Traces',
 			url: '#',
 			icon: DatabaseIcon,
 		},
 		{
-			name: 'Reports',
+			name: 'Saved Reports',
 			url: '#',
 			icon: ClipboardListIcon,
-		},
-		{
-			name: 'Word Assistant',
-			url: '#',
-			icon: FileIcon,
 		},
 	],
 };

@@ -1,5 +1,7 @@
 import { Separator } from '@/components/ui/separator';
 import { SidebarTrigger } from '@/components/ui/sidebar';
+import { Button } from '@/components/ui/button';
+import { FilePenIcon, Paperclip, PencilIcon, PenIcon } from 'lucide-react';
 
 export function SiteHeader() {
 	return (
@@ -10,7 +12,10 @@ export function SiteHeader() {
 					orientation="vertical"
 					className="mx-2 data-[orientation=vertical]:h-4"
 				/>
-				<h1 className="text-base font-medium">Chat</h1>
+				<Button variant="ghost" size="sm" className="group gap-2">
+					<h1 className="font-medium">Agent Insight #20</h1>
+					<FilePenIcon className="h-4 w-4 origin-left scale-0 transition-all group-hover:block group-hover:scale-100" />
+				</Button>
 			</div>
 		</header>
 	);
