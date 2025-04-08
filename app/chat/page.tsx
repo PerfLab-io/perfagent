@@ -452,213 +452,207 @@ export default function AiChatPage() {
 
 	return (
 		<ResearchProvider onAbort={handleAbortResearch}>
-			<div className="flex min-h-screen flex-col bg-background">
-				<div className="relative mb-20 bg-peppermint-200 dark:bg-background">
-					<Header />
-				</div>
-
-				<main className="container relative mx-auto flex min-h-[500px] flex-1 flex-col px-4 py-6 md:min-h-[600px] lg:min-h-[700px]">
-					{/* Dual panel container */}
+			<main className="container relative mx-auto flex min-h-[500px] flex-1 flex-col px-4 py-6 md:min-h-[600px] lg:min-h-[700px]">
+				{/* Dual panel container */}
+				<div
+					className={cn(
+						'dual-panel-container relative flex-1',
+						showSidePanel
+							? 'panel-active'
+							: showSidePanel === null
+								? ''
+								: 'panel-inactive',
+					)}
+				>
+					{/* Left panel with chat */}
 					<div
 						className={cn(
-							'dual-panel-container relative flex-1',
-							showSidePanel
-								? 'panel-active'
-								: showSidePanel === null
-									? ''
-									: 'panel-inactive',
+							'panel-left relative flex flex-col',
+							panelHeightClasses,
 						)}
 					>
-						{/* Left panel with chat */}
-						<div
-							className={cn(
-								'panel-left relative flex flex-col',
-								panelHeightClasses,
-							)}
+						{/* Outer main container with dropzone */}
+						<FileDropzone
+							onFilesDrop={handleFilesDrop}
+							className="relative flex h-full flex-1 flex-col"
+							disabled={isLoading}
 						>
-							{/* Outer main container with dropzone */}
-							<FileDropzone
-								onFilesDrop={handleFilesDrop}
-								className="relative flex h-full flex-1 flex-col"
-								disabled={isLoading}
+							{/* File context section */}
+							<FileContextSection
+								onTraceNavigationChange={handleTraceNavigationChange}
+								currentFile={currentContextFile}
+								isVisible={showContextFile}
+								traceAnalysis={traceAnalysis}
+							/>
+							{/* Chat messages container */}
+							<div
+								className={cn(
+									'flex-1 overflow-y-auto rounded-lg border border-border bg-card shadow-sm',
+									'transition-all duration-500 ease-in-out',
+									'h-[calc(100%-80px)] pb-20',
+									messagesVisible
+										? 'messages-container-active'
+										: 'messages-container-initial',
+									showFileSection ? 'messages-with-files' : '',
+								)}
 							>
-								{/* File context section */}
-								<FileContextSection
-									onTraceNavigationChange={handleTraceNavigationChange}
-									currentFile={currentContextFile}
-									isVisible={showContextFile}
-									traceAnalysis={traceAnalysis}
-								/>
-								{/* Chat messages container */}
-								<div
-									className={cn(
-										'flex-1 overflow-y-auto rounded-lg border border-border bg-card shadow-sm',
-										'transition-all duration-500 ease-in-out',
-										'h-[calc(100%-80px)] pb-20',
-										messagesVisible
-											? 'messages-container-active'
-											: 'messages-container-initial',
-										showFileSection ? 'messages-with-files' : '',
-									)}
-								>
-									<div className="space-y-4 p-4">
-										{memoizedMessages.map((message, index) => (
-											<ChatMessage
-												key={message.id}
-												message={message}
-												isStreaming={
-													isLoading && index === memoizedMessages.length - 1
-												}
-												onAbort={stop}
-												openReport={openReport}
-												closeReport={closeReport}
-												isActiveReport={activeReportId === message.id}
-												hasReport={Boolean(reportsMap[message.id])}
-												isGeneratingAnyReport={isGeneratingReport}
-											/>
-										))}
-										<div ref={messagesEndRef} />
-									</div>
+								<div className="space-y-4 p-4">
+									{memoizedMessages.map((message, index) => (
+										<ChatMessage
+											key={message.id}
+											message={message}
+											isStreaming={
+												isLoading && index === memoizedMessages.length - 1
+											}
+											onAbort={stop}
+											openReport={openReport}
+											closeReport={closeReport}
+											isActiveReport={activeReportId === message.id}
+											hasReport={Boolean(reportsMap[message.id])}
+											isGeneratingAnyReport={isGeneratingReport}
+										/>
+									))}
+									<div ref={messagesEndRef} />
 								</div>
+							</div>
 
-								{/* Input area container */}
-								<div
-									className={cn(
-										'rounded-lg border border-border bg-card shadow-sm',
-										'transition-all duration-500 ease-in-out',
-										chatStarted
-											? 'input-container-active'
-											: 'input-container-initial translate-x-[25%] translate-y-[26%] xl:translate-y-[-50%]',
-									)}
-									style={{ transformOrigin: 'center bottom' }}
-								>
-									{/* File previews */}
-									{attachedFiles?.length > 0 && (
-										<div
-											className={cn(
-												'file-section rounded-t-lg border-b bg-peppermint-100 px-4 py-2 dark:bg-peppermint-900',
-												showFileSection
-													? 'max-h-[500px] opacity-100'
-													: 'max-h-0 py-0 opacity-0',
-											)}
-										>
-											<div className="flex flex-wrap gap-2">
-												{attachedFiles?.map((file) => (
-													<FilePreview
-														key={file.id}
-														file={file}
-														onRemove={() => removeFile(file.id)}
-													/>
-												))}
-											</div>
-											<SuggestedMessages
-												files={attachedFiles}
-												onSelectSuggestion={setInput}
-												isLoading={suggestionsLoading}
-												suggestions={suggestions}
-											/>
-										</div>
-									)}
-
-									{/* Textarea and buttons */}
-									<form onSubmit={handleSubmit} className="p-4" ref={formRef}>
-										<div className="relative">
-											<textarea
-												ref={textareaRef}
-												value={input}
-												onChange={(e) => setInput(e.target.value)}
-												onKeyDown={handleKeyDown}
-												placeholder="Ask me anything about web vitals..."
-												className={cn(
-													'w-full resize-none rounded-xl p-4',
-													'border border-border bg-background focus:border-peppermint-800 focus:ring-0',
-													'text-foreground outline-none transition-all placeholder:text-foreground',
-													chatStarted
-														? 'max-h-[200px] min-h-[60px]'
-														: 'min-h-[100px]',
-													isLoading && 'cursor-not-allowed opacity-50',
-												)}
-												rows={chatStarted ? 2 : 3}
-												disabled={isLoading}
-											/>
-
-											<div className="pointer-events-auto absolute bottom-4 right-4 flex gap-2">
-												<input
-													type="file"
-													ref={fileInputRef}
-													onChange={handleFileChange}
-													className="hidden"
-													multiple
+							{/* Input area container */}
+							<div
+								className={cn(
+									'rounded-lg border border-border bg-card shadow-sm',
+									'transition-all duration-500 ease-in-out',
+									chatStarted
+										? 'input-container-active'
+										: 'input-container-initial translate-x-[25%] translate-y-[26%] xl:translate-y-[-50%]',
+								)}
+								style={{ transformOrigin: 'center bottom' }}
+							>
+								{/* File previews */}
+								{attachedFiles?.length > 0 && (
+									<div
+										className={cn(
+											'file-section rounded-t-lg border-b bg-peppermint-100 px-4 py-2 dark:bg-peppermint-900',
+											showFileSection
+												? 'max-h-[500px] opacity-100'
+												: 'max-h-0 py-0 opacity-0',
+										)}
+									>
+										<div className="flex flex-wrap gap-2">
+											{attachedFiles?.map((file) => (
+												<FilePreview
+													key={file.id}
+													file={file}
+													onRemove={() => removeFile(file.id)}
 												/>
-												<Button
-													type="button"
-													variant="outline"
-													size="icon"
-													onClick={() => fileInputRef.current?.click()}
-													title="Attach file"
-													disabled={isLoading}
-												>
-													<Paperclip className="h-5 w-5" />
-												</Button>
-
-												{isLoading ? (
-													<Button
-														onClick={stop}
-														variant="destructive"
-														title="Cancel"
-														size="icon"
-													>
-														<X className="h-5 w-5" />
-													</Button>
-												) : (
-													<Button
-														type="submit"
-														disabled={
-															isLoading ||
-															(!input.trim() && attachedFiles?.length === 0)
-														}
-														variant="default"
-														title="Send message"
-														size="icon"
-													>
-														<Send className="h-5 w-5" />
-													</Button>
-												)}
-											</div>
+											))}
 										</div>
-									</form>
-								</div>
-							</FileDropzone>
-						</div>
+										<SuggestedMessages
+											files={attachedFiles}
+											onSelectSuggestion={setInput}
+											isLoading={suggestionsLoading}
+											suggestions={suggestions}
+										/>
+									</div>
+								)}
 
-						{/* Right panel container */}
-						<div className={panelHeightClasses}>
-							{panelContentType === 'data' ? (
-								<DataPanel
-									visible={showSidePanel && panelAnimationComplete}
-									onClose={() => setShowSidePanel(false)}
-									exiting={panelExiting}
-								/>
-							) : (
-								<MarkdownReport
-									visible={showSidePanel && panelAnimationComplete}
-									onClose={() => {
-										setShowSidePanel(false);
-										setActiveReportId(null);
-									}}
-									exiting={panelExiting}
-									isGenerating={isGeneratingReport}
-									topic={reportTopic}
-									onComplete={handleReportComplete}
-									reportData={reportData}
-									onAbort={handleAbortReport}
-									reportId={activeReportId}
-								/>
-							)}
-						</div>
+								{/* Textarea and buttons */}
+								<form onSubmit={handleSubmit} className="p-4" ref={formRef}>
+									<div className="relative">
+										<textarea
+											ref={textareaRef}
+											value={input}
+											onChange={(e) => setInput(e.target.value)}
+											onKeyDown={handleKeyDown}
+											placeholder="Ask me anything about web vitals..."
+											className={cn(
+												'w-full resize-none rounded-xl p-4',
+												'border border-border bg-background focus:border-peppermint-800 focus:ring-0',
+												'text-foreground outline-none transition-all placeholder:text-foreground',
+												chatStarted
+													? 'max-h-[200px] min-h-[60px]'
+													: 'min-h-[100px]',
+												isLoading && 'cursor-not-allowed opacity-50',
+											)}
+											rows={chatStarted ? 2 : 3}
+											disabled={isLoading}
+										/>
+
+										<div className="pointer-events-auto absolute bottom-4 right-4 flex gap-2">
+											<input
+												type="file"
+												ref={fileInputRef}
+												onChange={handleFileChange}
+												className="hidden"
+												multiple
+											/>
+											<Button
+												type="button"
+												variant="outline"
+												size="icon"
+												onClick={() => fileInputRef.current?.click()}
+												title="Attach file"
+												disabled={isLoading}
+											>
+												<Paperclip className="h-5 w-5" />
+											</Button>
+
+											{isLoading ? (
+												<Button
+													onClick={stop}
+													variant="destructive"
+													title="Cancel"
+													size="icon"
+												>
+													<X className="h-5 w-5" />
+												</Button>
+											) : (
+												<Button
+													type="submit"
+													disabled={
+														isLoading ||
+														(!input.trim() && attachedFiles?.length === 0)
+													}
+													variant="default"
+													title="Send message"
+													size="icon"
+												>
+													<Send className="h-5 w-5" />
+												</Button>
+											)}
+										</div>
+									</div>
+								</form>
+							</div>
+						</FileDropzone>
 					</div>
-				</main>
-			</div>
+
+					{/* Right panel container */}
+					<div className={panelHeightClasses}>
+						{panelContentType === 'data' ? (
+							<DataPanel
+								visible={showSidePanel && panelAnimationComplete}
+								onClose={() => setShowSidePanel(false)}
+								exiting={panelExiting}
+							/>
+						) : (
+							<MarkdownReport
+								visible={showSidePanel && panelAnimationComplete}
+								onClose={() => {
+									setShowSidePanel(false);
+									setActiveReportId(null);
+								}}
+								exiting={panelExiting}
+								isGenerating={isGeneratingReport}
+								topic={reportTopic}
+								onComplete={handleReportComplete}
+								reportData={reportData}
+								onAbort={handleAbortReport}
+								reportId={activeReportId}
+							/>
+						)}
+					</div>
+				</div>
+			</main>
 		</ResearchProvider>
 	);
 }
