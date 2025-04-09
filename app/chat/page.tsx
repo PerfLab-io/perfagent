@@ -448,7 +448,7 @@ export default function AiChatPage() {
 
 	return (
 		<ResearchProvider onAbort={handleAbortResearch}>
-			<main className="container relative mx-auto flex h-full flex-1 flex-col px-4">
+			<main className="container relative flex flex-1 flex-col">
 				{/* Dual panel container */}
 				<div
 					className={cn(
@@ -461,11 +461,11 @@ export default function AiChatPage() {
 					)}
 				>
 					{/* Left panel with chat */}
-					<div className={cn('panel-left relative flex flex-col')}>
+					<div className="panel-left relative flex flex-col-reverse">
 						{/* Outer main container with dropzone */}
 						<FileDropzone
 							onFilesDrop={handleFilesDrop}
-							className="relative flex h-full flex-1 flex-col"
+							className="relative flex max-h-[calc(90vh-2rem)] flex-1 flex-col"
 							disabled={isLoading}
 						>
 							{/* File context section */}
@@ -478,16 +478,15 @@ export default function AiChatPage() {
 							{/* Chat messages container */}
 							<div
 								className={cn(
-									'flex-1 overflow-y-auto rounded-lg border border-border bg-card shadow-sm',
+									'flex-1 shrink overflow-y-auto rounded-lg border border-border bg-card shadow-sm',
 									'transition-all duration-500 ease-in-out',
-									'h-[calc(100%-80px)] pb-20',
 									messagesVisible
 										? 'messages-container-active'
 										: 'messages-container-initial',
 									showFileSection ? 'messages-with-files' : '',
 								)}
 							>
-								<div className="space-y-4 p-4">
+								<div className="space-y-4 p-4 pb-20">
 									{memoizedMessages.map((message, index) => (
 										<ChatMessage
 											key={message.id}
@@ -510,7 +509,7 @@ export default function AiChatPage() {
 							{/* Input area container */}
 							<div
 								className={cn(
-									'rounded-lg border border-border bg-card shadow-sm',
+									'sticky bottom-0 rounded-lg border border-border bg-card shadow-sm',
 									'transition-all duration-500 ease-in-out',
 									chatStarted
 										? 'input-container-active'
