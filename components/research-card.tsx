@@ -863,7 +863,9 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 											)}
 										>
 											<div className="flex w-full items-center justify-between gap-1">
-												<span className="font-semibold">{result.query}</span>
+												<span className="text-left font-semibold">
+													{result.query}
+												</span>
 												<div
 													className={cn(
 														'flex items-center space-x-1 rounded border border-dashed bg-transparent p-2 px-2 py-0.5 text-xs group-data-[state=open]:border-solid dark:group-data-[state=open]:bg-white',
@@ -875,6 +877,7 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 												>
 													<span
 														className={cn(
+															'shrink-0',
 															step.status === 'complete' &&
 																'text-peppermint-700 dark:text-peppermint-300',
 															step.status === 'in-progress' &&
@@ -892,9 +895,22 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 										<CollapsibleContent>
 											<Separator
 												orientation="horizontal"
-												className="my-2 w-full bg-peppermint-300 dark:bg-peppermint-900"
+												className={cn(
+													'my-2 w-full',
+													step.status === 'complete' &&
+														'bg-peppermint-300 dark:bg-peppermint-900',
+													step.status === 'in-progress' &&
+														'bg-merino-300 dark:bg-merino-900',
+												)}
 											/>
-											<ul>
+											<ul
+												className={cn(
+													step.status === 'complete' &&
+														'text-peppermint-600 dark:text-peppermint-400',
+													step.status === 'in-progress' &&
+														'text-merino-600 dark:text-merino-400',
+												)}
+											>
 												{result.results.map((r) => (
 													<li
 														key={r.id}
@@ -903,7 +919,7 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 														<div className="flex items-start gap-3">
 															<div
 																className={cn(
-																	'relative flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md',
+																	'relative flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md text-current',
 																	step.status === 'complete' &&
 																		'bg-peppermint-200 dark:bg-peppermint-900',
 																	step.status === 'in-progress' &&
@@ -915,10 +931,6 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 																		step.id === 'web'
 																			? 'h-3.5 w-3.5'
 																			: 'h-3 w-3',
-																		step.status === 'complete' &&
-																			'text-peppermint-600 dark:text-peppermint-400',
-																		step.status === 'in-progress' &&
-																			'text-merino-600 dark:text-merino-400',
 																	)}
 																/>
 															</div>
