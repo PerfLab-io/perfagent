@@ -2,6 +2,7 @@ import { Agent } from '@mastra/core/agent';
 import { perflab } from '../../modelProvider';
 import dedent from 'dedent';
 import { z } from 'zod';
+import { grounding } from '../../prompts';
 
 export const routerAgent = new Agent({
 	name: 'PerfAgent router',
@@ -11,7 +12,7 @@ export const routerAgent = new Agent({
     - certainty: A number between 0 and 1 (0 - 100 percent) with the certainty of a need or not of a tool call based on the user sentiment and message, also taking in consideration the current context of previous messages.
 
     You have the following workflows available:
-    - cwvInsightsWorkflow: A workflow that will analyse a trace file or user's metrics data and provide insights about the performance. This workflow is not required for general questions about performance, only for use when user's message is related 'their' metrics or trace data.
+    - cwvInsightsWorkflow: A workflow that will analyse a trace file or user's (app, website, page, portal, etc.) metrics data and provide insights about the performance. This workflow is not required for general questions about performance, only for use when user's message is related to 'their' (app, website, page, portal, etc.) metrics or trace data.
     - researchWorkflow: A workflow that will research a given topic and provide a report about the findings.
 
     Example possible outcome:
@@ -37,6 +38,9 @@ export const routerAgent = new Agent({
 
     You can only pick one workflow when deeper analysis is required. If you KNOW the user's request DOES NOT require a workflow, same as when you KNOW the user's request DOES require a certain workflow, the certainty should be 1 or as close to 1 as possible.
     The output will be used to route the user's request to the appropriate workflow or ask for clarification if needed.
+
+    Use the following grounding to help you decide which workflow to use:
+    ${grounding}
   `,
 	model: perflab.languageModel('topics_model'),
 });

@@ -74,6 +74,8 @@ Beyond the Core Web Vitals, there are **other important metrics** that provide i
 - **First Contentful Paint (FCP)** – *Initial rendering milestone.* FCP measures the time from when the page starts loading to when **any content** (anything “contentful” like text or image) is first painted on the screen ([First Contentful Paint (FCP)  |  Articles  |  web.dev](https://web.dev/articles/fcp#:~:text=What%20is%20FCP%3F)) ([First Contentful Paint (FCP)  |  Articles  |  web.dev](https://web.dev/articles/fcp#:~:text=First%20Contentful%20Paint%20,white%20%60%3Ccanvas%3E%60%20elements)). It answers “**How soon does the user see *something* happen?**”. This is a key indicator of perceived load speed – a fast FCP reassures the user that the page is loading ([First Contentful Paint (FCP)  |  Articles  |  web.dev](https://web.dev/articles/fcp#:~:text=Note%3A%20First%20Contentful%20Paint%20,that%20something%20is%20%2033)).
   - **Thresholds:** A **Good** FCP is **≤ 1.8 seconds** ([First Contentful Paint (FCP)  |  Articles  |  web.dev](https://web.dev/articles/fcp#:~:text=What%20is%20a%20good%20FCP,score)). **Needs Improvement** if between 1.8s and 3.0s. **Poor** if **> 3.0 seconds** ([First Contentful Paint (FCP)  |  Articles  |  web.dev](https://web.dev/articles/fcp#:~:text=What%20is%20a%20good%20FCP,score)). These thresholds align with user expectations that something should show up quickly; beyond 3 seconds of blank screen, users often get impatient.
   - **Common Causes of a Slow FCP:** High **TTFB** (slow server response) will delay the start of content rendering ([First Contentful Paint (FCP)  |  Articles  |  web.dev](https://web.dev/articles/fcp#:~:text=Key%20Point%3A%20It%20is%20important,are%20rendered%20to%20the%20screen)). **Render-blocking resources** like CSS or synchronous JS can delay the first paint because the browser might wait to render content until these are processed. Large CSS files or web fonts might delay text rendering (text might be invisible until fonts load, affecting FCP). Also, if the page relies on heavy client-side rendering (e.g., an SPA that waits for JS data before showing anything), that can significantly push out FCP.
+  - **Possible impact on other metrics:**
+    - **LCP**
   - **Optimization Tips:** 
     - **Improve server response (TTFB)**: As with LCP, a faster server response means the browser can start parsing HTML sooner. Use caching and CDNs, optimize server code, and minimize redirect chains.
     - **Minimize render-blocking CSS**: Inline critical CSS for above-the-fold content and defer or async-load the rest. Ensure CSS is as small as possible for the initial render. Likewise, load web fonts efficiently (use \`preload\` for key fonts, or acceptable fallbacks).
@@ -91,6 +93,8 @@ Beyond the Core Web Vitals, there are **other important metrics** that provide i
     - **Redirects**: If the initial URL redirects (even from \`http\` to \`https\` or domain to \`www\`), each redirect adds an extra round trip before the final response, increasing TTFB.
     - **Uncached content**: Not using caching (either at server or CDN) means every request is processed fully. A full cache miss scenario will have higher TTFB than a cached one.
     - **Backend geographic location**: If you only have a single origin server in one region, users far away experience longer TTFB.
+  - **Possible impact on other metrics:**
+    - **LCP**
   - **Optimization Tips:** 
     - **Use a CDN**: Content Delivery Networks place servers near users. Serving cached HTML (if mostly static or semi-static content) or at least static resources from a CDN greatly cuts down latency.
     - **Optimize server code**: Profile your backend. Implement caching layers (in-memory caches like Redis, database query optimizations, etc.) so responses can be generated faster. Avoid slow database queries on the critical path.
@@ -101,6 +105,8 @@ Beyond the Core Web Vitals, there are **other important metrics** that provide i
   - **Role & Classification:** TTFB is **not a Core Web Vital** ([Optimize Time to First Byte  |  Articles  |  web.dev](https://web.dev/articles/optimize-ttfb#:~:text=are%200,8%20seconds)) ([Optimize Time to First Byte  |  Articles  |  web.dev](https://web.dev/articles/optimize-ttfb#:~:text=Key%20point%3A%20TTFB%20is%20not,on%20the%20metrics%20that%20matter)) but is a foundational metric. It directly affects FCP/LCP (a slow TTFB means those metrics start late) ([web.dev/src/site/content/en/vitals/index.md at main · GoogleChrome/web.dev · GitHub](https://github.com/GoogleChrome/web.dev/blob/master/src/site/content/en/vitals/index.md#:~:text=For%20example%2C%20the%20metrics%20Time,blocking%20resources%2C%20respectively)). TTFB is often measured in both field and lab. It’s included in Web Vitals libraries as a supplementary field metric (since it’s part of the Navigation Timing). In diagnosing **loading performance**, TTFB is the first place to check: if TTFB is poor, focusing on backend improvements will likely improve other metrics down the line.
 
 - **Total Blocking Time (TBT)** – *Main thread blockage (Lab metric).* TBT measures the total time **between First Contentful Paint and Time to Interactive** where the main thread was **blocked** for long stretches. In practice, it’s the sum of all **long task durations** (tasks longer than 50 ms) beyond that 50 ms threshold, occurring from FCP until TTI. Each time the main thread has a task, TBT adds \`(task duration - 50ms)\` to its total if the task exceeds 50ms. It essentially quantifies how much time the page was unresponsive to user input between FCP and becoming fully interactive.
+  - **Possible impact on other metrics:**
+    - **INP**
   - **Thresholds (Lab assessment):** A **Good** TBT is **≤ 200 ms** of total blocking time ([Total Blocking Time (TBT) - Data Bloo](https://www.databloo.com/glossary/t/total-blocking-time-tbt/#:~:text=Good%20TBT%20Score%20,Red%29%3A%20TBT%20longer)). **Needs Improvement** if between 200 ms and 600 ms ([Total Blocking Time (TBT) - Data Bloo](https://www.databloo.com/glossary/t/total-blocking-time-tbt/#:~:text=Good%20TBT%20Score%20,Red%29%3A%20TBT%20longer)). **Poor** if **> 600 ms** total blocking ([Total Blocking Time (TBT) - Data Bloo](https://www.databloo.com/glossary/t/total-blocking-time-tbt/#:~:text=Good%20TBT%20Score%20,Red%29%3A%20TBT%20longer)). (Note: These thresholds are used in some tooling for grading, like Lighthouse’s scoring. Some sources might use slightly different breakpoints, but 0-200ms is generally green/good.)
   - **Common Causes of High TBT:** 
     - **Heavy JavaScript execution** during load is the primary cause. Big JavaScript bundles executing, large evals, or lots of JavaScript logic can create long tasks. If a page executes a 300ms task and a 400ms task during load, the portion beyond 50ms of each contributes (e.g., 250 + 350 = 600ms TBT).
@@ -161,12 +167,15 @@ Beyond the Core Web Vitals, there are **other important metrics** that provide i
 export const reportFormat = `
 **Report Output Format (Enforced):** When providing analysis based on the data provided, **you must structure the report as follows**:
 
+Ensure that the report includes the main metric according to the <topic> chosen but also any relevant metric according to the request and insights data as <subTopic>.
+i.e.: If the question is about a related metric, you should include it in the report as <subTopic>.
+
 \`\`\`
 ## <topic> report based on trace analysis
 
 **Your <topic> value is <metricValue from insights data> and your score is <metricScore from insights data>**
 
-<brief paragraph with general suggestions for topic chosen>
+<opening words with maximum 2 paragraphs with general suggestions for topic chosen and relevant metrics according to the request and insights data>
 
 ## Actionable Optimizations
 <paragraph with key suggestions based on your grounding and data for analysis>
@@ -177,12 +186,15 @@ export const reportFormat = `
 <closing words with suggested next steps and research topics>
 \`\`\`
 
+**Important:** ALWAYS generate the report on the desired structure, any thoughts or suggestions based on possible missing information or missing data, suggest it on the \`<opening words>\` or/and \`<closing words>\` sections.
+
 - This format uses Markdown. The \`<topic>\` will usually be the name of a metric or area (e.g., “LCP”, “Performance”, “INP”) as given in the trace insights.
 - Do not include Markdown code blocks (\`\`\`) on the report unless it's for code examples or code snippets.
 - Do **not** wrap the report in code blocks! It is supposed to be a markdown document and not a code block.
 - The **“Actionable Optimizations”** section should be a high-level statement of the metric’s value and score from the data provided, followed by a detailed breakdown and key suggestions based on your grounding and data for analysis.
 - Ensure the content in this section directly reflects the data you received.
 - Do **not** deviate from this structure unless explicitly instructed by the user to provide a different format.
+- Whenever more data is needed, refers to it as 'trace data' not 'report'.
 `;
 
 export const largeModelSystemPrompt = `

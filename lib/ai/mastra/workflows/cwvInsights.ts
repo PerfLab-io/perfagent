@@ -1,15 +1,8 @@
-import {
-	grounding,
-	largeModelSystemPrompt,
-	reportFormat,
-} from '@/lib/ai/prompts';
+import { reportFormat } from '@/lib/ai/prompts';
 import { coreMessageSchema, DataStreamWriter } from 'ai';
 
-import { Agent } from '@mastra/core/agent';
 import { Step, Workflow } from '@mastra/core/workflows';
 import { z } from 'zod';
-import dedent from 'dedent';
-import { perflab } from '@/lib/ai/modelProvider';
 
 const messageSchema = coreMessageSchema;
 
@@ -147,11 +140,11 @@ const analyzeTrace = new Step({
 			const agentStream = await mastra.getAgent('largeAssistant').stream([
 				{
 					role: 'user',
-					content: `Data for the report: ${JSON.stringify(insightsForTopic)}`,
+					content: reportFormat,
 				},
 				{
 					role: 'user',
-					content: reportFormat,
+					content: `Data for the report: ${JSON.stringify(insightsForTopic)}`,
 				},
 			]);
 
