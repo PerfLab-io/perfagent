@@ -66,7 +66,7 @@ export function SuggestedMessages({
 			<div className="pb-1 pt-2">
 				<div className="mb-2 flex items-center gap-2 text-sm text-foreground">
 					<Lightbulb className="h-4 w-4 text-merino-600 dark:text-merino-300" />
-					<span>Suggested questions based on your files:</span>
+					<span>Suggested questions based on your trace file:</span>
 				</div>
 				<div className="flex flex-wrap gap-2">
 					{isLoading ? (

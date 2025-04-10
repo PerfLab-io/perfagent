@@ -155,6 +155,22 @@ export default function AiChatPage() {
 
 						setCurrentContextFile(newFile);
 						setShowContextFile(true);
+
+						requestAnimationFrame(async () => {
+							const insights = analyseInsightsForCWV(
+								trace?.insights ?? new Map(),
+								trace?.parsedTrace ?? {},
+								currentNavigation ?? '',
+							);
+
+							const suggestedMessages = await fetch('/api/suggest', {
+								method: 'POST',
+								body: JSON.stringify({ insights }),
+							}).then((res) => res.json());
+
+							setSuggestions(suggestedMessages);
+							setSuggestionsLoading(false);
+						});
 					});
 				}, 100);
 			});
@@ -448,7 +464,7 @@ export default function AiChatPage() {
 
 	return (
 		<ResearchProvider onAbort={handleAbortResearch}>
-			<main className="container relative flex flex-1 flex-col">
+			<main className="relative flex flex-1 flex-col">
 				{/* Dual panel container */}
 				<div
 					className={cn(

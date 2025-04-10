@@ -1,4 +1,4 @@
-import { convertToCoreMessages, streamText, createDataStream } from 'ai';
+import { convertToCoreMessages, createDataStream } from 'ai';
 import { analyseInsightsForCWV } from '@/lib/insights';
 import { z } from 'zod';
 import { largeModelSystemPrompt } from '@/lib/ai/prompts';
@@ -8,9 +8,9 @@ import { stream } from 'hono/streaming';
 import { zValidator } from '@hono/zod-validator';
 import { UserInteractionsData } from '@paulirish/trace_engine/models/trace/handlers/UserInteractionsHandler';
 import { mastra } from '@/lib/ai/mastra';
-import { perflab } from '@/lib/ai/modelProvider';
 import { langfuse } from '@/lib/tools/langfuse';
 import { routerOutputSchema } from '@/lib/ai/mastra/agents/router';
+import dedent from 'dedent';
 
 export const runtime = 'nodejs';
 
@@ -172,6 +172,43 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 			500,
 		);
 	}
+});
+
+chat.post('/suggest', zValidator('json', requestSchema), async (c) => {
+	const body = c.req.valid('json');
+	const messages = body.messages;
+
+	const insights: ReturnType<typeof analyseInsightsForCWV> = body.insights;
+
+	const smallAssistant = mastra.getAgent('smallAssistant');
+
+	const stream = await smallAssistant.generate(
+		[
+			...messages,
+			{
+				role: 'assistant',
+				content: dedent`
+			I should suggest of least 5 but at most 7 messages to the user based on the insights data I have here.
+			Each suggestion context phrasing should refer to the insights data I have here, but as the user would ask it.
+			The suggestions should be based on what is the most relevant question for the user based on the insights data.
+			I should keep in mind that the user is a web developer and the suggestions should be related to web performance.
+			I should also keep in mind that the user might not know the terminology, so I should include one suggestion about the most relevant metric according to the insights data.
+			I should only return the suggested questions, no other text.
+			I should avoid questions that are too broad, keeping it as contextualized to the relevant insights data as possible, or aimed to explain an important metric according to the insights data.
+			I should keep the suggestions short and concise, maximum 100 characters each.
+			I should avoid using the 'full name' of a metric on the questions, use the abbreviation instead, even on a possible suggestion to explain a metric.
+
+			Here is the insights data:
+			\`\`\`json
+			${JSON.stringify(insights, null, 2)}
+			\`\`\`
+			`,
+			},
+		],
+		{ output: z.array(z.string()).min(5).max(7) },
+	);
+
+	return c.json(stream.object);
 });
 
 export const GET = handle(chat);
