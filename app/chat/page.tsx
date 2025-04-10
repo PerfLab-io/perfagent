@@ -1,8 +1,7 @@
 'use client';
 
 import type React from 'react';
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Header } from '@/components/header';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Paperclip, Send, X } from 'lucide-react';
 import { ChatMessage } from '@/components/chat-message';
@@ -46,6 +45,8 @@ const isFileInputEvent = (
 	return 'target' in e && 'files' in e.target;
 };
 
+const DEFAULT_DEBOUNCE_TIME = 120;
+
 /**
  * AiChatPage - Main chat interface component with file handling, messaging,
  * and side panel functionality for data visualization and reports
@@ -58,6 +59,7 @@ export default function AiChatPage() {
 		handleSubmit: originalHandleSubmit,
 		status,
 		stop,
+		handleInputChange,
 	} = useChat({
 		api: '/api/chat',
 		experimental_throttle: 500,
@@ -112,7 +114,7 @@ export default function AiChatPage() {
 	 * Smoothly scrolls to the bottom of the chat messages
 	 */
 	const scrollToBottom = useCallback(() => {
-		// messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+		messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
 	}, []);
 
 	const processFiles = useCallback(
@@ -245,6 +247,7 @@ export default function AiChatPage() {
 				// Clear suggestions when submitting a message
 				setSuggestions([]);
 				setSuggestionsLoading(false);
+				scrollToBottom();
 			}
 		},
 		[input, attachedFiles?.length, originalHandleSubmit],
@@ -337,13 +340,10 @@ export default function AiChatPage() {
 				// Delay showing messages until input animation completes
 				setTimeout(() => {
 					setMessagesVisible(true);
-					setTimeout(scrollToBottom, 100);
 				}, 500);
-			} else {
-				scrollToBottom();
 			}
 		}
-	}, [messages, chatStarted, scrollToBottom]);
+	}, [messages, chatStarted]);
 
 	// Effect: Handle file section visibility based on attached files
 	useEffect(() => {
@@ -427,41 +427,6 @@ export default function AiChatPage() {
 		// }
 	}, [messages]);
 
-	// Filter to only display user messages and assistant messages
-	const memoizedMessages = useMemo(() => {
-		// Create a shallow copy
-		const msgs = [...messages];
-
-		return msgs.filter((message) => {
-			// Keep all user messages
-			if (message.role === 'user') return true;
-
-			// For assistant messages
-			if (message.role === 'assistant') {
-				// Keep messages that have tool invocations
-				if (message.parts?.some((part) => part.type === 'tool-invocation')) {
-					return true;
-				}
-				// Keep messages that have text parts but no tool invocations
-				if (
-					message.parts?.some((part) => part.type === 'text') ||
-					!message.parts?.some((part) => part.type === 'tool-invocation')
-				) {
-					return true;
-				}
-				return false;
-			}
-			return false;
-		});
-	}, [messages]);
-
-	// Effect: Ensure proper scroll behavior when file section visibility changes
-	useEffect(() => {
-		if (messagesEndRef.current && messages.length > 0) {
-			setTimeout(scrollToBottom, 300);
-		}
-	}, [showFileSection, attachedFiles?.length, messages.length, scrollToBottom]);
-
 	return (
 		<ResearchProvider onAbort={handleAbortResearch}>
 			<main className="relative flex flex-1 flex-col">
@@ -481,7 +446,7 @@ export default function AiChatPage() {
 						{/* Outer main container with dropzone */}
 						<FileDropzone
 							onFilesDrop={handleFilesDrop}
-							className="relative flex max-h-[calc(90vh-2rem)] flex-1 flex-col"
+							className="relative flex max-h-[calc(90vh-2rem)] flex-1 flex-col px-4"
 							disabled={isLoading}
 						>
 							{/* File context section */}
@@ -503,13 +468,11 @@ export default function AiChatPage() {
 								)}
 							>
 								<div className="space-y-4 p-4 pb-20">
-									{memoizedMessages.map((message, index) => (
+									{messages.map((message, index) => (
 										<ChatMessage
 											key={message.id}
 											message={message}
-											isStreaming={
-												isLoading && index === memoizedMessages.length - 1
-											}
+											isStreaming={isLoading && index === messages.length - 1}
 											onAbort={stop}
 											openReport={openReport}
 											closeReport={closeReport}
@@ -525,7 +488,7 @@ export default function AiChatPage() {
 							{/* Input area container */}
 							<div
 								className={cn(
-									'sticky bottom-0 rounded-lg border border-border bg-card shadow-sm',
+									'max-w-[calc(100%-2rem)] rounded-lg border border-border bg-card shadow-sm',
 									'transition-all duration-500 ease-in-out',
 									chatStarted
 										? 'input-container-active'
@@ -567,7 +530,7 @@ export default function AiChatPage() {
 										<textarea
 											ref={textareaRef}
 											value={input}
-											onChange={(e) => setInput(e.target.value)}
+											onChange={handleInputChange}
 											onKeyDown={handleKeyDown}
 											placeholder="Ask me anything about web vitals..."
 											className={cn(
