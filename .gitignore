@@ -27,3 +27,4 @@ yarn-error.log*
 next-env.d.ts
 CLAUDE.md
 .mastra/
+_example/
