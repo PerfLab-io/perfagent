@@ -84,12 +84,12 @@ const analyzeTrace = new Step({
 		const { dataStream: dataStreamWriter, insights } = triggerData;
 		const { topic } = topicStepResult;
 
-		dataStreamWriter.writeMessageAnnotation({
+		dataStreamWriter.writeData({
 			type: 'text',
-			data: {
+			content: JSON.stringify({
 				topic,
 				insights,
-			},
+			}),
 		});
 
 		const insightsForTopic = ((topic) => {
@@ -112,46 +112,74 @@ const analyzeTrace = new Step({
 				};
 			}
 
-			dataStreamWriter.writeMessageAnnotation({
-				type: 'trace_analysis_update',
-				data: {
-					id: 'trace-insights',
-					type: 'trace-insight',
-					status: 'started',
-					topic,
-					timestamp: Date.now(),
+			dataStreamWriter.writeData({
+				type: 'research_update',
+				content: {
+					type: 'research_update',
+					data: {
+						id: 'trace-insights',
+						type: 'trace-insight',
+						status: 'started',
+						topic,
+						timestamp: Date.now(),
+					},
 				},
 			});
 
-			dataStreamWriter.writeMessageAnnotation({
-				type: 'trace_analysis_update',
-				data: {
-					id: 'trace-insights',
-					type: 'trace-insight',
-					status: 'completed',
-					topic,
-					traceInsight: insightsForTopic,
-					timestamp: Date.now(),
+			dataStreamWriter.writeData({
+				type: 'research_update',
+				content: {
+					type: 'research_update',
+					data: {
+						id: 'trace-insights',
+						type: 'trace-insight',
+						status: 'completed',
+						topic,
+						traceInsight: insightsForTopic,
+						timestamp: Date.now(),
+					},
 				},
 			});
 
 			console.log('insightsForTopic complete: ', insightsForTopic.metric);
 
+			// Generate the analysis content
+			const { text: fullContent } = await mastra
+				.getAgent('largeAssistant')
+				.generate([
+					{
+						role: 'user',
+						content: reportFormat,
+					},
+					{
+						role: 'user',
+						content: `Data for the report: ${JSON.stringify(insightsForTopic)}`,
+					},
+				]);
+
+			// Create a text artifact with the report
+			dataStreamWriter.writeData({
+				type: 'text',
+				content: fullContent,
+			});
+
+			// Add a stream with final remarks
 			const agentStream = await mastra.getAgent('largeAssistant').stream([
 				{
-					role: 'user',
-					content: reportFormat,
+					role: 'system',
+					content: 'You are a helpful web performance assistant.',
 				},
 				{
 					role: 'user',
-					content: `Data for the report: ${JSON.stringify(insightsForTopic)}`,
+					content: `Provide a concluding remark about this web performance metric:
+					${JSON.stringify(insightsForTopic)}
+					
+					Be concise and end with "The complete analysis is available above."`,
 				},
 			]);
 
 			agentStream.mergeIntoDataStream(dataStreamWriter, {
 				sendReasoning: true,
-				sendSources: true,
-				experimental_sendStart: true,
 			});
 
 			return {
@@ -176,10 +204,10 @@ const cwvInsightsWorkflow = new Workflow({
 	name: 'trace-analysis-workflow',
 	triggerSchema: z.object({
 		dataStream: z.object({
-			writeMessageAnnotation: z.function().args(
+			writeData: z.function().args(
 				z.object({
 					type: z.string(),
-					data: z.any(),
+					content: z.any(),
 				}),
 			),
 		}),

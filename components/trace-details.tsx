@@ -37,13 +37,7 @@ import { type SyntheticAnimationFramePair } from '@paulirish/trace_engine/models
 import { type Micro } from '@paulirish/trace_engine/models/trace/types/Timing';
 import { MetricGauge } from './trace-details/metric-gauge';
 import { LinePattern } from './line-pattern';
-interface AttachedFile {
-	id: string;
-	name: string;
-	size: number;
-	type: string;
-	data: string | ArrayBuffer | null;
-}
+import { AttachedFile } from '@/lib/hooks/use-chat';
 
 enum WebVitalsMetric {
 	INP = 'Interaction to Next Paint',

@@ -1,18 +1,10 @@
 'use client';
 
-import React, {
-	useState,
-	useEffect,
-	useRef,
-	useCallback,
-	useContext,
-	useMemo,
-} from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
 	Dialog,
 	DialogContent,
-	DialogDescription,
 	DialogHeader,
 	DialogTrigger,
 } from '@/components/ui/dialog';
@@ -34,7 +26,6 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { FeedbackButtons } from '@/components/feedback-buttons';
-import { filterProgressSteps } from '@/lib/filter-progress';
 import { researchPlanSchema } from '@/lib/ai/mastra/workflows/researchWorkflow';
 import { z } from 'zod';
 import {
@@ -43,43 +34,12 @@ import {
 	CollapsibleTrigger,
 } from './ui/collapsible';
 import { Separator } from './ui/separator';
+import { useChat } from '@ai-sdk/react';
+import { ResearchUpdateArtifactMetadata } from '@/artifacts/research_update/client';
+
 /**
  * Types and Interfaces
  */
-
-/**
- * Research context state structure
- */
-interface ResearchContextState {
-	[key: string]: ResearchInstance;
-}
-
-export interface ResearchMessageAnnotation {
-	type: string;
-	data: any;
-	toolCallId: string;
-}
-
-/**
- * Structure for a single research instance
- */
-interface ResearchInstance {
-	results: ResearchResult[];
-	steps: ResearchStep[];
-	visibleSteps: string[];
-	activeStep: string | null;
-	phase: ResearchPhase;
-	progress: number;
-	showResults: boolean;
-	completed: boolean;
-	toolCallId: string | null;
-	isCancelled: boolean;
-}
-
-/**
- * Type for research phases
- */
-type ResearchPhase = 'planning' | 'searching' | 'analyzing' | 'complete';
 
 /**
  * Structure for a research result
@@ -92,6 +52,7 @@ interface ResearchResult {
 	sourceIcon: string | React.ReactNode;
 	url?: string;
 	query?: string;
+	findingType?: string;
 }
 
 /**
@@ -109,108 +70,18 @@ interface ResearchStep {
 }
 
 /**
+ * Type for research phases
+ */
+type ResearchPhase = 'planning' | 'searching' | 'analyzing' | 'complete';
+
+/**
  * Props for ResearchCard component
  */
 interface ResearchCardProps {
 	query: string;
-	triggerAnimation: boolean;
-	preserveData?: boolean;
-	researchId: string;
-	toolCallId?: string | null;
-	onAbort?: (toolCallId?: string) => void;
-	streamedData?: {
-		phase?: ResearchPhase;
-		progress?: number;
-		steps?: ResearchStep[];
-		visibleSteps?: string[];
-		activeStep?: string | null;
-		results?: ResearchResult[];
-		showResults?: boolean;
-		completed?: boolean;
-	};
-	annotations?: ResearchMessageAnnotation[];
-}
-
-/**
- * Context for sharing research data across components
- */
-const ResearchContext = React.createContext<{
-	state: ResearchContextState;
-	setState: React.Dispatch<React.SetStateAction<ResearchContextState>>;
-	onAbort?: (toolCallId?: string) => void;
-}>({
-	state: {},
-	setState: () => {},
-	onAbort: undefined,
-});
-
-/**
- * Research context provider component
- */
-export function ResearchProvider({
-	children,
-	onAbort,
-}: {
-	children: React.ReactNode;
-	onAbort?: (toolCallId?: string) => void;
-}) {
-	const [state, setState] = useState<ResearchContextState>({});
-
-	return (
-		<ResearchContext.Provider
-			value={{
-				state,
-				setState,
-				onAbort,
-			}}
-		>
-			{children}
-		</ResearchContext.Provider>
-	);
-}
-
-/**
- * Custom hook for accessing and updating research state
- */
-function useResearch(id: string) {
-	const { state, setState, onAbort } = useContext(ResearchContext);
-
-	const updateState = useCallback(
-		(update: Partial<ResearchInstance>) => {
-			setState((prevState) => ({
-				...prevState,
-				[id]: {
-					...(prevState[id] || getInitialResearchState()),
-					...update,
-				},
-			}));
-		},
-		[id, setState],
-	);
-
-	return {
-		data: state[id] || getInitialResearchState(),
-		updateState,
-		onAbort,
-	};
-}
-
-/**
- * Helper function to get initial research state
- */
-function getInitialResearchState(): ResearchInstance {
-	return {
-		results: [],
-		steps: [],
-		visibleSteps: [],
-		activeStep: null,
-		phase: 'planning',
-		progress: 0,
-		showResults: false,
-		completed: false,
-		toolCallId: null,
-		isCancelled: false,
-	};
+	triggerAnimation?: boolean;
+	onAbort?: () => void;
+	artifact: ResearchUpdateArtifactMetadata;
 }
 
 /**
@@ -334,9 +205,9 @@ const utils = {
  * Research Card Component
  * Displays research progress, steps, and results
  */
-export function ResearchCard({ query, annotations }: ResearchCardProps) {
-	// Context and state management
-	const { onAbort: contextOnAbort } = useResearch('asd');
+export function ResearchCard({ query, onAbort, artifact }: ResearchCardProps) {
+	// Use the artifact hook instead of context
+	const { stop } = useChat();
 
 	const [isCardExpanded, setIsCardExpanded] = useState(true);
 	const [isCancelled, setIsCancelled] = useState(false);
@@ -350,8 +221,9 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 
 	const handleAbort = useCallback(() => {
 		setIsCancelled(true);
-		contextOnAbort?.();
-	}, [contextOnAbort]);
+		stop();
+		if (onAbort) onAbort();
+	}, [onAbort, stop]);
 
 	const toggleCardExpansion = useCallback(() => {
 		setIsCardExpanded((prev) => !prev);
@@ -374,11 +246,13 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 	 * Process annotations when they change
 	 */
 	useEffect(() => {
-		if (!annotations || annotations.length === 0 || isCancelled) return;
+		if (!artifact || isCancelled) return;
+
+		console.log(artifact, 'ARTIFACT');
 
 		// Track if we've already processed these annotations by using their IDs
 		// This is more reliable than comparing the entire object which may have changing timestamps
-		const annotationIds = `research-${annotations.at(0)?.toolCallId}-${annotations
+		const annotationIds = `research-${artifact.annotations
 			.map(
 				(a) =>
 					`${a.data?.id || ''}-${a.data?.status || ''}-${a.data?.timestamp || ''}`,
@@ -406,8 +280,7 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 		};
 
 		// Process each annotation
-		for (const annotation of annotations) {
-			const { data, toolCallId } = annotation;
+		for (const data of artifact.annotations) {
 			if (!data) continue;
 
 			// Update progress if available
@@ -512,7 +385,7 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 					// Use stable IDs without Date.now() to prevent duplicates on re-renders
 					const formattedResults: ResearchResult[] = items.map(
 						(item: any, index: number) => ({
-							id: `${toolCallId}-${stepIteration}-${index}`,
+							id: `${data.id}-${stepIteration}-${index}`,
 							title: item.title || item.insight,
 							content:
 								typeof item.content === 'string'
@@ -600,7 +473,7 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 		}
 	}, [
 		// Include necessary dependencies
-		annotations,
+		artifact,
 		isCancelled,
 	]);
 
@@ -952,6 +825,9 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 		[results],
 	);
 
+	// Only render if we have a research artifact
+	if (!artifact) return null;
+
 	return (
 		<div className="mt-4 w-full space-y-4">
 			{/* Research Progress Card */}
@@ -1094,7 +970,7 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 							size="sm"
 							className="rounded-full transition-all duration-300 hover:-translate-y-0.5 hover:translate-x-0.5 hover:shadow-[-4px_4px_0_hsl(var(--border-color))]"
 						>
-							Show resuls
+							Show results
 						</Button>
 					</DialogTrigger>
 					<DialogContent className="w-9/12 max-w-screen-lg">
@@ -1120,7 +996,7 @@ export function ResearchCard({ query, annotations }: ResearchCardProps) {
 											Complete
 										</Badge>
 										<FeedbackButtons
-											messageId={`research-${annotations?.[0]?.toolCallId}`}
+											messageId={`research-${artifact.researchId}`}
 											source="research"
 										/>
 									</div>

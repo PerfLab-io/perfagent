@@ -1,4 +1,9 @@
-import { CoreMessage, coreMessageSchema, DataStreamWriter } from 'ai';
+import {
+	CoreMessage,
+	coreMessageSchema,
+	DataStreamWriter,
+	smoothStream,
+} from 'ai';
 
 import { Step, Workflow } from '@mastra/core/workflows';
 import { z } from 'zod';
@@ -94,30 +99,34 @@ const researchPlanning = new Step({
 
 		const { dataStream: dataStreamWriter, messages } = triggerData;
 
-		dataStreamWriter.writeMessageAnnotation({
+		dataStreamWriter.writeData({
 			type: 'research_update',
-			toolCallId,
-			data: {
-				id: 'research-and-analysis',
-				type: 'research-and-analysis',
-				status: 'started',
-				title: 'Research and Analysis',
-				message: 'Starting research and analysis...',
-				timestamp: Date.now(),
+			content: {
+				type: 'research_update',
+				data: {
+					id: 'research-and-analysis',
+					type: 'research-and-analysis',
+					status: 'started',
+					title: 'Research and Analysis',
+					message: 'Starting research and analysis...',
+					timestamp: Date.now(),
+				},
 			},
 		});
 
-		dataStreamWriter.writeMessageAnnotation({
+		dataStreamWriter.writeData({
 			type: 'research_update',
-			toolCallId,
-			data: {
-				id: `research-plan`,
-				type: 'research_plan',
-				status: 'in-progress',
-				title: 'Research Plan',
-				message: 'Creating research plan...',
-				timestamp: Date.now(),
-				completedSteps: 0,
+			content: {
+				type: 'research_update',
+				data: {
+					id: `research-plan`,
+					type: 'research_plan',
+					status: 'in-progress',
+					title: 'Research Plan',
+					message: 'Creating research plan...',
+					timestamp: Date.now(),
+					completedSteps: 0,
+				},
 			},
 		});
 
@@ -127,18 +136,20 @@ const researchPlanning = new Step({
 				output: researchPlanSchema,
 			});
 
-		dataStreamWriter.writeMessageAnnotation({
+		dataStreamWriter.writeData({
 			type: 'research_update',
-			toolCallId,
-			data: {
-				id: `research-plan`,
-				type: 'research_plan',
-				status: 'in-progress',
-				title: 'Research Plan created',
-				message: 'Creating research steps...',
-				timestamp: Date.now(),
-				researchPlan,
-				completedSteps: 0,
+			content: {
+				type: 'research_update',
+				data: {
+					id: `research-plan`,
+					type: 'research_plan',
+					status: 'in-progress',
+					title: 'Research Plan created',
+					message: 'Creating research steps...',
+					timestamp: Date.now(),
+					researchPlan,
+					completedSteps: 0,
+				},
 			},
 		});
 		return researchPlan;
@@ -205,19 +216,21 @@ const researchSteps = new Step({
 		const totalSteps =
 			stepIds.searchSteps.length + stepIds.analysisSteps.length + 1;
 
-		dataStreamWriter.writeMessageAnnotation({
+		dataStreamWriter.writeData({
 			type: 'research_update',
-			toolCallId,
-			data: {
-				id: `research-plan`,
-				type: 'research_plan',
-				status: 'complete',
-				title: 'Research Plan',
-				message: 'Research plan created',
-				timestamp: Date.now(),
-				researchPlan,
-				completedSteps,
-				totalSteps,
+			content: {
+				type: 'research_update',
+				data: {
+					id: `research-plan`,
+					type: 'research_plan',
+					status: 'complete',
+					title: 'Research Plan',
+					message: 'Research plan created',
+					timestamp: Date.now(),
+					researchPlan,
+					completedSteps,
+					totalSteps,
+				},
 			},
 		});
 
@@ -272,17 +285,19 @@ const searchWeb = new Step({
 
 		for (const step of stepIds.searchSteps) {
 			// Send running annotation for this search step
-			dataStreamWriter.writeMessageAnnotation({
+			dataStreamWriter.writeData({
 				type: 'research_update',
-				toolCallId,
-				data: {
-					id: step.id,
-					type: 'web',
-					status: 'in-progress',
-					title: `Searching the web for "${step.query.query}"`,
-					query: step.query.query,
-					message: `Searching trusted sources...`,
-					timestamp: Date.now(),
+				content: {
+					type: 'research_update',
+					data: {
+						id: step.id,
+						type: 'web',
+						status: 'in-progress',
+						title: `Searching the web for "${step.query.query}"`,
+						query: step.query.query,
+						message: `Searching trusted sources...`,
+						timestamp: Date.now(),
+					},
 				},
 			});
 
@@ -317,38 +332,42 @@ const searchWeb = new Step({
 			}
 
 			// Send progress annotation for the search step
-			dataStreamWriter.writeMessageAnnotation({
+			dataStreamWriter.writeData({
 				type: 'research_update',
-				toolCallId,
-				data: {
-					id: step.id,
-					type: 'web',
-					status: 'in-progress',
-					title: `Searched the web for "${step.query.query}"`,
-					query: step.query.query,
-					results: searchResults[searchResults.length - 1].results,
-					message: `Found ${
-						searchResults[searchResults.length - 1].results.length
-					} results for "${step.query.query}"`,
-					timestamp: Date.now(),
-					completedSteps: _newCompletedSteps,
-					totalSteps,
+				content: {
+					type: 'research_update',
+					data: {
+						id: step.id,
+						type: 'web',
+						status: 'in-progress',
+						title: `Searched the web for "${step.query.query}"`,
+						query: step.query.query,
+						results: searchResults[searchResults.length - 1].results,
+						message: `Found ${
+							searchResults[searchResults.length - 1].results.length
+						} results for "${step.query.query}"`,
+						timestamp: Date.now(),
+						completedSteps: _newCompletedSteps,
+						totalSteps,
+					},
 				},
 			});
 		}
 
 		// Send completed annotation for the search step
-		dataStreamWriter.writeMessageAnnotation({
+		dataStreamWriter.writeData({
 			type: 'research_update',
-			toolCallId,
-			data: {
-				id: `search-web-final`,
-				type: 'web',
-				status: 'complete',
-				title: 'Search step complete',
-				timestamp: Date.now(),
-				completedSteps: _newCompletedSteps,
-				totalSteps,
+			content: {
+				type: 'research_update',
+				data: {
+					id: `search-web-final`,
+					type: 'web',
+					status: 'complete',
+					title: 'Search step complete',
+					timestamp: Date.now(),
+					completedSteps: _newCompletedSteps,
+					totalSteps,
+				},
 			},
 		});
 
@@ -409,19 +428,21 @@ const analyzeResults = new Step({
 		let _completedSteps = completedSteps;
 
 		for (const step of stepIds.analysisSteps) {
-			dataStreamWriter.writeMessageAnnotation({
+			dataStreamWriter.writeData({
 				type: 'research_update',
-				toolCallId,
-				data: {
-					id: step.id,
-					type: 'analysis',
-					status: 'in-progress',
-					title: `Analyzing ${step.analysis.type}`,
-					analysisType: step.analysis.type,
-					message: `Analyzing ${step.analysis.type}...`,
-					timestamp: Date.now(),
-					completedSteps,
-					totalSteps,
+				content: {
+					type: 'research_update',
+					data: {
+						id: step.id,
+						type: 'analysis',
+						status: 'in-progress',
+						title: `Analyzing ${step.analysis.type}`,
+						analysisType: step.analysis.type,
+						message: `Analyzing ${step.analysis.type}...`,
+						timestamp: Date.now(),
+						completedSteps,
+						totalSteps,
+					},
 				},
 			});
 
@@ -448,35 +469,39 @@ const analyzeResults = new Step({
 			_analysisResults.push(...analysisResult.findings);
 			_completedSteps++;
 
-			dataStreamWriter.writeMessageAnnotation({
+			dataStreamWriter.writeData({
 				type: 'research_update',
-				toolCallId,
-				data: {
-					id: step.id,
-					type: 'analysis',
-					status: 'in-progress',
-					title: `Analysis of ${step.analysis.type} complete`,
-					analysisType: step.analysis.type,
-					findings: analysisResult.findings,
-					message: `Completed analysis of ${step.analysis.type}`,
-					timestamp: Date.now(),
-					completedSteps: _completedSteps,
-					totalSteps,
+				content: {
+					type: 'research_update',
+					data: {
+						id: step.id,
+						type: 'analysis',
+						status: 'in-progress',
+						title: `Analysis of ${step.analysis.type} complete`,
+						analysisType: step.analysis.type,
+						findings: analysisResult.findings,
+						message: `Completed analysis of ${step.analysis.type}`,
+						timestamp: Date.now(),
+						completedSteps: _completedSteps,
+						totalSteps,
+					},
 				},
 			});
 		}
 
-		dataStreamWriter.writeMessageAnnotation({
+		dataStreamWriter.writeData({
 			type: 'research_update',
-			toolCallId,
-			data: {
-				id: `analysis-final`,
-				type: 'analysis',
-				status: 'complete',
-				title: `Analysis complete`,
-				timestamp: Date.now(),
-				completedSteps: _completedSteps,
-				totalSteps,
+			content: {
+				type: 'research_update',
+				data: {
+					id: `analysis-final`,
+					type: 'analysis',
+					status: 'complete',
+					title: `Analysis complete`,
+					timestamp: Date.now(),
+					completedSteps: _completedSteps,
+					totalSteps,
+				},
 			},
 		});
 
@@ -521,30 +546,37 @@ const researchReport = new Step({
 		const { totalSteps } = researchStepsStepResult;
 		const { analysisResults } = analyzeResultsStepResult;
 
-		const reportStream = await mastra.getAgent('largeAssistant').stream([
-			{
-				role: 'user',
-				content: dedent`
+		const reportStream = await mastra.getAgent('largeAssistant').stream(
+			[
+				{
+					role: 'user',
+					content: dedent`
           Generate a markdown report based on the research plan, search results and analysis results.
 
           Research plan: ${JSON.stringify(researchPlan)}
           Search results: ${JSON.stringify(searchResults)}
           Analysis results: ${JSON.stringify(analysisResults)}
           `,
+				},
+			],
+			{
+				experimental_transform: smoothStream({ chunking: 'word' }),
 			},
-		]);
+		);
 
-		dataStreamWriter.writeMessageAnnotation({
+		dataStreamWriter.writeData({
 			type: 'research_update',
-			toolCallId,
-			data: {
-				id: 'research-and-analysis',
-				type: 'research-and-analysis',
-				status: 'complete',
-				message: `Research and analysis complete`,
-				completedSteps: totalSteps,
-				totalSteps,
-				timestamp: Date.now(),
+			content: {
+				type: 'research_update',
+				data: {
+					id: 'research-and-analysis',
+					type: 'research-and-analysis',
+					status: 'complete',
+					message: `Research and analysis complete`,
+					completedSteps: totalSteps,
+					totalSteps,
+					timestamp: Date.now(),
+				},
 			},
 		});
 
@@ -565,10 +597,10 @@ const researchWorkflow = new Workflow({
 	name: 'research-workflow',
 	triggerSchema: z.object({
 		dataStream: z.object({
-			writeMessageAnnotation: z.function().args(
+			writeData: z.function().args(
 				z.object({
 					type: z.string(),
-					data: z.any(),
+					content: z.any(),
 				}),
 			),
 		}),
