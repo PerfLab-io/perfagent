@@ -1,5 +1,6 @@
 import { Artifact } from '@/components/artifact';
 import { MarkdownRenderer } from '@/components/markdown-renderer';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CopyIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -16,29 +17,21 @@ export const textArtifact = new Artifact<'text', TextArtifactMetadata>({
 		});
 	},
 	onStreamPart: ({ streamPart, setMetadata, setArtifact }) => {
-		if (streamPart.type === 'text-delta') {
+		if (streamPart.content.type === 'text-delta') {
 			setMetadata((metadata) => {
 				return {
-					text: (metadata.text || '') + (streamPart.content as string),
-				};
-			});
-
-			setArtifact((draftArtifact) => {
-				return {
-					...draftArtifact,
-					content:
-						(draftArtifact.content || '') + (streamPart.content as string),
-					isVisible: true,
-					status: 'streaming',
+					text: (metadata?.text || '') + (streamPart.content as any).data,
 				};
 			});
 		}
 	},
 	content: ({ content, metadata }) => {
 		return (
-			<div className="w-full overflow-auto p-4">
-				<MarkdownRenderer content={content || metadata?.text || ''} />
-			</div>
+			<Card className="mb-4 w-full overflow-auto p-4">
+				<CardContent>
+					<MarkdownRenderer content={content || metadata?.text || ''} />
+				</CardContent>
+			</Card>
 		);
 	},
 	actions: [

@@ -19,26 +19,57 @@ const topicStep = new Step({
 				'Insight topic to analyze based on the user prompt. The list reffers to CLS, INP and LCP related queries',
 			),
 	}),
-	execute: async ({ context, mastra }) => {
-		const triggerData = context.getStepResult<{
+	execute: async ({ context, mastra, runId }) => {
+		const { messages, dataStream } = context.getStepResult<{
 			messages: z.infer<typeof messageSchema>[];
+			dataStream: DataStreamWriter;
 		}>('trigger');
 
 		if (!mastra) {
 			throw new Error('Mastra not found');
 		}
 
-		const response = await mastra
-			.getAgent('topicsAgent')
-			.generate(triggerData?.messages, {
-				output: z.object({
-					topic: z
-						.enum(['LCP', 'CLS', 'INP'])
-						.describe(
-							'Insight topic to analyze based on the user prompt. The list reffers to CLS, INP and LCP related queries',
-						),
-				}),
-			});
+		dataStream.writeData({
+			type: 'text',
+			runId,
+			content: {
+				type: 'trace-insight',
+				data: {
+					id: 'trace-insight',
+					type: 'trace-insight',
+					status: 'started',
+					timestamp: Date.now(),
+					title: 'Trace Analysis',
+					message: 'Selecting topic...',
+				},
+			},
+		});
+
+		const response = await mastra.getAgent('topicsAgent').generate(messages, {
+			output: z.object({
+				topic: z
+					.enum(['LCP', 'CLS', 'INP'])
+					.describe(
+						'Insight topic to analyze based on the user prompt. The list reffers to CLS, INP and LCP related queries',
+					),
+			}),
+		});
+
+		dataStream.writeData({
+			type: 'text',
+			runId,
+			content: {
+				type: 'trace-insight',
+				data: {
+					id: 'trace-insight',
+					type: 'trace-insight',
+					status: 'in-progress',
+					timestamp: Date.now(),
+					title: 'Trace Analysis',
+					message: `Selected topic: ${response.object.topic}`,
+				},
+			},
+		});
 
 		return {
 			topic: response.object.topic,
@@ -65,7 +96,7 @@ const insightsSchema = z.object({
 const analyzeTrace = new Step({
 	id: 'analyze-trace',
 	description: 'Analyzes a trace insights',
-	execute: async ({ context, mastra }) => {
+	execute: async ({ context, mastra, runId }) => {
 		const triggerData = context?.getStepResult<{
 			insights: z.infer<typeof insightsSchema>;
 			dataStream: DataStreamWriter;
@@ -86,10 +117,18 @@ const analyzeTrace = new Step({
 
 		dataStreamWriter.writeData({
 			type: 'text',
-			content: JSON.stringify({
-				topic,
-				insights,
-			}),
+			runId,
+			content: {
+				type: 'trace-insight',
+				data: {
+					id: 'trace-insight',
+					type: 'trace-insight',
+					status: 'in-progress',
+					timestamp: Date.now(),
+					title: 'Trace Analysis',
+					message: `Analyzing trace insights for ${topic}...`,
+				},
+			},
 		});
 
 		const insightsForTopic = ((topic) => {
@@ -113,30 +152,17 @@ const analyzeTrace = new Step({
 			}
 
 			dataStreamWriter.writeData({
-				type: 'research_update',
+				type: 'text',
+				runId,
 				content: {
-					type: 'research_update',
+					type: 'trace-insight',
 					data: {
-						id: 'trace-insights',
+						id: 'trace-insight',
 						type: 'trace-insight',
-						status: 'started',
-						topic,
+						status: 'in-progress',
 						timestamp: Date.now(),
-					},
-				},
-			});
-
-			dataStreamWriter.writeData({
-				type: 'research_update',
-				content: {
-					type: 'research_update',
-					data: {
-						id: 'trace-insights',
-						type: 'trace-insight',
-						status: 'completed',
-						topic,
-						traceInsight: insightsForTopic,
-						timestamp: Date.now(),
+						title: 'Trace Analysis',
+						message: `Generating report based on insights for ${topic}...`,
 					},
 				},
 			});
@@ -144,24 +170,27 @@ const analyzeTrace = new Step({
 			console.log('insightsForTopic complete: ', insightsForTopic.metric);
 
 			// Generate the analysis content
-			const { text: fullContent } = await mastra
-				.getAgent('largeAssistant')
-				.generate([
-					{
-						role: 'user',
-						content: reportFormat,
-					},
-					{
-						role: 'user',
-						content: `Data for the report: ${JSON.stringify(insightsForTopic)}`,
-					},
-				]);
+			const reportStream = await mastra.getAgent('largeAssistant').stream([
+				{
+					role: 'user',
+					content: reportFormat,
+				},
+				{
+					role: 'user',
+					content: `Data for the report: ${JSON.stringify(insightsForTopic)}`,
+				},
+			]);
 
-			// Create a text artifact with the report
-			dataStreamWriter.writeData({
-				type: 'text',
-				content: fullContent,
-			});
+			for await (const chunk of reportStream.textStream) {
+				dataStreamWriter.writeData({
+					type: 'text',
+					runId,
+					content: {
+						type: 'text-delta',
+						data: chunk,
+					},
+				});
+			}
 
 			// Add a stream with final remarks
 			const agentStream = await mastra.getAgent('largeAssistant').stream([
@@ -173,7 +202,7 @@ const analyzeTrace = new Step({
 					role: 'user',
 					content: `Provide a concluding remark about this web performance metric:
 					${JSON.stringify(insightsForTopic)}
-					
+
 					Be concise and end with "The complete analysis is available above."`,
 				},
 			]);
@@ -181,6 +210,23 @@ const analyzeTrace = new Step({
 			agentStream.mergeIntoDataStream(dataStreamWriter, {
 				sendReasoning: true,
 			});
+
+			// const agentStream = await mastra.getAgent('largeAssistant').stream([
+			// 	{
+			// 		role: 'user',
+			// 		content: reportFormat,
+			// 	},
+			// 	{
+			// 		role: 'user',
+			// 		content: `Data for the report: ${JSON.stringify(insightsForTopic)}`,
+			// 	},
+			// ]);
+
+			// agentStream.mergeIntoDataStream(dataStreamWriter, {
+			// 	sendReasoning: true,
+			// 	sendSources: true,
+			// 	experimental_sendStart: true,
+			// });
 
 			return {
 				type: 'trace_analysis',
