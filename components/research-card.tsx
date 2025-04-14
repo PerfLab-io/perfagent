@@ -248,8 +248,6 @@ export function ResearchCard({ query, onAbort, artifact }: ResearchCardProps) {
 	useEffect(() => {
 		if (!artifact || isCancelled) return;
 
-		console.log(artifact, 'ARTIFACT');
-
 		// Track if we've already processed these annotations by using their IDs
 		// This is more reliable than comparing the entire object which may have changing timestamps
 		const annotationIds = `research-${artifact.annotations

@@ -84,7 +84,7 @@ const researchPlanning = new Step({
 		messages: z.array(messageSchema),
 	}),
 	outputSchema: researchPlanSchema,
-	execute: async ({ context, runId: toolCallId, mastra }) => {
+	execute: async ({ context, runId, mastra }) => {
 		const triggerData = context?.getStepResult<{
 			dataStream: DataStreamWriter;
 			messages: CoreMessage[];
@@ -101,6 +101,7 @@ const researchPlanning = new Step({
 
 		dataStreamWriter.writeData({
 			type: 'research_update',
+			runId,
 			content: {
 				type: 'research_update',
 				data: {
@@ -116,6 +117,7 @@ const researchPlanning = new Step({
 
 		dataStreamWriter.writeData({
 			type: 'research_update',
+			runId,
 			content: {
 				type: 'research_update',
 				data: {
@@ -138,6 +140,7 @@ const researchPlanning = new Step({
 
 		dataStreamWriter.writeData({
 			type: 'research_update',
+			runId,
 			content: {
 				type: 'research_update',
 				data: {
@@ -193,7 +196,7 @@ const researchSteps = new Step({
 	id: 'research-steps',
 	description: 'Assembles the research plan into a list of steps',
 	outputSchema: researchStepsSchema,
-	execute: async ({ context, runId: toolCallId }) => {
+	execute: async ({ context, runId }) => {
 		const triggerData = context?.getStepResult<{
 			dataStream: DataStreamWriter;
 		}>('trigger');
@@ -218,6 +221,7 @@ const researchSteps = new Step({
 
 		dataStreamWriter.writeData({
 			type: 'research_update',
+			runId,
 			content: {
 				type: 'research_update',
 				data: {
@@ -257,7 +261,7 @@ const searchWeb = new Step({
 	id: 'search-web',
 	description:
 		'Searches the web based on the data from the research steps plan',
-	execute: async ({ context, runId: toolCallId, mastra }) => {
+	execute: async ({ context, runId, mastra }) => {
 		const triggerData = context?.getStepResult<{
 			dataStream: DataStreamWriter;
 		}>('trigger');
@@ -287,6 +291,7 @@ const searchWeb = new Step({
 			// Send running annotation for this search step
 			dataStreamWriter.writeData({
 				type: 'research_update',
+				runId,
 				content: {
 					type: 'research_update',
 					data: {
@@ -334,6 +339,7 @@ const searchWeb = new Step({
 			// Send progress annotation for the search step
 			dataStreamWriter.writeData({
 				type: 'research_update',
+				runId,
 				content: {
 					type: 'research_update',
 					data: {
@@ -357,6 +363,7 @@ const searchWeb = new Step({
 		// Send completed annotation for the search step
 		dataStreamWriter.writeData({
 			type: 'research_update',
+			runId,
 			content: {
 				type: 'research_update',
 				data: {
@@ -401,7 +408,7 @@ const analyzeResults = new Step({
 		analysisResults: analysisResultSchema,
 		completedSteps: z.number(),
 	}),
-	execute: async ({ context, runId: toolCallId, mastra }) => {
+	execute: async ({ context, runId, mastra }) => {
 		const triggerData = context?.getStepResult<{
 			dataStream: DataStreamWriter;
 		}>('trigger');
@@ -430,6 +437,7 @@ const analyzeResults = new Step({
 		for (const step of stepIds.analysisSteps) {
 			dataStreamWriter.writeData({
 				type: 'research_update',
+				runId,
 				content: {
 					type: 'research_update',
 					data: {
@@ -471,6 +479,7 @@ const analyzeResults = new Step({
 
 			dataStreamWriter.writeData({
 				type: 'research_update',
+				runId,
 				content: {
 					type: 'research_update',
 					data: {
@@ -491,6 +500,7 @@ const analyzeResults = new Step({
 
 		dataStreamWriter.writeData({
 			type: 'research_update',
+			runId,
 			content: {
 				type: 'research_update',
 				data: {
@@ -515,7 +525,7 @@ const analyzeResults = new Step({
 const researchReport = new Step({
 	id: 'research-report',
 	description: 'Generates a research report based on the results and analysis',
-	execute: async ({ context, runId: toolCallId, mastra }) => {
+	execute: async ({ context, runId, mastra }) => {
 		const triggerData = context?.getStepResult<{
 			dataStream: DataStreamWriter;
 		}>('trigger');
@@ -566,6 +576,7 @@ const researchReport = new Step({
 
 		dataStreamWriter.writeData({
 			type: 'research_update',
+			runId,
 			content: {
 				type: 'research_update',
 				data: {
@@ -584,7 +595,7 @@ const researchReport = new Step({
 
 		return {
 			type: 'research',
-			toolCallId,
+			runId,
 			researchPlan,
 			searchResults,
 			analysisResults,

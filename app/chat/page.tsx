@@ -15,7 +15,6 @@ import { useChat } from '@ai-sdk/react';
 import { analyzeTraceFromFile, TraceAnalysis } from '@/lib/trace';
 import { FileContextSection } from '@/components/trace-details';
 import { analyseInsightsForCWV } from '@/lib/insights';
-import { DataStreamHandler } from '@/components/data-stream-handler';
 
 /**
  * Type definition for the report data structure
@@ -434,7 +433,6 @@ export default function AiChatPage() {
 										onAbort={stop}
 									/>
 								))}
-								<DataStreamHandler chatId="current-chat" />
 								<div ref={messagesEndRef} />
 							</div>
 						</div>

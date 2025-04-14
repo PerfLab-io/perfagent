@@ -13,13 +13,13 @@ export const researchUpdateArtifact = new Artifact<
 >({
 	kind: 'research_update',
 	description: 'Research updates from the AI agent',
-	initialize: async ({ documentId }) => {
+	initialize: async ({ documentId, setMetadata }) => {
 		console.log('initialize', documentId);
 	},
 	onStreamPart: ({ streamPart, setMetadata }) => {
 		if (streamPart.type === 'research_update') {
 			setMetadata((draftArtifact) => {
-				if (!draftArtifact)
+				if (!draftArtifact) {
 					return {
 						isVisible: true,
 						query: streamPart.content.query,
@@ -27,6 +27,7 @@ export const researchUpdateArtifact = new Artifact<
 						annotations: [(streamPart.content as any).data],
 						completed: false,
 					};
+				}
 
 				const newAnnotations = [
 					...(draftArtifact.annotations || []),
@@ -38,6 +39,8 @@ export const researchUpdateArtifact = new Artifact<
 
 				return {
 					...draftArtifact,
+					query: streamPart.content.query,
+					researchId: streamPart.content.id,
 					annotations: newAnnotations,
 					completed,
 				};
@@ -46,6 +49,7 @@ export const researchUpdateArtifact = new Artifact<
 	},
 	content: (props) => {
 		const { metadata } = props;
+		console.log('metadata', metadata);
 		if (!metadata) {
 			return null;
 		}

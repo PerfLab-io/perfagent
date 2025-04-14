@@ -22,10 +22,17 @@ export const initialArtifactData: UIArtifact = {
 
 type Selector<T> = (state: UIArtifact) => T;
 
-export function useArtifactSelector<Selected>(selector: Selector<Selected>) {
-	const { data: localArtifact } = useSWR<UIArtifact>('artifact', null, {
-		fallbackData: initialArtifactData,
-	});
+export function useArtifactSelector<Selected>(
+	artifactId: string,
+	selector: Selector<Selected>,
+) {
+	const { data: localArtifact } = useSWR<UIArtifact>(
+		artifactId ? `artifact-${artifactId}` : 'artifact',
+		null,
+		{
+			fallbackData: initialArtifactData,
+		},
+	);
 
 	const selectedValue = useMemo(() => {
 		if (!localArtifact) return selector(initialArtifactData);
@@ -35,9 +42,9 @@ export function useArtifactSelector<Selected>(selector: Selector<Selected>) {
 	return selectedValue;
 }
 
-export function useArtifact() {
+export function useArtifact(artifactId?: string) {
 	const { data: localArtifact, mutate: setLocalArtifact } = useSWR<UIArtifact>(
-		'artifact',
+		artifactId ? `artifact-${artifactId}` : 'artifact',
 		null,
 		{
 			fallbackData: initialArtifactData,

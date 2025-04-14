@@ -136,7 +136,11 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
 			<div className="flex max-w-[80%] flex-col">
 				{/* Render artifacts */}
 				{message.role === 'assistant' && (
-					<ArtifactComponent message={message} />
+					<ArtifactComponent
+						message={message}
+						key={message.id}
+						chatId="current-chat"
+					/>
 				)}
 				{/* Message bubble - Always render for assistant, even if empty */}
 				{messageText ? (
