@@ -1,12 +1,13 @@
 'use client';
 
 import { useChat } from '@ai-sdk/react';
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { initialArtifactData, useArtifact } from '@/hooks/use-artifact';
 import { JSONValue, UIMessage } from 'ai';
 import { researchUpdateArtifact } from '@/artifacts/research_update/client';
 import { textArtifact } from '@/artifacts/text/client';
 import { Artifact, UIArtifact } from '@/components/artifact';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
 export type DataStreamDelta = {
 	type: string;
@@ -147,6 +148,10 @@ function PureArtifactComponent(props: ArtifactProps) {
 		? props.message.id
 		: undefined;
 	const { artifact, metadata } = useArtifact(messageId);
+	const [expanded, setExpanded] = useState(true);
+	const toggleExpanded = useCallback(() => {
+		setExpanded((prev) => !prev);
+	}, []);
 
 	if (!artifact || !artifact.isVisible) return null;
 
@@ -158,11 +163,36 @@ function PureArtifactComponent(props: ArtifactProps) {
 	if (!artifactDefinition) return null;
 
 	// Render the artifact using its content component
-	return artifactDefinition.content({
-		content: artifact.content,
-		metadata: metadata,
-		status: artifact.status,
-	});
+	return (
+		<div className="mb-4 mt-1 flex w-[500px] flex-col flex-wrap items-start xl:w-[650px]">
+			<div className="mb-1 flex w-full items-center justify-between">
+				<div className="text-xs text-merino-400 dark:text-merino-800">
+					<span>Artifact</span>
+				</div>
+				<button
+					onClick={toggleExpanded}
+					className="flex items-center gap-1 rounded-md p-1 text-xs text-merino-400 hover:bg-merino-100 hover:text-merino-800 dark:text-merino-800 dark:hover:bg-merino-900 dark:hover:text-merino-100"
+				>
+					{expanded ? (
+						<>
+							<ChevronUp className="h-3 w-3" /> Hide
+						</>
+					) : (
+						<>
+							<ChevronDown className="h-3 w-3" /> Show
+						</>
+					)}
+				</button>
+			</div>
+			<div className={expanded ? 'block w-full' : 'hidden'}>
+				{artifactDefinition.content({
+					content: artifact.content,
+					metadata: metadata,
+					status: artifact.status,
+				})}
+			</div>
+		</div>
+	);
 }
 
 export const ArtifactComponent = memo(PureArtifactComponent);
