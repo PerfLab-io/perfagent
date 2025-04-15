@@ -1,6 +1,4 @@
 import { Artifact } from '@/components/artifact';
-import { MarkdownRenderer } from '@/components/markdown-renderer';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CopyIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
