@@ -21,6 +21,8 @@ import {
 	X,
 	BrainCircuit,
 	Check,
+	FileText,
+	ExternalLink,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -1112,18 +1114,18 @@ export function ResearchCard({
 				</Dialog>
 			)}
 
-			{metadata.report && (
+			{/* {metadata.report && (
 				<div className="mt-4 w-full space-y-4">
 					<Card className="group relative rounded-lg border border-border bg-card transition-all duration-300">
 						<CardHeader>
-							<CardTitle>Research Report</CardTitle>
+							<CardTitle>{metadata.title || 'Research Report'}</CardTitle>
 						</CardHeader>
 						<CardContent>
 							<MarkdownRenderer content={metadata.report} />
 						</CardContent>
 					</Card>
 				</div>
-			)}
+			)} */}
 
 			{/* Invisible element for scrolling reference */}
 			<div ref={bottomRef} />

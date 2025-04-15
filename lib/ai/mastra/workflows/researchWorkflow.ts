@@ -124,6 +124,7 @@ const researchPlanning = new Step({
 		dataStreamWriter.writeData({
 			type: 'research_update',
 			runId,
+			status: 'started',
 			content: {
 				type: 'research_update',
 				data: {
@@ -140,6 +141,7 @@ const researchPlanning = new Step({
 		dataStreamWriter.writeData({
 			type: 'research_update',
 			runId,
+			status: 'in-progress',
 			content: {
 				type: 'research_update',
 				data: {
@@ -163,6 +165,7 @@ const researchPlanning = new Step({
 		dataStreamWriter.writeData({
 			type: 'research_update',
 			runId,
+			status: 'in-progress',
 			content: {
 				type: 'research_update',
 				data: {
@@ -244,6 +247,7 @@ const researchSteps = new Step({
 		dataStreamWriter.writeData({
 			type: 'research_update',
 			runId,
+			status: 'in-progress',
 			content: {
 				type: 'research_update',
 				data: {
@@ -314,6 +318,7 @@ const searchWeb = new Step({
 			dataStreamWriter.writeData({
 				type: 'research_update',
 				runId,
+				status: 'in-progress',
 				content: {
 					type: 'research_update',
 					data: {
@@ -362,6 +367,7 @@ const searchWeb = new Step({
 			dataStreamWriter.writeData({
 				type: 'research_update',
 				runId,
+				status: 'in-progress',
 				content: {
 					type: 'research_update',
 					data: {
@@ -386,6 +392,7 @@ const searchWeb = new Step({
 		dataStreamWriter.writeData({
 			type: 'research_update',
 			runId,
+			status: 'in-progress',
 			content: {
 				type: 'research_update',
 				data: {
@@ -460,6 +467,7 @@ const analyzeResults = new Step({
 			dataStreamWriter.writeData({
 				type: 'research_update',
 				runId,
+				status: 'in-progress',
 				content: {
 					type: 'research_update',
 					data: {
@@ -502,6 +510,7 @@ const analyzeResults = new Step({
 			dataStreamWriter.writeData({
 				type: 'research_update',
 				runId,
+				status: 'in-progress',
 				content: {
 					type: 'research_update',
 					data: {
@@ -523,6 +532,7 @@ const analyzeResults = new Step({
 		dataStreamWriter.writeData({
 			type: 'research_update',
 			runId,
+			status: 'in-progress',
 			content: {
 				type: 'research_update',
 				data: {
@@ -600,6 +610,7 @@ const researchReport = new Step({
 			dataStreamWriter.writeData({
 				type: 'research_update',
 				runId,
+				status: 'in-progress',
 				content: { type: 'text-delta', data: chunk },
 			});
 		}
@@ -629,6 +640,7 @@ const researchReport = new Step({
 		dataStreamWriter.writeData({
 			type: 'research_update',
 			runId,
+			status: 'complete',
 			content: {
 				type: 'research_update',
 				data: {

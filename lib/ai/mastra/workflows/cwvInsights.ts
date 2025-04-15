@@ -32,12 +32,12 @@ const topicStep = new Step({
 		dataStream.writeData({
 			type: 'text',
 			runId,
+			status: 'started',
 			content: {
 				type: 'trace-insight',
 				data: {
 					id: 'trace-insight',
 					type: 'trace-insight',
-					status: 'started',
 					timestamp: Date.now(),
 					title: 'Trace Analysis',
 					message: 'Selecting topic...',
@@ -58,12 +58,12 @@ const topicStep = new Step({
 		dataStream.writeData({
 			type: 'text',
 			runId,
+			status: 'in-progress',
 			content: {
 				type: 'trace-insight',
 				data: {
 					id: 'trace-insight',
 					type: 'trace-insight',
-					status: 'in-progress',
 					timestamp: Date.now(),
 					title: 'Trace Analysis',
 					message: `Selected topic: ${response.object.topic}`,
@@ -118,12 +118,12 @@ const analyzeTrace = new Step({
 		dataStreamWriter.writeData({
 			type: 'text',
 			runId,
+			status: 'in-progress',
 			content: {
 				type: 'trace-insight',
 				data: {
 					id: 'trace-insight',
 					type: 'trace-insight',
-					status: 'in-progress',
 					timestamp: Date.now(),
 					title: 'Trace Analysis',
 					message: `Analyzing trace insights for ${topic}...`,
@@ -154,12 +154,12 @@ const analyzeTrace = new Step({
 			dataStreamWriter.writeData({
 				type: 'text',
 				runId,
+				status: 'in-progress',
 				content: {
 					type: 'trace-insight',
 					data: {
 						id: 'trace-insight',
 						type: 'trace-insight',
-						status: 'in-progress',
 						timestamp: Date.now(),
 						title: 'Trace Analysis',
 						message: `Generating report based on insights for ${topic}...`,
@@ -185,6 +185,7 @@ const analyzeTrace = new Step({
 				dataStreamWriter.writeData({
 					type: 'text',
 					runId,
+					status: 'in-progress',
 					content: {
 						type: 'text-delta',
 						data: chunk,
@@ -192,20 +193,34 @@ const analyzeTrace = new Step({
 				});
 			}
 
+			dataStreamWriter.writeData({
+				type: 'text',
+				runId,
+				status: 'complete',
+				content: {
+					type: 'trace-insight',
+					data: {
+						id: 'trace-insight',
+						type: 'trace-insight',
+						timestamp: Date.now(),
+						title: 'Trace Analysis',
+						message: 'Report generated',
+					},
+				},
+			});
+
 			// Add a stream with final remarks
 			const agentStream = await mastra.getAgent('largeAssistant').stream([
 				{
-					role: 'assistant',
-					content: `I now shall provide a concluding remark about this web performance metric:
+					role: 'user',
+					content: `Provide a concluding remark about this web performance metric:
 					${JSON.stringify(insightsForTopic)}
 
-					Being concise and verify with the user if the there's interest in further research into a specific topic or point from the report.`,
+					Be concise and verify with me if the there's interest in further research into a specific topic or point from the report (suggesting possible research topics based on the report).`,
 				},
 			]);
 
-			agentStream.mergeIntoDataStream(dataStreamWriter, {
-				sendReasoning: true,
-			});
+			agentStream.mergeIntoDataStream(dataStreamWriter);
 
 			return {
 				type: 'trace_analysis',

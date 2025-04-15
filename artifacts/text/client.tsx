@@ -24,24 +24,18 @@ export const textArtifact = new Artifact<
 			text: '',
 		});
 	},
-	onStreamPart: ({ streamPart, setMetadata }) => {
+	onStreamPart: ({ streamPart, setArtifact }) => {
 		if (streamPart.content.type === 'text-delta') {
-			setMetadata((metadata) => {
+			setArtifact((artifact) => {
 				return {
-					text: (metadata?.text || '') + streamPart.content.data,
+					...artifact,
+					content: (artifact.content || '') + streamPart.content.data,
 				};
 			});
 		}
 	},
-	content: ({ content, metadata }) => {
-		if (!content && !metadata?.text) return null;
-		return (
-			<Card className="mb-4 w-full overflow-auto p-4">
-				<CardContent>
-					<MarkdownRenderer content={content || metadata?.text || ''} />
-				</CardContent>
-			</Card>
-		);
+	content: () => {
+		return null;
 	},
 	actions: [
 		{

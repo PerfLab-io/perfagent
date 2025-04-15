@@ -10,29 +10,12 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
 import { MarkdownRenderer } from './markdown-renderer';
 import { FeedbackButtons } from '@/components/feedback-buttons';
 
 /**
  * Types and Interfaces
  */
-
-/**
- * Report section interface
- */
-interface ReportSection {
-	title: string;
-	content: string;
-}
-
-/**
- * Report data interface
- */
-interface ReportData {
-	title: string;
-	sections: ReportSection[];
-}
 
 /**
  * MarkdownReport component props
@@ -42,10 +25,8 @@ interface MarkdownReportProps {
 	onClose: () => void;
 	exiting?: boolean;
 	isGenerating: boolean;
-	topic: string;
-	onComplete: () => void;
 	onAbort?: () => void;
-	reportData?: ReportData;
+	reportData?: string;
 	reportId?: string | null;
 }
 
@@ -58,8 +39,6 @@ export function MarkdownReport({
 	onClose,
 	exiting = false,
 	isGenerating,
-	topic,
-	onComplete,
 	onAbort,
 	reportData,
 	reportId,
@@ -69,43 +48,11 @@ export function MarkdownReport({
 	const reportRef = useRef<HTMLDivElement>(null);
 
 	/**
-	 * Default report data when loading or no data is available
-	 */
-	const defaultReportData: ReportData = useMemo(
-		() => ({
-			title: 'Loading Report...',
-			sections: [{ title: 'Preparing Content', content: 'Loading content...' }],
-		}),
-		[],
-	);
-
-	/**
-	 * Use the report data from props or fallback to default
-	 */
-	const report = useMemo(
-		() => reportData || defaultReportData,
-		[reportData, defaultReportData],
-	);
-
-	/**
-	 * Check if the report is complete and ready to display
-	 */
-	const isReportComplete = useMemo(
-		() =>
-			!isGenerating &&
-			reportData &&
-			reportData.sections &&
-			reportData.sections.length > 0,
-		[isGenerating, reportData],
-	);
-
-	/**
 	 * Generate a unique ID for the report for feedback
 	 */
 	const reportFeedbackId = useMemo(
-		() =>
-			`report-${reportId || report.title.replace(/\s+/g, '-').toLowerCase()}`,
-		[reportId, report.title],
+		() => `report-${reportId?.toLowerCase()}`,
+		[reportId],
 	);
 
 	/**
@@ -123,74 +70,31 @@ export function MarkdownReport({
 	}, [visible]);
 
 	/**
-	 * Call onComplete when reportData is available and not empty
-	 */
-	useEffect(() => {
-		if (reportData && reportData.sections && reportData.sections.length > 0) {
-			onComplete();
-		}
-	}, [reportData, onComplete]);
-
-	/**
-	 * Scroll to bottom of the report
-	 */
-	const scrollToBottom = useCallback(() => {
-		// if (reportRef.current) {
-		// 	reportRef.current.scrollTo({
-		// 		top: reportRef.current.scrollHeight,
-		// 		behavior: 'smooth',
-		// 	});
-		// }
-	}, []);
-
-	/**
-	 * Scroll to bottom when new sections are added
-	 */
-	useEffect(() => {
-		if (reportData && reportData.sections) {
-			scrollToBottom();
-		}
-	}, [reportData, scrollToBottom]);
-
-	/**
 	 * Copy report content to clipboard
 	 */
 	const copyToClipboard = useCallback(() => {
 		// Create a string of all the report content
-		const fullContent = report.sections
-			.map((section) => `${section.title}\n\n${section.content}`)
-			.join('\n\n');
 
-		// Copy to clipboard
-		navigator.clipboard.writeText(fullContent).catch((err) => {
+		navigator.clipboard.writeText(reportData || '').catch((err) => {
 			console.error('Failed to copy: ', err);
 		});
 
 		setIsCopied(true);
 		setTimeout(() => setIsCopied(false), 2000);
-	}, [report.sections]);
+	}, [reportData]);
 
 	/**
 	 * Download report as markdown file
 	 */
 	const downloadReport = useCallback(() => {
-		// Create a string of all the report content with proper markdown formatting
-		const fullContent =
-			`# ${report.title}\n\n` +
-			report.sections
-				.map((section) => `## ${section.title}\n\n${section.content}`)
-				.join('\n\n');
-
 		// Create a blob with the content
-		const blob = new Blob([fullContent], { type: 'text/markdown' });
+		const blob = new Blob([reportData || ''], { type: 'text/markdown' });
 
 		// Create a URL for the blob
 		const url = URL.createObjectURL(blob);
 
 		// Create a filename with reportId to make it unique
-		const filename = `${report.title.toLowerCase().replace(/\s+/g, '-')}${
-			reportId ? `-${reportId.substring(0, 8)}` : ''
-		}.md`;
+		const filename = `report${reportId ? `-${reportId.substring(0, 8)}` : ''}.md`;
 
 		// Create a temporary anchor element to trigger the download
 		const a = document.createElement('a');
@@ -202,7 +106,7 @@ export function MarkdownReport({
 		// Clean up
 		document.body.removeChild(a);
 		URL.revokeObjectURL(url);
-	}, [report.title, report.sections, reportId]);
+	}, [reportId]);
 
 	/**
 	 * Animation styles
@@ -240,7 +144,7 @@ export function MarkdownReport({
 				<div className="flex items-center gap-2">
 					<FileText className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
 					<h2 className="text-xl font-bold text-foreground">
-						{report.title}
+						Report
 						{reportId && (
 							<span className="ml-2 text-sm font-normal text-foreground/60">
 								#{reportId}
@@ -251,7 +155,7 @@ export function MarkdownReport({
 
 				<div className="flex items-center gap-2">
 					{/* Feedback buttons - only shown when report is complete */}
-					{isReportComplete && (
+					{reportData && (
 						<FeedbackButtons messageId={reportFeedbackId} source="report" />
 					)}
 
@@ -260,7 +164,7 @@ export function MarkdownReport({
 						variant="ghost"
 						size="sm"
 						onClick={copyToClipboard}
-						disabled={!isReportComplete}
+						disabled={!reportData}
 						className="flex items-center gap-1"
 						aria-label={isCopied ? 'Copied to clipboard' : 'Copy to clipboard'}
 					>
@@ -284,7 +188,7 @@ export function MarkdownReport({
 						variant="ghost"
 						size="sm"
 						onClick={downloadReport}
-						disabled={!isReportComplete}
+						disabled={!reportData}
 						className="flex items-center gap-1"
 						aria-label="Download report as markdown"
 					>
@@ -325,35 +229,7 @@ export function MarkdownReport({
 				className="max-h-full flex-grow overflow-y-auto pr-1"
 				aria-live="polite"
 			>
-				{isGenerating && !reportData ? (
-					<div className="flex h-32 items-center justify-center">
-						<div className="typing-indicator" aria-label="Generating report">
-							<span></span>
-							<span></span>
-							<span></span>
-						</div>
-					</div>
-				) : (
-					report.sections.map((section, index) => (
-						<div key={index} className="mb-6">
-							<div className="mb-2 flex items-center gap-2">
-								<Badge
-									variant="outline"
-									className="bg-peppermint-100 text-peppermint-800 dark:bg-peppermint-900 dark:text-peppermint-300"
-								>
-									Section {index + 1}
-								</Badge>
-								<h3 className="text-lg font-medium text-foreground">
-									{section.title}
-								</h3>
-							</div>
-
-							<div className="relative">
-								<MarkdownRenderer content={section.content || ''} />
-							</div>
-						</div>
-					))
-				)}
+				<MarkdownRenderer content={reportData || ''} />
 			</div>
 		</div>
 	);

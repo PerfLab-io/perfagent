@@ -5,8 +5,8 @@ import { z } from 'zod';
 export interface ResearchUpdateArtifactMetadata {
 	query: string;
 	annotations: any[];
-	report?: string;
 	completed: boolean;
+	title?: string;
 }
 
 export const researchUpdateArtifact = new Artifact<
@@ -20,7 +20,7 @@ export const researchUpdateArtifact = new Artifact<
 	initialize: async ({ documentId, setMetadata }) => {
 		console.log('initialize', documentId);
 	},
-	onStreamPart: ({ streamPart, setMetadata }) => {
+	onStreamPart: ({ streamPart, setMetadata, setArtifact }) => {
 		if (streamPart.type === 'research_update') {
 			setMetadata((draftArtifact) => {
 				const content = streamPart.content;
@@ -30,14 +30,21 @@ export const researchUpdateArtifact = new Artifact<
 						query: content.data.query || '',
 						annotations: [content.data],
 						completed: false,
+						title: content.data.title || 'Research Report',
 					};
 				}
 
 				const newAnnotations = [...(draftArtifact.annotations || [])];
-				let report = draftArtifact.report || '';
 
 				if (streamPart.content.type === 'text-delta') {
-					report += streamPart.content.data;
+					setArtifact((draftArtifact) => {
+						return {
+							...draftArtifact,
+							title:
+								content.data.title || draftArtifact.title || 'Research Report',
+							content: (draftArtifact.content || '') + streamPart.content.data,
+						};
+					});
 				} else {
 					newAnnotations.push((streamPart.content as any).data);
 				}
@@ -51,7 +58,7 @@ export const researchUpdateArtifact = new Artifact<
 					query: content.data.query || '',
 					annotations: newAnnotations,
 					completed,
-					report,
+					title: content.data.title || draftArtifact.title || 'Research Report',
 				};
 			});
 		}
