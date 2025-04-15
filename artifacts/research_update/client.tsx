@@ -1,31 +1,34 @@
 import { Artifact } from '@/components/artifact';
 import { ResearchCard } from '@/components/research-card';
+import { ArtifactStreamData } from '@/lib/ai/mastra/workflows/researchWorkflow';
+import { z } from 'zod';
 export interface ResearchUpdateArtifactMetadata {
 	query: string;
 	annotations: any[];
 	report?: string;
-	researchId: string;
 	completed: boolean;
 }
 
 export const researchUpdateArtifact = new Artifact<
 	'research_update',
-	ResearchUpdateArtifactMetadata
+	ResearchUpdateArtifactMetadata,
+	z.infer<typeof ArtifactStreamData>['content']
 >({
 	kind: 'research_update',
 	description: 'Research updates from the AI agent',
+	toolbar: [],
 	initialize: async ({ documentId, setMetadata }) => {
 		console.log('initialize', documentId);
 	},
 	onStreamPart: ({ streamPart, setMetadata }) => {
 		if (streamPart.type === 'research_update') {
 			setMetadata((draftArtifact) => {
+				const content = streamPart.content;
 				if (!draftArtifact) {
 					return {
 						isVisible: true,
-						query: streamPart.content.query,
-						researchId: streamPart.content.id,
-						annotations: [(streamPart.content as any).data],
+						query: content.data.query || '',
+						annotations: [content.data],
 						completed: false,
 					};
 				}
@@ -45,8 +48,7 @@ export const researchUpdateArtifact = new Artifact<
 
 				return {
 					...draftArtifact,
-					query: streamPart.content.query,
-					researchId: streamPart.content.id,
+					query: content.data.query || '',
 					annotations: newAnnotations,
 					completed,
 					report,
@@ -55,13 +57,17 @@ export const researchUpdateArtifact = new Artifact<
 		}
 	},
 	content: (props) => {
-		const { metadata } = props;
+		const { metadata, documentId } = props;
 		if (!metadata) {
 			return null;
 		}
 
 		return (
-			<ResearchCard query={metadata.query || 'Research'} artifact={metadata} />
+			<ResearchCard
+				query={metadata.query || 'Research'}
+				metadata={metadata}
+				documentId={documentId}
+			/>
 		);
 	},
 	actions: [],

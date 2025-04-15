@@ -54,6 +54,28 @@ export const researchPlanSchema = z.object({
 		.max(4),
 });
 
+export const ArtifactStreamData = z.object({
+	type: z.string(),
+	runId: z.string(),
+	content: z.object({
+		type: z.string(),
+		data: z.object({
+			id: z.string(),
+			type: z.string(),
+			status: z.string(),
+			title: z.string(),
+			message: z.string(),
+			timestamp: z.number(),
+			query: z.string().optional(),
+			completedSteps: z.number().optional(),
+			totalSteps: z.number().optional(),
+			researchPlan: researchPlanSchema.optional(),
+			searchResults: z.array(z.any()).optional(),
+			analysisResults: z.array(z.any()).optional(),
+		}),
+	}),
+});
+
 // Generate IDs for all steps based on the plan
 const generateStepIds = (plan: z.infer<typeof researchPlanSchema>) => {
 	// Generate an array of search steps.

@@ -8,9 +8,17 @@ interface TextArtifactMetadata {
 	text: string;
 }
 
-export const textArtifact = new Artifact<'text', TextArtifactMetadata>({
+export const textArtifact = new Artifact<
+	'text',
+	TextArtifactMetadata,
+	{
+		type: string;
+		data: string;
+	}
+>({
 	kind: 'text',
 	description: 'Text content from the AI',
+	toolbar: [],
 	initialize: async ({ setMetadata }) => {
 		setMetadata({
 			text: '',
@@ -20,7 +28,7 @@ export const textArtifact = new Artifact<'text', TextArtifactMetadata>({
 		if (streamPart.content.type === 'text-delta') {
 			setMetadata((metadata) => {
 				return {
-					text: (metadata?.text || '') + (streamPart.content as any).data,
+					text: (metadata?.text || '') + streamPart.content.data,
 				};
 			});
 		}

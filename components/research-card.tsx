@@ -82,7 +82,8 @@ interface ResearchCardProps {
 	query: string;
 	triggerAnimation?: boolean;
 	onAbort?: () => void;
-	artifact: ResearchUpdateArtifactMetadata;
+	metadata: ResearchUpdateArtifactMetadata;
+	documentId: string;
 }
 
 /**
@@ -206,7 +207,12 @@ const utils = {
  * Research Card Component
  * Displays research progress, steps, and results
  */
-export function ResearchCard({ query, onAbort, artifact }: ResearchCardProps) {
+export function ResearchCard({
+	query,
+	onAbort,
+	metadata,
+	documentId,
+}: ResearchCardProps) {
 	// Use the artifact hook instead of context
 	const { stop } = useChat();
 
@@ -247,11 +253,11 @@ export function ResearchCard({ query, onAbort, artifact }: ResearchCardProps) {
 	 * Process annotations when they change
 	 */
 	useEffect(() => {
-		if (!artifact || isCancelled) return;
+		if (!metadata || isCancelled) return;
 
 		// Track if we've already processed these annotations by using their IDs
 		// This is more reliable than comparing the entire object which may have changing timestamps
-		const annotationIds = `research-${artifact.annotations
+		const annotationIds = `research-${metadata.annotations
 			.map(
 				(a) =>
 					`${a.data?.id || ''}-${a.data?.status || ''}-${a.data?.timestamp || ''}`,
@@ -279,7 +285,7 @@ export function ResearchCard({ query, onAbort, artifact }: ResearchCardProps) {
 		};
 
 		// Process each annotation
-		for (const data of artifact.annotations) {
+		for (const data of metadata.annotations) {
 			if (!data) continue;
 
 			// Update progress if available
@@ -472,7 +478,7 @@ export function ResearchCard({ query, onAbort, artifact }: ResearchCardProps) {
 		}
 	}, [
 		// Include necessary dependencies
-		artifact,
+		metadata,
 		isCancelled,
 	]);
 
@@ -825,7 +831,7 @@ export function ResearchCard({ query, onAbort, artifact }: ResearchCardProps) {
 	);
 
 	// Only render if we have a research artifact
-	if (!artifact) return null;
+	if (!metadata) return null;
 
 	return (
 		<div className="mt-4 w-full space-y-4">
@@ -995,7 +1001,7 @@ export function ResearchCard({ query, onAbort, artifact }: ResearchCardProps) {
 											Complete
 										</Badge>
 										<FeedbackButtons
-											messageId={`research-${artifact.researchId}`}
+											messageId={`research-${documentId}`}
 											source="research"
 										/>
 									</div>
@@ -1106,14 +1112,14 @@ export function ResearchCard({ query, onAbort, artifact }: ResearchCardProps) {
 				</Dialog>
 			)}
 
-			{artifact.report && (
+			{metadata.report && (
 				<div className="mt-4 w-full space-y-4">
 					<Card className="group relative rounded-lg border border-border bg-card transition-all duration-300">
 						<CardHeader>
 							<CardTitle>Research Report</CardTitle>
 						</CardHeader>
 						<CardContent>
-							<MarkdownRenderer content={artifact.report} />
+							<MarkdownRenderer content={metadata.report} />
 						</CardContent>
 					</Card>
 				</div>

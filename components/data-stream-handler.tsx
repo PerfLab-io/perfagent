@@ -9,16 +9,17 @@ import { textArtifact } from '@/artifacts/text/client';
 import { Artifact, UIArtifact } from '@/components/artifact';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 
-export type DataStreamDelta = {
+export type DataStreamDelta<T extends JSONValue = NonNullable<JSONValue>> = {
 	type: string;
-	content: string | JSONValue;
+	content: T;
+	runId: string;
 };
 
 // Register artifacts in the global artifactDefinitions array
 // This is done here to avoid circular dependencies
 
 // We'll populate this from outside to avoid circular dependencies
-export const artifactDefinitions: Array<Artifact<any, any>> = [];
+export const artifactDefinitions: Array<Artifact<any, any, any>> = [];
 artifactDefinitions.push(textArtifact, researchUpdateArtifact);
 
 export function DataStreamHandler({
@@ -73,12 +74,12 @@ export function DataStreamHandler({
 		if (!dataStream?.length) return;
 
 		// Process the data that hasn't been processed yet
-		const newDeltas = dataStream
+		const newDeltas: DataStreamDelta[] = dataStream
 			.slice(lastProcessedIndex.current + 1)
 			.filter(
 				(data) =>
 					!(typeof data !== 'object' || data === null || !('type' in data)),
-			);
+			) as DataStreamDelta[];
 		if (newDeltas.length === 0) return;
 
 		lastProcessedIndex.current = dataStream.length - 1;
@@ -127,7 +128,7 @@ export function DataStreamHandler({
 			if (artifactDefinition.onStreamPart) {
 				// Call the onStreamPart method of the artifact definition
 				artifactDefinition.onStreamPart({
-					streamPart: delta,
+					streamPart: delta as DataStreamDelta,
 					setArtifact,
 					setMetadata,
 				});
@@ -187,11 +188,21 @@ function PureArtifactComponent(props: ArtifactProps) {
 				</button>
 			</div>
 			<div className={expanded ? 'block w-full' : 'hidden'}>
-				{artifactDefinition.content({
-					content: artifact.content,
-					metadata: metadata,
-					status: artifact.status,
-				})}
+				<artifactDefinition.content
+					content={artifact.content}
+					documentId={artifact.documentId}
+					metadata={metadata}
+					status={artifact.status}
+					title={artifact.title}
+					mode="diff"
+					isCurrentVersion={true}
+					currentVersionIndex={0}
+					onSaveContent={() => {}}
+					isInline={false}
+					getDocumentContentById={() => ''}
+					isLoading={false}
+					setMetadata={() => {}}
+				/>
 			</div>
 		</div>
 	);
