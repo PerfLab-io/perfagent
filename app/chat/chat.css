@@ -224,7 +224,7 @@
 		grid-template-columns: 1fr 0fr;
 	}
 	100% {
-		grid-template-columns: 0.3fr 0.7fr;
+		grid-template-columns: 0.4fr 0.6fr;
 	}
 }
 
@@ -241,7 +241,7 @@
 
 @keyframes expandRight {
 	0% {
-		grid-template-columns: 0.3fr 0.7fr;
+		grid-template-columns: 0.4fr 0.6fr;
 	}
 	100% {
 		grid-template-columns: 1fr 0fr;
