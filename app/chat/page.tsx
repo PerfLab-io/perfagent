@@ -1,7 +1,7 @@
 'use client';
 
 import type React from 'react';
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Paperclip, Send, X } from 'lucide-react';
 import { ChatMessage } from '@/components/chat-message';
@@ -15,6 +15,7 @@ import { useChat } from '@ai-sdk/react';
 import { analyzeTraceFromFile, TraceAnalysis } from '@/lib/trace';
 import { FileContextSection } from '@/components/trace-details';
 import { analyseInsightsForCWV } from '@/lib/insights';
+import { DataStreamHandler } from '@/components/data-stream-handler';
 
 /**
  * Type definition for the report data structure
@@ -385,6 +386,10 @@ export default function AiChatPage() {
 		}
 	}, [showSidePanel, panelAnimationComplete]);
 
+	const currentAssistantMessageId = useMemo(() => {
+		return messages.findLast((message) => message.role === 'assistant')?.id;
+	}, [messages]);
+
 	return (
 		<main className="relative flex flex-1 flex-col">
 			{/* Dual panel container */}
@@ -433,6 +438,10 @@ export default function AiChatPage() {
 										onAbort={stop}
 									/>
 								))}
+								<DataStreamHandler
+									chatId="current-chat"
+									currentMessageId={currentAssistantMessageId}
+								/>
 								<div ref={messagesEndRef} />
 							</div>
 						</div>

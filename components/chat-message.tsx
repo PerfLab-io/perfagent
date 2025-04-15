@@ -18,26 +18,6 @@ interface ChatMessageProps {
 }
 
 /**
- * Utility function to determine if a message is streaming based on tool invocation state
- */
-export function isMessageStreaming(message: UIMessage): boolean {
-	// Check if any tool invocation is in partial-call or call state without result
-	return (
-		message.parts?.some(
-			(part) =>
-				(part.type === 'tool-invocation' &&
-					(part.toolInvocation.state === 'partial-call' ||
-						part.toolInvocation.state === 'call')) ||
-				(part.type === 'text' &&
-					(part.text.trim() === '' ||
-						part.text === null ||
-						part.text === undefined ||
-						!part.text)),
-		) ?? false
-	);
-}
-
-/**
  * Utility function to determine if a message is waiting to be processed
  */
 export function isMessageWaiting(message: UIMessage): boolean {
@@ -58,15 +38,6 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
 
 	// Refs
 	const messageEndRef = useRef<HTMLDivElement>(null);
-
-	// Derived state from message
-	const messageIsStreaming = useMemo(() => {
-		// Check if the current message is the one that's streaming
-		if (message.role === 'assistant' && isStreaming) {
-			return isMessageStreaming(message) || message.id === message.id;
-		}
-		return false;
-	}, [isStreaming, message]);
 
 	const isMessageIsWaiting = useMemo(
 		() => isMessageWaiting(message),
@@ -162,7 +133,7 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
 							</div>
 
 							{/* Only show feedback for assistant messages that are not streaming or waiting */}
-							{!isUser && !messageIsStreaming && !isMessageIsWaiting && (
+							{!isUser && !isStreaming && !isMessageIsWaiting && (
 								<FeedbackButtons messageId={message.id} source="message" />
 							)}
 						</div>

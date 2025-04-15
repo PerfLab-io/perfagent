@@ -11,12 +11,12 @@ interface TextArtifactMetadata {
 export const textArtifact = new Artifact<'text', TextArtifactMetadata>({
 	kind: 'text',
 	description: 'Text content from the AI',
-	initialize: async ({ documentId, setMetadata }) => {
+	initialize: async ({ setMetadata }) => {
 		setMetadata({
 			text: '',
 		});
 	},
-	onStreamPart: ({ streamPart, setMetadata, setArtifact }) => {
+	onStreamPart: ({ streamPart, setMetadata }) => {
 		if (streamPart.content.type === 'text-delta') {
 			setMetadata((metadata) => {
 				return {
@@ -26,6 +26,7 @@ export const textArtifact = new Artifact<'text', TextArtifactMetadata>({
 		}
 	},
 	content: ({ content, metadata }) => {
+		if (!content && !metadata?.text) return null;
 		return (
 			<Card className="mb-4 w-full overflow-auto p-4">
 				<CardContent>

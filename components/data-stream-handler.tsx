@@ -1,12 +1,12 @@
 'use client';
 
 import { useChat } from '@ai-sdk/react';
-import { memo, useEffect, useRef } from 'react';
-import { useArtifact } from '@/hooks/use-artifact';
+import { memo, useEffect, useRef, useState } from 'react';
+import { initialArtifactData, useArtifact } from '@/hooks/use-artifact';
 import { JSONValue, UIMessage } from 'ai';
 import { researchUpdateArtifact } from '@/artifacts/research_update/client';
 import { textArtifact } from '@/artifacts/text/client';
-import { Artifact } from '@/components/artifact';
+import { Artifact, UIArtifact } from '@/components/artifact';
 
 export type DataStreamDelta = {
 	type: string;
@@ -20,31 +20,64 @@ export type DataStreamDelta = {
 export const artifactDefinitions: Array<Artifact<any, any>> = [];
 artifactDefinitions.push(textArtifact, researchUpdateArtifact);
 
-interface ArtifactProps {
-	message: UIMessage;
-	chatId: string;
-}
-
-function PureArtifactComponent(props: ArtifactProps) {
-	const { data: dataStream, messages } = useChat({
+export function DataStreamHandler({
+	chatId,
+	currentMessageId,
+}: {
+	chatId?: string;
+	currentMessageId?: string;
+}) {
+	const { data: dataStream } = useChat({
 		api: '/api/chat',
 		experimental_throttle: 500,
-		id: props.chatId,
+		id: chatId,
 	});
-	const { artifact, setArtifact, metadata, setMetadata } = useArtifact(
-		props.message.id,
-	);
+	const [assistantMessageId, setAssistantMessageId] = useState<
+		string | undefined
+	>(undefined);
+	const { artifact, setArtifact, metadata, setMetadata } =
+		useArtifact(assistantMessageId);
 	const lastProcessedIndex = useRef(-1);
+	const _artifactId = useRef<UIArtifact | undefined>(undefined);
+	const _metadata = useRef<JSONValue | undefined>(undefined);
+
+	useEffect(() => {
+		if (!currentMessageId || currentMessageId === assistantMessageId) return;
+		if (currentMessageId.startsWith('msg-')) {
+			setAssistantMessageId(currentMessageId);
+			_artifactId.current = artifact;
+			_metadata.current = metadata;
+
+			setArtifact(initialArtifactData);
+			setMetadata(undefined);
+		} else {
+			setAssistantMessageId(undefined);
+		}
+	}, [currentMessageId]);
+
+	useEffect(() => {
+		if (
+			!_artifactId.current ||
+			assistantMessageId !== currentMessageId ||
+			!('kind' in _artifactId.current)
+		) {
+			return;
+		}
+
+		setArtifact(_artifactId.current);
+		setMetadata(_metadata.current);
+	}, [_artifactId.current, artifact, setArtifact]);
 
 	useEffect(() => {
 		if (!dataStream?.length) return;
-		// Since the data stream is 'global' according to the chatId
-		// we need to check if we are processing information about the message that the artifact is attached to
-		// This will need to be updated if we need to support re-runs or edits for artifacts
-		if (messages.at(-1)?.id !== props.message.id) return;
 
 		// Process the data that hasn't been processed yet
-		const newDeltas = dataStream.slice(lastProcessedIndex.current + 1);
+		const newDeltas = dataStream
+			.slice(lastProcessedIndex.current + 1)
+			.filter(
+				(data) =>
+					!(typeof data !== 'object' || data === null || !('type' in data)),
+			);
 		if (newDeltas.length === 0) return;
 
 		lastProcessedIndex.current = dataStream.length - 1;
@@ -63,14 +96,12 @@ function PureArtifactComponent(props: ArtifactProps) {
 			);
 
 			if (!artifactDefinition) {
-				console.log('NO ARTIFACT DEFINITION FOUND FOR', deltaType);
 				continue;
 			}
 
 			// Update the artifact
 			setArtifact((draftArtifact) => {
 				if ((delta.content as any).data?.status === 'started') {
-					console.log('INITIALIZING ARTIFACT', delta.runId);
 					return {
 						...draftArtifact,
 						documentId: delta.runId as string,
@@ -79,8 +110,6 @@ function PureArtifactComponent(props: ArtifactProps) {
 					};
 				}
 
-				console.log(draftArtifact, 'DRAFT ARTIFACT');
-
 				return {
 					...draftArtifact,
 					status: 'streaming',
@@ -88,7 +117,6 @@ function PureArtifactComponent(props: ArtifactProps) {
 			});
 
 			if ((delta.content as any).data?.status === 'started' && !metadata) {
-				console.log('INITIALIZING ARTIFACT');
 				artifactDefinition.initialize?.({
 					documentId: delta.runId as string,
 					setMetadata,
@@ -104,15 +132,21 @@ function PureArtifactComponent(props: ArtifactProps) {
 				});
 			}
 		}
-	}, [
-		dataStream,
-		setArtifact,
-		artifact,
-		metadata,
-		setMetadata,
-		props.chatId,
-		messages.at(-1)?.id,
-	]);
+	}, [dataStream, setArtifact, artifact, metadata, setMetadata]);
+
+	return null;
+}
+
+interface ArtifactProps {
+	message: UIMessage;
+	chatId: string;
+}
+
+function PureArtifactComponent(props: ArtifactProps) {
+	const messageId = props.message.id.startsWith('msg-')
+		? props.message.id
+		: undefined;
+	const { artifact, metadata } = useArtifact(messageId);
 
 	if (!artifact || !artifact.isVisible) return null;
 
