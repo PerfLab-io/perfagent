@@ -36,6 +36,7 @@ import {
 import { Separator } from './ui/separator';
 import { useChat } from '@ai-sdk/react';
 import { ResearchUpdateArtifactMetadata } from '@/artifacts/research_update/client';
+import { MarkdownRenderer } from './markdown-renderer';
 
 /**
  * Types and Interfaces
@@ -1103,6 +1104,19 @@ export function ResearchCard({ query, onAbort, artifact }: ResearchCardProps) {
 						</DialogHeader>
 					</DialogContent>
 				</Dialog>
+			)}
+
+			{artifact.report && (
+				<div className="mt-4 w-full space-y-4">
+					<Card className="group relative rounded-lg border border-border bg-card transition-all duration-300">
+						<CardHeader>
+							<CardTitle>Research Report</CardTitle>
+						</CardHeader>
+						<CardContent>
+							<MarkdownRenderer content={artifact.report} />
+						</CardContent>
+					</Card>
+				</div>
 			)}
 
 			{/* Invisible element for scrolling reference */}

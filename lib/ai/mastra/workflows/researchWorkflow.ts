@@ -574,6 +574,36 @@ const researchReport = new Step({
 			},
 		);
 
+		for await (const chunk of reportStream.textStream) {
+			dataStreamWriter.writeData({
+				type: 'research_update',
+				runId,
+				content: { type: 'text-delta', data: chunk },
+			});
+		}
+
+		const agentSummary = await mastra.getAgent('largeAssistant').stream(
+			[
+				{
+					role: 'user',
+					content: dedent`
+          Provide a short summary in markdown about the research outcome:
+
+          Research plan: ${JSON.stringify(researchPlan)}
+          Search results: ${JSON.stringify(searchResults)}
+          Analysis results: ${JSON.stringify(analysisResults)}
+					
+					- Be concise, a paragraph or two
+					- Highlight key findings and insights
+					- Verify with me if the result needs further research into a specific topic or point from the report.
+          `,
+				},
+			],
+			{
+				experimental_transform: smoothStream({ chunking: 'word' }),
+			},
+		);
+
 		dataStreamWriter.writeData({
 			type: 'research_update',
 			runId,
@@ -591,7 +621,7 @@ const researchReport = new Step({
 			},
 		});
 
-		reportStream.mergeIntoDataStream(dataStreamWriter);
+		agentSummary.mergeIntoDataStream(dataStreamWriter);
 
 		return {
 			type: 'research',

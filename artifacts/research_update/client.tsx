@@ -3,6 +3,7 @@ import { ResearchCard } from '@/components/research-card';
 export interface ResearchUpdateArtifactMetadata {
 	query: string;
 	annotations: any[];
+	report?: string;
 	researchId: string;
 	completed: boolean;
 }
@@ -29,10 +30,15 @@ export const researchUpdateArtifact = new Artifact<
 					};
 				}
 
-				const newAnnotations = [
-					...(draftArtifact.annotations || []),
-					(streamPart.content as any).data,
-				];
+				const newAnnotations = [...(draftArtifact.annotations || [])];
+				let report = draftArtifact.report || '';
+
+				if (streamPart.content.type === 'text-delta') {
+					report += streamPart.content.data;
+				} else {
+					newAnnotations.push((streamPart.content as any).data);
+				}
+
 				const completed =
 					(streamPart.content as any)?.data?.type === 'research_plan' &&
 					(streamPart.content as any)?.data?.status === 'complete';
@@ -43,13 +49,13 @@ export const researchUpdateArtifact = new Artifact<
 					researchId: streamPart.content.id,
 					annotations: newAnnotations,
 					completed,
+					report,
 				};
 			});
 		}
 	},
 	content: (props) => {
 		const { metadata } = props;
-		console.log('metadata', metadata);
 		if (!metadata) {
 			return null;
 		}
