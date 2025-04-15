@@ -142,6 +142,7 @@ export function DataStreamHandler({
 interface ArtifactProps {
 	message: UIMessage;
 	chatId: string;
+	openArtifact: (artifactId: string, artifactData: string) => void;
 }
 
 function PureArtifactComponent(props: ArtifactProps) {

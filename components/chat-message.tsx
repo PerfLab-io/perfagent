@@ -15,6 +15,7 @@ interface ChatMessageProps {
 	message: UIMessage;
 	isStreaming: boolean;
 	onAbort?: (toolCallId?: string) => void;
+	openArtifact: (artifactId: string, artifactData: string) => void;
 }
 
 /**
@@ -32,7 +33,11 @@ export function isMessageWaiting(message: UIMessage): boolean {
  * ChatMessage Component
  * Displays a chat message with optional artifacts
  */
-export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
+export function ChatMessage({
+	message,
+	isStreaming,
+	openArtifact,
+}: ChatMessageProps) {
 	// Animation and visibility state
 	const [visible, setVisible] = useState(false);
 
@@ -111,6 +116,7 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
 						message={message}
 						key={message.id}
 						chatId="current-chat"
+						openArtifact={openArtifact}
 					/>
 				)}
 				{/* Message bubble - Always render for assistant, even if empty */}

@@ -81,9 +81,7 @@ export default function AiChatPage() {
 
 	// Report state management
 	const [isGeneratingReport, setIsGeneratingReport] = useState(false);
-	const [reportTopic, setReportTopic] = useState('');
-	const [reportData, setReportData] = useState(null);
-	const [toolCallId, setToolCallId] = useState<string | undefined>(undefined);
+	const [reportData, setReportData] = useState<string | null>(null);
 	const [activeReportId, setActiveReportId] = useState<string | null>(null);
 	const [reportsMap, setReportsMap] = useState<Record<string, Report>>({});
 	const [currentNavigation, setCurrentNavigation] = useState<string | null>(
@@ -303,16 +301,13 @@ export default function AiChatPage() {
 	 * Opens a specific report in the side panel
 	 */
 	const openReport = useCallback(
-		(reportId: string) => {
-			const report = reportsMap[reportId];
-			if (report) {
+		(reportId: string, reportData: string) => {
+			if (reportId && reportData) {
 				setActiveReportId(reportId);
 				setShowSidePanel(true);
 				setPanelContentType('report');
 				setIsGeneratingReport(false);
-				setReportTopic(report.topic);
-				setReportData(report.data);
-				setToolCallId(report.toolCallId);
+				setReportData(reportData);
 			}
 		},
 		[reportsMap],
@@ -395,7 +390,7 @@ export default function AiChatPage() {
 			{/* Dual panel container */}
 			<div
 				className={cn(
-					'dual-panel-container relative flex-1',
+					'dual-panel-container group relative flex-1',
 					showSidePanel
 						? 'panel-active'
 						: showSidePanel === null
@@ -436,6 +431,7 @@ export default function AiChatPage() {
 										message={message}
 										isStreaming={isLoading && index === messages.length - 1}
 										onAbort={stop}
+										openArtifact={openReport}
 									/>
 								))}
 								<DataStreamHandler
@@ -557,7 +553,7 @@ export default function AiChatPage() {
 				</div>
 
 				{/* Right panel container */}
-				<div>
+				<div className="max-h-[90dvh]">
 					{panelContentType === 'data' ? (
 						<DataPanel
 							visible={!!showSidePanel && panelAnimationComplete}
@@ -573,9 +569,7 @@ export default function AiChatPage() {
 							}}
 							exiting={panelExiting}
 							isGenerating={isGeneratingReport}
-							topic={reportTopic}
-							onComplete={handleReportComplete}
-							reportData={reportData as any}
+							reportData={reportData || undefined}
 							onAbort={handleAbortReport}
 							reportId={activeReportId}
 						/>
