@@ -195,38 +195,17 @@ const analyzeTrace = new Step({
 			// Add a stream with final remarks
 			const agentStream = await mastra.getAgent('largeAssistant').stream([
 				{
-					role: 'system',
-					content: 'You are a helpful web performance assistant.',
-				},
-				{
-					role: 'user',
-					content: `Provide a concluding remark about this web performance metric:
+					role: 'assistant',
+					content: `I now shall provide a concluding remark about this web performance metric:
 					${JSON.stringify(insightsForTopic)}
 
-					Be concise and end with "The complete analysis is available above."`,
+					Being concise and verify with the user if the there's interest in further research into a specific topic or point from the report.`,
 				},
 			]);
 
 			agentStream.mergeIntoDataStream(dataStreamWriter, {
 				sendReasoning: true,
 			});
-
-			// const agentStream = await mastra.getAgent('largeAssistant').stream([
-			// 	{
-			// 		role: 'user',
-			// 		content: reportFormat,
-			// 	},
-			// 	{
-			// 		role: 'user',
-			// 		content: `Data for the report: ${JSON.stringify(insightsForTopic)}`,
-			// 	},
-			// ]);
-
-			// agentStream.mergeIntoDataStream(dataStreamWriter, {
-			// 	sendReasoning: true,
-			// 	sendSources: true,
-			// 	experimental_sendStart: true,
-			// });
 
 			return {
 				type: 'trace_analysis',
