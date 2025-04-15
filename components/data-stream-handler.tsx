@@ -167,7 +167,9 @@ function PureArtifactComponent(props: ArtifactProps) {
 		<div className="mb-4 mt-1 flex w-[500px] flex-col flex-wrap items-start xl:w-[650px]">
 			<div className="mb-1 flex w-full items-center justify-between">
 				<div className="text-xs text-merino-400 dark:text-merino-800">
-					<span>Artifact</span>
+					<span>
+						{artifactDefinition.kind === 'text' ? 'Text' : 'Research'}
+					</span>
 				</div>
 				<button
 					onClick={toggleExpanded}
