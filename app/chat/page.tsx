@@ -403,7 +403,7 @@ export default function AiChatPage() {
 					{/* Outer main container with dropzone */}
 					<FileDropzone
 						onFilesDrop={handleFilesDrop}
-						className="relative flex max-h-[90dvh] flex-1 flex-col px-4"
+						className="relative flex max-h-[90dvh] flex-1 flex-col px-4 focus-within:outline-none"
 						disabled={isLoading}
 					>
 						{/* File context section */}
