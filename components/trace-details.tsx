@@ -199,32 +199,32 @@ export function FileContextSection({
 	return (
 		<div
 			className={cn(
-				'z-50 mb-4 overflow-hidden rounded-lg bg-peppermint-50 transition-all duration-300 dark:bg-peppermint-950/30',
+				'bg-peppermint-50 dark:bg-peppermint-950/30 z-50 mb-4 overflow-hidden rounded-lg transition-all duration-300',
 				isExpanded
-					? 'max-h-[600px] overflow-y-auto border border-peppermint-300 dark:border-peppermint-900'
-					: 'max-h-[40px] border border-dashed border-peppermint-300 dark:border-peppermint-900',
+					? 'border-peppermint-300 dark:border-peppermint-900 max-h-[600px] overflow-y-auto border'
+					: 'border-peppermint-300 dark:border-peppermint-900 max-h-[40px] border border-dashed',
 				isAnimating &&
-					'-translate-y-1 translate-x-1 shadow-[-4px_4px_0_hsl(var(--border-color))]',
+					'translate-x-1 -translate-y-1 shadow-[-4px_4px_0_hsl(var(--border-color))]',
 				isInitialRender && 'file-context-appear',
 			)}
 		>
 			{/* Header */}
 			<div
-				className="group sticky top-0 z-10 flex cursor-pointer items-center justify-between bg-peppermint-50 p-2 hover:bg-peppermint-100 dark:bg-peppermint-950/30 dark:hover:bg-peppermint-900/20"
+				className="group bg-peppermint-50 hover:bg-peppermint-100 dark:bg-peppermint-950/30 dark:hover:bg-peppermint-900/20 sticky top-0 z-10 flex cursor-pointer items-center justify-between p-2"
 				onClick={() => setIsExpanded(!isExpanded)}
 			>
 				<div className="flex items-center space-x-2">
 					{isExpanded ? (
-						<ChevronDown className="h-4 w-4 text-peppermint-700 dark:text-peppermint-300" />
+						<ChevronDown className="text-peppermint-700 dark:text-peppermint-300 h-4 w-4" />
 					) : (
-						<ChevronRight className="h-4 w-4 text-peppermint-700 dark:text-peppermint-300" />
+						<ChevronRight className="text-peppermint-700 dark:text-peppermint-300 h-4 w-4" />
 					)}
-					<span className="text-sm font-medium text-peppermint-800 dark:text-peppermint-200">
+					<span className="text-peppermint-800 dark:text-peppermint-200 text-sm font-medium">
 						Trace Metadata
 					</span>
 				</div>
 				<div className="flex items-center space-x-2">
-					<div className="flex items-center space-x-1 rounded border border-peppermint-200 bg-transparent px-2 py-0.5 text-xs group-hover:bg-peppermint-200 dark:bg-peppermint-900/40">
+					<div className="border-peppermint-200 group-hover:bg-peppermint-200 dark:bg-peppermint-900/40 flex items-center space-x-1 rounded border bg-transparent px-2 py-0.5 text-xs">
 						<span className="inline-block h-2 w-2 animate-pulse rounded-full bg-green-500"></span>
 						<span className="text-peppermint-700 group-hover:text-peppermint-900 dark:text-peppermint-300">
 							Processing
@@ -235,36 +235,36 @@ export function FileContextSection({
 
 			{/* Content */}
 			{isExpanded && (
-				<div className="border-t border-peppermint-200 p-3 dark:border-peppermint-900/50">
+				<div className="border-peppermint-200 dark:border-peppermint-900/50 border-t p-3">
 					<div className="flex justify-between">
 						<div className="flex items-center">
-							<div className="shrink-0 rounded border border-peppermint-200 bg-white p-2 dark:border-peppermint-800 dark:bg-peppermint-900/30">
+							<div className="border-peppermint-200 dark:border-peppermint-800 dark:bg-peppermint-900/30 shrink-0 rounded border bg-white p-2">
 								{getFileIcon()}
 							</div>
 							<div className="ml-3">
-								<h3 className="font-medium text-peppermint-900 dark:text-peppermint-100">
+								<h3 className="text-peppermint-900 dark:text-peppermint-100 font-medium">
 									{currentFile.name}
 								</h3>
 								<div className="mt-1 flex flex-wrap gap-2">
-									<span className="rounded bg-peppermint-200 px-2 py-0.5 text-xs text-peppermint-800 dark:bg-peppermint-900/40 dark:text-peppermint-300">
+									<span className="bg-peppermint-200 text-peppermint-800 dark:bg-peppermint-900/40 dark:text-peppermint-300 rounded px-2 py-0.5 text-xs">
 										URL: {traceAnalysis.parsedTrace.Meta.mainFrameURL}
 									</span>
-									<span className="rounded bg-peppermint-200 px-2 py-0.5 text-xs text-peppermint-800 dark:bg-peppermint-900/40 dark:text-peppermint-300">
+									<span className="bg-peppermint-200 text-peppermint-800 dark:bg-peppermint-900/40 dark:text-peppermint-300 rounded px-2 py-0.5 text-xs">
 										Navigations:{' '}
 										{traceAnalysis.parsedTrace.Meta.mainFrameNavigations.length}
 									</span>
 									{traceAnalysis.metadata.cpuThrottling && (
-										<span className="rounded bg-peppermint-200 px-2 py-0.5 text-xs text-peppermint-800 dark:bg-peppermint-900/40 dark:text-peppermint-300">
+										<span className="bg-peppermint-200 text-peppermint-800 dark:bg-peppermint-900/40 dark:text-peppermint-300 rounded px-2 py-0.5 text-xs">
 											CPU Throttling: {traceAnalysis.metadata.cpuThrottling}x
 										</span>
 									)}
 									{traceAnalysis.metadata.networkThrottling && (
-										<span className="rounded bg-peppermint-200 px-2 py-0.5 text-xs text-peppermint-800 dark:bg-peppermint-900/40 dark:text-peppermint-300">
+										<span className="bg-peppermint-200 text-peppermint-800 dark:bg-peppermint-900/40 dark:text-peppermint-300 rounded px-2 py-0.5 text-xs">
 											Network Throttling:{' '}
 											{traceAnalysis.metadata.networkThrottling}
 										</span>
 									)}
-									<span className="rounded bg-peppermint-200 px-2 py-0.5 text-xs text-peppermint-800 dark:bg-peppermint-900/40 dark:text-peppermint-300">
+									<span className="bg-peppermint-200 text-peppermint-800 dark:bg-peppermint-900/40 dark:text-peppermint-300 rounded px-2 py-0.5 text-xs">
 										File Size: {formatFileSize(currentFile.size)}
 									</span>
 								</div>
@@ -274,10 +274,10 @@ export function FileContextSection({
 							value={selectedNavigation || __insights[0][0]}
 							onValueChange={handleTraceNavigationChange}
 						>
-							<SelectTrigger className="w-48 border border-dashed border-peppermint-400 text-peppermint-800 focus:ring-peppermint-300">
+							<SelectTrigger className="border-peppermint-400 text-peppermint-800 focus:ring-peppermint-300 w-48 border border-dashed">
 								<SelectValue placeholder="Choose a navigation" />
 							</SelectTrigger>
-							<SelectContent className="border border-dashed border-peppermint-400 text-peppermint-800 focus:ring-peppermint-300">
+							<SelectContent className="border-peppermint-400 text-peppermint-800 focus:ring-peppermint-300 border border-dashed">
 								{__insights.map(([navigationId, insight]) => (
 									<SelectItem
 										className="focus:bg-peppermint-100 focus:text-peppermint-900 dark:focus:bg-peppermint-900/40 dark:focus:text-peppermint-100"
@@ -293,7 +293,7 @@ export function FileContextSection({
 
 					{/* Core Web Vitals Section - Updated with better visuals */}
 					<div className="mt-4">
-						<h4 className="mb-2 max-w-96 truncate text-xs font-semibold text-peppermint-800 dark:text-peppermint-200">
+						<h4 className="text-peppermint-800 dark:text-peppermint-200 mb-2 max-w-96 truncate text-xs font-semibold">
 							Core Web Vitals for:{' '}
 							{
 								__insights.find(([nav, _in]) => {
@@ -339,7 +339,7 @@ export function FileContextSection({
 														id={`metric-${metric}-${selectedNavigation}-lines`}
 													/>
 												</div>
-												<span className="text-[10px] text-peppermint-600 dark:text-peppermint-400">
+												<span className="text-peppermint-600 dark:text-peppermint-400 text-[10px]">
 													{metricValue?.metricScore ===
 													MetricScoreClassification.BAD
 														? 'Poor'
@@ -349,7 +349,7 @@ export function FileContextSection({
 															: 'Good'}
 												</span>
 											</div>
-											<div className="text-[10px] text-peppermint-600 dark:text-peppermint-400">
+											<div className="text-peppermint-600 dark:text-peppermint-400 text-[10px]">
 												<span className="font-medium">Target: &lt;100ms</span>
 											</div>
 										</div> */}
@@ -448,14 +448,14 @@ export function FileContextSection({
 
 					{/* Frame Histogram */}
 					<div className="mt-4">
-						<h4 className="mb-2 text-xs font-semibold text-peppermint-800 dark:text-peppermint-200">
+						<h4 className="text-peppermint-800 dark:text-peppermint-200 mb-2 text-xs font-semibold">
 							Trace activity
 						</h4>
-						<div className="rounded-lg border border-peppermint-200 bg-white p-3 dark:border-peppermint-800 dark:bg-peppermint-900/30">
+						<div className="border-peppermint-200 dark:border-peppermint-800 dark:bg-peppermint-900/30 rounded-lg border bg-white p-3">
 							<div className="h-24">
 								<FrameHistogram data={frameDurations} />
 							</div>
-							<div className="mt-2 flex justify-between text-[10px] text-peppermint-600 dark:text-peppermint-400">
+							<div className="text-peppermint-600 dark:text-peppermint-400 mt-2 flex justify-between text-[10px]">
 								<div className="flex items-center">
 									<div className="relative mr-1 h-2 w-2 bg-green-200 text-green-700">
 										<LinePattern
@@ -486,7 +486,7 @@ export function FileContextSection({
 
 					{/* Task Breakdown */}
 					<div className="mt-4">
-						<h4 className="mb-2 text-xs font-semibold text-peppermint-800 dark:text-peppermint-200">
+						<h4 className="text-peppermint-800 dark:text-peppermint-200 mb-2 text-xs font-semibold">
 							Metrics Breakdown
 						</h4>
 						<div className="grid grid-cols-2 gap-3">
@@ -548,7 +548,7 @@ export function FileContextSection({
 												id={`long-tasks-${selectedNavigation}-values`}
 											/>
 										</div>
-										<span className="text-[10px] text-peppermint-600 dark:text-peppermint-400">
+										<span className="text-peppermint-600 dark:text-peppermint-400 text-[10px]">
 											Longest: {msOrSDisplay(longestAnimationFrameDuration)}ms
 										</span>
 									</div>
@@ -570,7 +570,7 @@ export function FileContextSection({
 											id={`interaction-events-${selectedNavigation}-values`}
 										/>
 									</div>
-									<span className="text-[10px] text-peppermint-600 dark:text-peppermint-400">
+									<span className="text-peppermint-600 dark:text-peppermint-400 text-[10px]">
 										{interactionsClassification.clicks} click,{' '}
 										{interactionsClassification.pointers} pointer events
 									</span>
