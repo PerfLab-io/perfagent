@@ -36,7 +36,7 @@ const data = {
 	user: {
 		name: 'vinicius',
 		email: 'vinicius@example.com',
-		avatar: '/avatars/shadcn.jpg',
+		avatar: 'https://github.com/perflab-io.png',
 	},
 	navMain: [
 		{
@@ -129,7 +129,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 							href="#"
 							className="hover:bg-none data-[slot=sidebar-menu-button]:p-1.5!"
 						>
-							<span className="text-xl font-bold text-primary-foreground">
+							<span className="text-primary-foreground text-xl font-bold">
 								PerfAgent
 							</span>
 						</a>
