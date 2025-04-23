@@ -161,10 +161,10 @@ const utils = {
 	 */
 	getStepContainerStyle: (step: ResearchStep): string => {
 		return cn(
-			'rounded-lg border border-border/20 p-3',
+			'border-border/20 rounded-lg border p-3',
 			'transition-all duration-300 ease-in-out',
 			step.status === 'in-progress' &&
-				'-translate-y-1 translate-x-1 bg-accent/10 text-merino-900 shadow-[-4px_4px_0_hsl(var(--merino-900))]',
+				'bg-accent/10 text-merino-900 translate-x-1 -translate-y-1 shadow-[-4px_4px_0_hsl(var(--merino-900))]',
 			step.status === 'complete' && 'bg-background text-base',
 		);
 	},
@@ -190,10 +190,10 @@ const utils = {
 	 */
 	getResultContainerStyle: (isExpanded: boolean): string => {
 		return cn(
-			'rounded-lg border border-border/20 p-3 transition-all duration-200',
+			'border-border/20 w-full rounded-lg border p-3 transition-all duration-200',
 			isExpanded
 				? 'bg-accent text-accent-foreground'
-				: 'bg-white hover:bg-primary',
+				: 'hover:bg-primary bg-white',
 		);
 	},
 };
@@ -530,7 +530,7 @@ export function ResearchCard({
 									className={cn(
 										'w-full rounded-md border border-dashed p-2 data-[state=open]:border-solid',
 										step.status === 'complete' &&
-											'border-peppermint-500 data-[state=open]:bg-white dark:border-peppermint-900',
+											'border-peppermint-500 dark:border-peppermint-900 data-[state=open]:bg-white',
 										step.status === 'in-progress' &&
 											'border-midnight-500 data-[state=open]:bg-midnight-50 dark:border-midnight-900',
 									)}
@@ -553,7 +553,7 @@ export function ResearchCard({
 									<CollapsibleContent>
 										<Separator
 											orientation="horizontal"
-											className="my-2 w-full bg-peppermint-300 dark:bg-peppermint-900"
+											className="bg-peppermint-300 dark:bg-peppermint-900 my-2 w-full"
 										/>
 										<ul>
 											{step.researchPlan.searchQueries.map((query) => (
@@ -574,7 +574,7 @@ export function ResearchCard({
 													</div>
 													<div className="flex flex-col gap-1">
 														<span className="font-semibold">{query.query}</span>
-														<span className="text-sm text-foreground/70">
+														<span className="text-foreground/70 text-sm">
 															{query.rationale}
 														</span>
 													</div>
@@ -587,7 +587,7 @@ export function ResearchCard({
 									className={cn(
 										'w-full rounded-md border border-dashed p-2 data-[state=open]:border-solid',
 										step.status === 'complete' &&
-											'border-peppermint-500 data-[state=open]:bg-white dark:border-peppermint-900',
+											'border-peppermint-500 dark:border-peppermint-900 data-[state=open]:bg-white',
 										step.status === 'in-progress' &&
 											'border-midnight-500 data-[state=open]:bg-midnight-50 dark:border-midnight-900',
 									)}
@@ -605,12 +605,12 @@ export function ResearchCard({
 											<BarChart className="h-3 w-3" />
 											<strong>Required Analyses</strong>
 										</div>
-										<ChevronDown className="h-3 w-3 text-peppermint-700 dark:text-peppermint-300" />
+										<ChevronDown className="text-peppermint-700 dark:text-peppermint-300 h-3 w-3" />
 									</CollapsibleTrigger>
 									<CollapsibleContent>
 										<Separator
 											orientation="horizontal"
-											className="my-2 w-full bg-peppermint-300 dark:bg-peppermint-900"
+											className="bg-peppermint-300 dark:bg-peppermint-900 my-2 w-full"
 										/>
 										<ul>
 											{step.researchPlan.requiredAnalyses.map((analysis) => (
@@ -631,7 +631,7 @@ export function ResearchCard({
 														<span className="font-semibold">
 															{analysis.type}
 														</span>
-														<span className="text-sm text-foreground/70">
+														<span className="text-foreground/70 text-sm">
 															{analysis.description}
 														</span>
 													</div>
@@ -721,7 +721,7 @@ export function ResearchCard({
 										className={cn(
 											'group w-full rounded-md border border-dashed p-2 data-[state=open]:border-solid',
 											step.status === 'complete' &&
-												'border-peppermint-500 data-[state=open]:bg-white dark:border-peppermint-900',
+												'border-peppermint-500 dark:border-peppermint-900 data-[state=open]:bg-white',
 											step.status === 'in-progress' &&
 												'border-merino-500 data-[state=open]:bg-merino-50 dark:border-merino-900',
 										)}
@@ -831,10 +831,10 @@ export function ResearchCard({
 	return (
 		<div className="mt-4 w-full space-y-4">
 			{/* Research Progress Card */}
-			<Card className="group relative rounded-lg border border-border bg-card transition-all duration-300">
+			<Card className="group border-border bg-card relative rounded-lg border transition-all duration-300">
 				<CardHeader
 					className={cn(
-						'flex flex-row items-center justify-between border-b border-border bg-accent p-4 font-mono text-midnight-950 dark:text-peppermint-950',
+						'border-border bg-accent text-midnight-950 dark:text-peppermint-950 flex flex-row items-center justify-between border-b p-4 font-mono',
 						'rounded-t-lg',
 						!isCardExpanded && 'rounded-lg',
 					)}
@@ -850,9 +850,9 @@ export function ResearchCard({
 							onClick={toggleCardExpansion}
 						>
 							{isCardExpanded ? (
-								<ChevronUp className="h-4 w-4 text-foreground/70" />
+								<ChevronUp className="text-foreground/70 h-4 w-4" />
 							) : (
-								<ChevronDown className="h-4 w-4 text-foreground/70" />
+								<ChevronDown className="text-foreground/70 h-4 w-4" />
 							)}
 							<span className="sr-only">Toggle card</span>
 						</Button>
@@ -873,7 +873,7 @@ export function ResearchCard({
 							<Button
 								variant="outline"
 								size="icon"
-								className="h-8 w-8 rounded-full border-destructive/50 hover:bg-destructive/10 hover:text-destructive"
+								className="border-destructive/50 hover:bg-destructive/10 hover:text-destructive h-8 w-8 rounded-full"
 								onClick={handleAbort}
 								title="Cancel research"
 							>
@@ -893,7 +893,7 @@ export function ResearchCard({
 					)}
 				>
 					<div className="mb-4 space-y-2">
-						<div className="flex justify-between text-xs text-foreground/60">
+						<div className="text-foreground/60 flex justify-between text-xs">
 							<span>Progress</span>
 							<span>{progress}%</span>
 						</div>
@@ -942,15 +942,15 @@ export function ResearchCard({
 										</div>
 										<button type="button" className="mt-1 shrink-0">
 											{step.expanded ? (
-												<ChevronDown className="h-4 w-4 text-foreground/60" />
+												<ChevronDown className="text-foreground/60 h-4 w-4" />
 											) : (
-												<ChevronRight className="h-4 w-4 text-foreground/60" />
+												<ChevronRight className="text-foreground/60 h-4 w-4" />
 											)}
 										</button>
 									</div>
 
 									{step.expanded && (
-										<div className="mt-3 space-y-2 pl-12 text-sm text-foreground/90 animate-in fade-in-50 dark:text-foreground/90">
+										<div className="text-foreground/90 animate-in fade-in-50 dark:text-foreground/90 mt-3 space-y-2 pl-12 text-sm">
 											{renderStepContent(step.id)}
 										</div>
 									)}
@@ -968,23 +968,23 @@ export function ResearchCard({
 						<Button
 							variant="outline"
 							size="sm"
-							className="rounded-full transition-all duration-300 hover:-translate-y-0.5 hover:translate-x-0.5 hover:shadow-[-4px_4px_0_hsl(var(--border-color))]"
+							className="rounded-full transition-all duration-300 hover:translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[-4px_4px_0_hsl(var(--border-color))]"
 						>
 							Show results
 						</Button>
 					</DialogTrigger>
-					<DialogContent className="w-9/12 max-w-(--breakpoint-lg)">
+					<DialogContent className="max-w-xl">
 						<DialogHeader>
 							<Card
 								className={cn(
-									'group relative mt-4 w-full rounded-xl border-border bg-white',
+									'group border-border relative mt-4 w-full rounded-xl bg-white',
 									'animate-in fade-in slide-in-from-bottom-5',
 								)}
 							>
 								<CardHeader className="flex flex-row items-center justify-between p-4 pb-2">
 									<div className="flex items-center gap-2">
-										<Search className="h-4 w-4 text-foreground/70" />
-										<CardTitle className="text-lg font-bold text-foreground">
+										<Search className="text-foreground/70 h-4 w-4" />
+										<CardTitle className="text-foreground text-lg font-bold">
 											Research Results: {query}
 										</CardTitle>
 									</div>
@@ -1003,7 +1003,7 @@ export function ResearchCard({
 								</CardHeader>
 
 								<CardContent className="p-4 pt-2">
-									<div className="space-y-4">
+									<div className="w-full space-y-4">
 										<div className="mb-2 flex flex-wrap gap-2">
 											<Badge
 												variant="outline"
@@ -1060,27 +1060,24 @@ export function ResearchCard({
 																	{result.title}
 																</h3>
 																{expandedResult !== result.id && (
-																	<p className="text-current/70 line-clamp-1 text-sm">
+																	<p className="line-clamp-1 text-sm text-current/70">
 																		{result.content}
 																	</p>
 																)}
 															</div>
 														</div>
-														<button
-															type="button"
-															className="mt-1 shrink-0"
-														>
+														<button type="button" className="mt-1 shrink-0">
 															{expandedResult === result.id ? (
-																<ChevronDown className="text-current/60 h-4 w-4" />
+																<ChevronDown className="h-4 w-4 text-current/60" />
 															) : (
-																<ChevronRight className="text-current/60 h-4 w-4" />
+																<ChevronRight className="h-4 w-4 text-current/60" />
 															)}
 														</button>
 													</div>
 
 													{expandedResult === result.id && (
 														<div className="mt-2 pl-12">
-															<p className="text-current/80 mb-2 text-sm">
+															<p className="mb-2 text-sm text-current/80">
 																{result.content}
 															</p>
 															{result.url && (
@@ -1088,7 +1085,7 @@ export function ResearchCard({
 																	href={result.url}
 																	target="_blank"
 																	rel="noopener noreferrer"
-																	className="inline-flex items-center gap-1 text-xs text-midnight-600 hover:underline dark:text-midnight-400"
+																	className="text-midnight-600 dark:text-midnight-400 inline-flex items-center gap-1 text-xs hover:underline"
 																>
 																	View source{' '}
 																	<ChevronRight className="h-3 w-3" />
