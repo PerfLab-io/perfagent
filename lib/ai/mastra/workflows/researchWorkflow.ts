@@ -28,6 +28,9 @@ const trustedDomains = [
 	'developer.chrome.com',
 	'developer.mozilla.org',
 	'dev.to',
+	'speedcurve.com',
+	'rumvision.com',
+	'debugbear.com',
 ] as const;
 
 const depth = 'advanced' as const;
@@ -478,7 +481,7 @@ const analyzeResults = new Step({
 						analysisType: step.analysis.type,
 						message: `Analyzing ${step.analysis.type}...`,
 						timestamp: Date.now(),
-						completedSteps,
+						completedSteps: _completedSteps,
 						totalSteps,
 					},
 				},
@@ -560,6 +563,7 @@ const researchReport = new Step({
 	execute: async ({ context, runId, mastra }) => {
 		const triggerData = context?.getStepResult<{
 			dataStream: DataStreamWriter;
+			messages: CoreMessage[];
 		}>('trigger');
 		const researchPlan =
 			context?.getStepResult<z.infer<typeof researchPlanSchema>>(
@@ -583,17 +587,29 @@ const researchReport = new Step({
 			throw new Error('Mastra not found');
 		}
 
-		const { dataStream: dataStreamWriter } = triggerData;
+		const { dataStream: dataStreamWriter, messages } = triggerData;
 		const { searchResults } = searchWebStepResult;
 		const { totalSteps } = researchStepsStepResult;
 		const { analysisResults } = analyzeResultsStepResult;
 
 		const reportStream = await mastra.getAgent('largeAssistant').stream(
 			[
+				...messages,
 				{
 					role: 'user',
 					content: dedent`
-          Generate a markdown report based on the research plan, search results and analysis results.
+          Generate a markdown report for my request based on the research plan, search results and analysis results.
+					The report should keep the original request in mind, utilizing the search results and analysis results to formulate
+					a well structured report that is easy to understand based on the findings on the search results and taking the analysis results
+					as insights and possible observations.
+
+					Do not output anything other than the report in markdown (follow your markdown formatting and citations guidelines).
+					Never open with 'This report summarizes ...' or anything similar. Be objective and attend to generating a useful, professional report.
+
+					Open the report with a summary and create sections to present the findings on the search results and the analysis results.
+					Do not create sections to expand on basic concepts unless my original request asks for it.
+
+					Give a relevant main title to the report, based on my original request and key insights
 
           Research plan: ${JSON.stringify(researchPlan)}
           Search results: ${JSON.stringify(searchResults)}
@@ -617,6 +633,7 @@ const researchReport = new Step({
 
 		const agentSummary = await mastra.getAgent('largeAssistant').stream(
 			[
+				...messages,
 				{
 					role: 'user',
 					content: dedent`
@@ -628,7 +645,9 @@ const researchReport = new Step({
 					
 					- Be concise, a paragraph or two
 					- Highlight key findings and insights
-					- Verify with me if the result needs further research into a specific topic or point from the report.
+					- Verify with me if the result needs further research into a specific topic or point from the research or analyses results, offering possible leads.
+					- Return the summary in markdown format with a subheader saying something like 'Key findings and insights from the research' or similar, diversifying and keeping it short and engaging.
+					- Don't open with 'Here's a summary...' or something similar. Open with the subheader as instructed.
           `,
 				},
 			],
