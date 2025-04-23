@@ -161,6 +161,13 @@ Beyond the Core Web Vitals, there are **other important metrics** that provide i
     - **Use the LoAF API and DevTools**: Chrome’s DevTools (as of v123+) can show long animation frames. The LoAF API can be used in JavaScript (via PerformanceObserver for \`long-animation-frame\` entries) to gather data in the field about slow frames ([Long Animation Frames API  |  Web Platform  |  Chrome for Developers](https://developer.chrome.com/docs/web-platform/long-animation-frames#:~:text=There%20is%20no%20direct%20API,INP%20attribution%20interface%20from%20v4)). Use this to catch jank in user sessions that might not appear in simple testing.
   - **Role & Classification:** Long Animation Frames are an **experimental/diagnostic metric**. They are not a Web Vital with a set “score,” but rather a tool/indicator. LoAF data is particularly useful for **troubleshooting INP** and overall **smoothness** of interactions ([Long Animation Frames API  |  Web Platform  |  Chrome for Developers](https://developer.chrome.com/docs/web-platform/long-animation-frames#:~:text=The%20Long%20Animation%20Frames%20API,UI%20jank%20which%20affects%20smoothness)) ([Long Animation Frames API  |  Web Platform  |  Chrome for Developers](https://developer.chrome.com/docs/web-platform/long-animation-frames#:~:text=diagnose%20and%20fix%20Interaction%20to,help%20you%20diagnose%20those%20interactions)). By reducing LoAF occurrences (and their durations), you inherently improve user experience for animations and interactions. In summary, LoAF is about **frame-time performance**: fewer long frames means a smoother, more responsive app.
 
+- **Other related subjects:**
+  - Critical rendering path (also related to LCP and CLS, possibly related to INP as first interaction may be impacted)
+  - Resource optimization (JS, CSS, images, fonts - Also related to critical rendering path)
+  - Speculation rules for faster page load metrics (Related to LCP and Critical rendering path)
+  - BFCache (Back/Forward Cache - similar to Speculation rules)
+  - Network performance (caching, compression, preloading, lazy loading - related to LCP and Critical rendering path)
+
 *(Note: The “Other Web Vitals” above like FCP, TTFB are included in the official web-vitals library and have field APIs, whereas TBT and TTI are lab metrics. LoAF is a new concept tied to an API shipped in Chrome 123+ for performance insights.)*
 `;
 
