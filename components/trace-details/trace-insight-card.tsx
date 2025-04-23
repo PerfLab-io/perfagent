@@ -37,15 +37,15 @@ export function FileInsightCard({
 	return (
 		<div
 			className={cn(
-				'rounded-lg border border-peppermint-200 bg-white dark:border-peppermint-800 dark:bg-peppermint-950/30',
-				'transition-all duration-300 hover:-translate-y-1 hover:translate-x-1 hover:shadow-[-4px_4px_0_hsl(var(--border-color))]',
+				'border-peppermint-200 dark:border-peppermint-800 dark:bg-peppermint-950/30 rounded-lg border bg-white',
+				'transition-all duration-300 hover:translate-x-1 hover:-translate-y-1 hover:shadow-[-4px_4px_0_hsl(var(--border-color))]',
 				'metric-context-appear p-3',
 				'flex flex-col gap-2',
 				className,
 			)}
 		>
 			<div className="mb-2 flex items-center justify-between">
-				<span className="text-xs font-medium text-peppermint-700 dark:text-peppermint-300">
+				<span className="text-peppermint-700 dark:text-peppermint-300 text-xs font-medium">
 					{title}
 				</span>
 				<div
