@@ -238,7 +238,7 @@ export function FileContextSection({
 				<div className="border-t border-peppermint-200 p-3 dark:border-peppermint-900/50">
 					<div className="flex justify-between">
 						<div className="flex items-center">
-							<div className="flex-shrink-0 rounded border border-peppermint-200 bg-white p-2 dark:border-peppermint-800 dark:bg-peppermint-900/30">
+							<div className="shrink-0 rounded border border-peppermint-200 bg-white p-2 dark:border-peppermint-800 dark:bg-peppermint-900/30">
 								{getFileIcon()}
 							</div>
 							<div className="ml-3">

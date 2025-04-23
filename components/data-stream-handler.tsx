@@ -244,11 +244,11 @@ function PureArtifactComponent(props: ArtifactProps) {
 								}}
 								disabled={artifact.status === 'streaming'}
 							>
-								<FileText className="h-4 w-4 flex-shrink-0" />
+								<FileText className="h-4 w-4 shrink-0" />
 								<span className="report-button-text overflow-hidden whitespace-nowrap">
 									Open Report
 								</span>
-								<ExternalLink className="h-3 w-3 flex-shrink-0" />
+								<ExternalLink className="h-3 w-3 shrink-0" />
 							</Button>
 						</div>
 						<p className="mt-2 line-clamp-4 text-sm italic text-foreground">

@@ -272,9 +272,9 @@ export function DataPanel({
 												key={index}
 												className="flex flex-1 flex-col items-center"
 											>
-												<div className="flex w-full flex-grow items-end justify-center">
+												<div className="flex w-full grow items-end justify-center">
 													<div
-														className="w-4/5 rounded-t-sm bg-gradient-to-t from-indigo-600 to-peppermint-400 transition-all duration-500 ease-out"
+														className="w-4/5 rounded-t-sm bg-linear-to-t from-indigo-600 to-peppermint-400 transition-all duration-500 ease-out"
 														style={{
 															height: `${item.score}%`,
 															animationName: animate ? 'growUp' : 'none',
@@ -323,7 +323,7 @@ export function DataPanel({
 												{ topic: 'Functions', score: 80 },
 											].map((item, i) => (
 												<li key={i} className="flex items-center gap-3">
-													<div className="h-2 flex-grow rounded-full bg-peppermint-200 dark:bg-peppermint-800">
+													<div className="h-2 grow rounded-full bg-peppermint-200 dark:bg-peppermint-800">
 														<div
 															className="h-full rounded-full bg-peppermint-500"
 															style={{
@@ -363,7 +363,7 @@ export function DataPanel({
 												{ topic: 'Testing', score: 50 },
 											].map((item, i) => (
 												<li key={i} className="flex items-center gap-3">
-													<div className="h-2 flex-grow rounded-full bg-merino-200 dark:bg-merino-900">
+													<div className="h-2 grow rounded-full bg-merino-200 dark:bg-merino-900">
 														<div
 															className="h-full rounded-full bg-merino-500"
 															style={{

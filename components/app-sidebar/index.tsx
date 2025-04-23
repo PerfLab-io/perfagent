@@ -127,7 +127,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 					<SidebarMenuItem className="flex items-center justify-between">
 						<a
 							href="#"
-							className="hover:bg-none data-[slot=sidebar-menu-button]:!p-1.5"
+							className="hover:bg-none data-[slot=sidebar-menu-button]:p-1.5!"
 						>
 							<span className="text-xl font-bold text-primary-foreground">
 								PerfAgent

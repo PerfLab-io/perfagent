@@ -108,7 +108,7 @@ export default function UnsubscribePage() {
 												if (error) setError(undefined);
 											}}
 											placeholder="Confirm your email address"
-											className="h-12 w-full rounded-md border border-peppermint-700 bg-peppermint-50 px-8 py-3 text-peppermint-600 placeholder:text-peppermint-600 focus:outline-none focus:ring-2 focus:ring-peppermint-500 dark:border-peppermint-400 dark:bg-white dark:text-peppermint-500 dark:placeholder:text-peppermint-500 dark:focus:ring-peppermint-700"
+											className="h-12 w-full rounded-md border border-peppermint-700 bg-peppermint-50 px-8 py-3 text-peppermint-600 placeholder:text-peppermint-600 focus:outline-hidden focus:ring-2 focus:ring-peppermint-500 dark:border-peppermint-400 dark:bg-white dark:text-peppermint-500 dark:placeholder:text-peppermint-500 dark:focus:ring-peppermint-700"
 											required
 											aria-invalid={error ? 'true' : 'false'}
 											aria-describedby={error ? 'email-error' : undefined}
@@ -133,7 +133,7 @@ export default function UnsubscribePage() {
 								</div>
 								{error && (
 									<div className="mt-2 flex items-start gap-2 text-red-500">
-										<AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+										<AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
 										<span className="text-sm">{error}</span>
 									</div>
 								)}
@@ -142,7 +142,7 @@ export default function UnsubscribePage() {
 					) : (
 						<>
 							<div className="animate-fadeIn mb-8 flex items-start gap-4 rounded-md border border-peppermint-700 bg-peppermint-900/30 p-6 dark:border-peppermint-400 dark:bg-peppermint-200/30">
-								<CheckCircle className="mt-1 h-8 w-8 flex-shrink-0 text-peppermint-500 dark:text-peppermint-700" />
+								<CheckCircle className="mt-1 h-8 w-8 shrink-0 text-peppermint-500 dark:text-peppermint-700" />
 								<div>
 									<h4 className="mb-2 font-bold text-peppermint-50 dark:text-peppermint-950">
 										You've been unsubscribed

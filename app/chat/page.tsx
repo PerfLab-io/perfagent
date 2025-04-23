@@ -403,7 +403,7 @@ export default function AiChatPage() {
 					{/* Outer main container with dropzone */}
 					<FileDropzone
 						onFilesDrop={handleFilesDrop}
-						className="relative flex max-h-[90dvh] flex-1 flex-col px-4 focus-within:outline-none"
+						className="relative flex max-h-[90dvh] flex-1 flex-col px-4 focus-within:outline-hidden"
 						disabled={isLoading}
 					>
 						{/* File context section */}
@@ -416,7 +416,7 @@ export default function AiChatPage() {
 						{/* Chat messages container */}
 						<div
 							className={cn(
-								'flex-1 shrink overflow-y-auto rounded-lg border border-border bg-card shadow-sm',
+								'flex-1 shrink overflow-y-auto rounded-lg border border-border bg-card shadow-xs',
 								'transition-all duration-500 ease-in-out',
 								messagesVisible
 									? 'messages-container-active'
@@ -445,7 +445,7 @@ export default function AiChatPage() {
 						{/* Input area container */}
 						<div
 							className={cn(
-								'max-w-[calc(100%-2rem)] rounded-lg border border-border bg-card shadow-sm',
+								'max-w-[calc(100%-2rem)] rounded-lg border border-border bg-card shadow-xs',
 								'transition-all duration-500 ease-in-out',
 								chatStarted
 									? 'input-container-active'
@@ -493,7 +493,7 @@ export default function AiChatPage() {
 										className={cn(
 											'w-full resize-none rounded-xl p-4',
 											'border border-border bg-background focus:border-peppermint-800 focus:ring-0',
-											'text-foreground outline-none transition-all placeholder:text-foreground',
+											'text-foreground outline-hidden transition-all placeholder:text-foreground',
 											chatStarted
 												? 'max-h-[200px] min-h-[60px]'
 												: 'min-h-[100px]',

@@ -76,7 +76,7 @@ export function LandingBanner() {
 							<CardContent>
 								<ul className="space-y-3">
 									<li className="flex items-baseline gap-2">
-										<span className="mt-1 inline-block h-3 w-3 flex-shrink-0">
+										<span className="mt-1 inline-block h-3 w-3 shrink-0">
 											<svg
 												width="100%"
 												height="100%"
@@ -130,7 +130,7 @@ export function LandingBanner() {
 										</span>
 									</li>
 									<li className="flex items-baseline gap-2">
-										<span className="mt-1 inline-block h-3 w-3 flex-shrink-0">
+										<span className="mt-1 inline-block h-3 w-3 shrink-0">
 											<svg
 												width="100%"
 												height="100%"
@@ -182,7 +182,7 @@ export function LandingBanner() {
 										<span>Create reports with actionable fixes</span>
 									</li>
 									<li className="flex items-baseline gap-2">
-										<span className="mt-1 inline-block h-3 w-3 flex-shrink-0">
+										<span className="mt-1 inline-block h-3 w-3 shrink-0">
 											<svg
 												width="100%"
 												height="100%"

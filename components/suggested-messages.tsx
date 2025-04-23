@@ -94,7 +94,7 @@ export function SuggestedMessages({
 									onClick={() => handleSelectSuggestion(suggestion)}
 									className={cn(
 										'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm transition-colors',
-										'focus:outline-none focus:ring-0',
+										'focus:outline-hidden focus:ring-0',
 										isActive
 											? 'border border-merino-800 bg-merino-50 text-merino-800 dark:border-merino-900 dark:bg-merino-100 dark:text-merino-900'
 											: 'border border-border bg-background text-foreground hover:border-merino-600 hover:bg-merino-50 hover:text-merino-600 dark:hover:border-merino-900 dark:hover:bg-merino-50 dark:hover:text-merino-900',

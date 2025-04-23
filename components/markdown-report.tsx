@@ -226,7 +226,7 @@ export function MarkdownReport({
 			{/* Content area with report sections */}
 			<div
 				ref={reportRef}
-				className="max-h-full flex-grow overflow-y-auto pr-1"
+				className="max-h-full grow overflow-y-auto pr-1"
 				aria-live="polite"
 			>
 				<MarkdownRenderer content={reportData || ''} />

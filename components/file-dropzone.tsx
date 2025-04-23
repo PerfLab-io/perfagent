@@ -213,7 +213,7 @@ export function FileDropzone({
 			cn(
 				'absolute inset-0 z-50 flex flex-col items-center justify-center',
 				'rounded-lg border-4 border-dashed transition-all duration-300',
-				'backdrop-blur-sm animate-in fade-in zoom-in-95',
+				'backdrop-blur-xs animate-in fade-in zoom-in-95',
 				isHovering
 					? 'animate-pulse-border border-peppermint-500 dark:border-peppermint-400'
 					: 'shadow-none',

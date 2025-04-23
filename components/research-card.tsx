@@ -503,7 +503,7 @@ export function ResearchCard({
 							<div className="flex items-start gap-3">
 								<div
 									className={cn(
-										'relative flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md',
+										'relative flex h-5 w-5 shrink-0 items-center justify-center rounded-md',
 										step.status === 'complete' &&
 											'bg-peppermint-200 dark:bg-peppermint-900',
 										step.status === 'in-progress' &&
@@ -564,7 +564,7 @@ export function ResearchCard({
 													<div className="flex items-start gap-3">
 														<div
 															className={cn(
-																'relative mt-1 h-3.5 w-3.5 flex-shrink-0 rounded-sm border border-solid',
+																'relative mt-1 h-3.5 w-3.5 shrink-0 rounded-sm border border-solid',
 																step.status === 'complete' &&
 																	'border-peppermint-300 bg-peppermint-50 dark:border-peppermint-900',
 																step.status === 'in-progress' &&
@@ -620,7 +620,7 @@ export function ResearchCard({
 												>
 													<div
 														className={cn(
-															'relative mt-1 h-3.5 w-3.5 flex-shrink-0 rounded-sm border border-solid',
+															'relative mt-1 h-3.5 w-3.5 shrink-0 rounded-sm border border-solid',
 															step.status === 'complete' &&
 																'border-peppermint-300 bg-peppermint-50 dark:border-peppermint-900',
 															step.status === 'in-progress' &&
@@ -690,7 +690,7 @@ export function ResearchCard({
 											<div className="flex items-start gap-3">
 												<div
 													className={cn(
-														'relative flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md',
+														'relative flex h-5 w-5 shrink-0 items-center justify-center rounded-md',
 														step.status === 'complete' &&
 															'bg-peppermint-200 dark:bg-peppermint-900',
 														step.status === 'in-progress' &&
@@ -792,7 +792,7 @@ export function ResearchCard({
 														<div className="flex items-start gap-3">
 															<div
 																className={cn(
-																	'relative flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md text-current',
+																	'relative flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-current',
 																	step.status === 'complete' &&
 																		'bg-peppermint-200 dark:bg-peppermint-900',
 																	step.status === 'in-progress' &&
@@ -940,7 +940,7 @@ export function ResearchCard({
 												</p>
 											</div>
 										</div>
-										<button type="button" className="mt-1 flex-shrink-0">
+										<button type="button" className="mt-1 shrink-0">
 											{step.expanded ? (
 												<ChevronDown className="h-4 w-4 text-foreground/60" />
 											) : (
@@ -973,7 +973,7 @@ export function ResearchCard({
 							Show results
 						</Button>
 					</DialogTrigger>
-					<DialogContent className="w-9/12 max-w-screen-lg">
+					<DialogContent className="w-9/12 max-w-(--breakpoint-lg)">
 						<DialogHeader>
 							<Card
 								className={cn(
@@ -1068,7 +1068,7 @@ export function ResearchCard({
 														</div>
 														<button
 															type="button"
-															className="mt-1 flex-shrink-0"
+															className="mt-1 shrink-0"
 														>
 															{expandedResult === result.id ? (
 																<ChevronDown className="text-current/60 h-4 w-4" />

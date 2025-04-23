@@ -137,7 +137,7 @@ export function FilePreview({
 			<button
 				onClick={onRemove}
 				onKeyDown={handleKeyDown}
-				className="rounded p-1 text-foreground transition-colors hover:bg-neutral-100 hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 dark:hover:bg-neutral-800"
+				className="rounded p-1 text-foreground transition-colors hover:bg-neutral-100 hover:text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary/50 dark:hover:bg-neutral-800"
 				aria-label={removeButtonLabel}
 				title={removeButtonLabel}
 				tabIndex={0}

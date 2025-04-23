@@ -104,7 +104,7 @@ export function ChatMessage({
 		<div className={styles.messageContainer}>
 			{/* Bot avatar */}
 			{!isUser && (
-				<div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-merino-100 dark:bg-merino-700">
+				<div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-merino-100 dark:bg-merino-700">
 					<Bot className="h-5 w-5 text-merino-600 dark:text-merino-100" />
 				</div>
 			)}
@@ -155,7 +155,7 @@ export function ChatMessage({
 
 			{/* User avatar */}
 			{isUser && (
-				<div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-midnight-600">
+				<div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-midnight-600">
 					<User className="h-5 w-5 text-white" />
 				</div>
 			)}

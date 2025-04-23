@@ -119,7 +119,7 @@ const CodeBlock: React.FC<{
 
 	return (
 		<div className="group relative my-5">
-			<div className="overflow-hidden rounded-md border border-neutral-200 shadow-sm dark:border-neutral-800">
+			<div className="overflow-hidden rounded-md border border-neutral-200 shadow-xs dark:border-neutral-800">
 				<div className="flex items-center justify-between border-b border-neutral-200 bg-neutral-100 px-3 py-1.5 dark:border-neutral-700 dark:bg-neutral-800">
 					<div className="px-2 py-0.5 text-xs font-medium text-neutral-600 dark:text-neutral-400">
 						{language || 'text'}
@@ -323,7 +323,7 @@ export function MarkdownRenderer({
 				<HoverCardContent
 					side="top"
 					align="start"
-					className="w-48 overflow-hidden rounded-md border border-neutral-200 p-0 shadow-sm dark:border-neutral-700"
+					className="w-48 overflow-hidden rounded-md border border-neutral-200 p-0 shadow-xs dark:border-neutral-700"
 				>
 					<LinkPreview href={href} />
 				</HoverCardContent>
@@ -429,7 +429,7 @@ export function MarkdownRenderer({
 			table(children: React.ReactNode) {
 				return (
 					<div className="my-8 w-full overflow-hidden">
-						<div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+						<div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-xs dark:border-neutral-800 dark:bg-neutral-900">
 							<table className="m-0 w-full border-collapse text-sm">
 								{children}
 							</table>

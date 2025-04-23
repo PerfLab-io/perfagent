@@ -5,6 +5,13 @@ import { SidebarInset } from '@/components/ui/sidebar';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/app-sidebar';
 import { SiteHeader } from '@/components/site-header';
+import { Metadata } from 'next';
+
+export const metadata: Metadata = {
+	title: 'PerfAgent - Agent insights for web performance',
+	description:
+		"PerfAgent is an AI-powered web performance insights tool that helps you understand your website's performance and identify opportunities for improvement.",
+};
 
 export default function AiChatLayout({
 	children,
@@ -12,18 +19,20 @@ export default function AiChatLayout({
 	children: React.ReactNode;
 }) {
 	return (
-		<SidebarProvider>
-			<AppSidebar variant="inset" />
-			<SidebarInset>
-				<SiteHeader />
-				<div className="flex h-full flex-1 flex-col">
-					<div className="flex flex-1 flex-col gap-2 @container/main">
-						<div className="flex h-full flex-col gap-4 py-4 md:gap-6 md:py-6">
-							{children}
+		<>
+			<SidebarProvider>
+				<AppSidebar variant="inset" />
+				<SidebarInset>
+					<SiteHeader />
+					<div className="flex h-full flex-1 flex-col">
+						<div className="@container/main flex flex-1 flex-col gap-2">
+							<div className="flex h-full flex-col gap-4 py-4 md:gap-6 md:py-6">
+								{children}
+							</div>
 						</div>
 					</div>
-				</div>
-			</SidebarInset>
-		</SidebarProvider>
+				</SidebarInset>
+			</SidebarProvider>
+		</>
 	);
 }

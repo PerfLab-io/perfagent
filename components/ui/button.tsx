@@ -7,7 +7,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 
 const buttonVariants = cva(
-	'inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+	'inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-medium ring-offset-background transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
 	{
 		variants: {
 			variant: {
@@ -24,7 +24,7 @@ const buttonVariants = cva(
 				link: 'text-primary underline-offset-4 hover:underline',
 				// Updated question variant to use our color scheme
 				question:
-					'bg-card hover:bg-border hover:text-card text-midnight-950 dark:text-peppermint-950 border border-border/20 shadow-sm justify-start gap-2 px-5 py-4 text-base font-normal',
+					'bg-card hover:bg-border hover:text-card text-midnight-950 dark:text-peppermint-950 border border-border/20 shadow-xs justify-start gap-2 px-5 py-4 text-base font-normal',
 			},
 			size: {
 				default: 'h-10 px-4 py-2',
