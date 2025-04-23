@@ -2,20 +2,14 @@
 
 import * as React from 'react';
 import {
-	BarChartIcon,
 	BotMessageSquareIcon,
 	CameraIcon,
 	ClipboardListIcon,
 	DatabaseIcon,
 	FileCodeIcon,
-	FileIcon,
 	FileTextIcon,
-	FolderIcon,
 	HelpCircleIcon,
-	ListIcon,
-	SearchIcon,
 	SettingsIcon,
-	UsersIcon,
 } from 'lucide-react';
 
 import { NavDocuments } from './nav-documents';

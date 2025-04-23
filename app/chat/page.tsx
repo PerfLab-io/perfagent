@@ -17,15 +17,6 @@ import { FileContextSection } from '@/components/trace-details';
 import { analyseInsightsForCWV } from '@/lib/insights';
 import { DataStreamHandler } from '@/components/data-stream-handler';
 
-/**
- * Type definition for the report data structure
- */
-type Report = {
-	data: any;
-	topic: string;
-	toolCallId: string;
-};
-
 export interface AttachedFile {
 	id: string;
 	name: string;
@@ -83,7 +74,6 @@ export default function AiChatPage() {
 	const [isGeneratingReport, setIsGeneratingReport] = useState(false);
 	const [reportData, setReportData] = useState<string | null>(null);
 	const [activeReportId, setActiveReportId] = useState<string | null>(null);
-	const [reportsMap, setReportsMap] = useState<Record<string, Report>>({});
 	const [currentNavigation, setCurrentNavigation] = useState<string | null>(
 		null,
 	);
@@ -265,20 +255,6 @@ export default function AiChatPage() {
 	);
 
 	/**
-	 * Toggles the visibility of the side panel
-	 */
-	const toggleSidePanel = useCallback(() => {
-		setShowSidePanel((prev) => !prev);
-	}, []);
-
-	/**
-	 * Marks a report as complete
-	 */
-	const handleReportComplete = useCallback(() => {
-		setIsGeneratingReport(false);
-	}, []);
-
-	/**
 	 * Aborts the current report generation
 	 */
 	const handleAbortReport = useCallback(() => {
@@ -300,26 +276,15 @@ export default function AiChatPage() {
 	/**
 	 * Opens a specific report in the side panel
 	 */
-	const openReport = useCallback(
-		(reportId: string, reportData: string) => {
-			if (reportId && reportData) {
-				setActiveReportId(reportId);
-				setShowSidePanel(true);
-				setPanelContentType('report');
-				setIsGeneratingReport(false);
-				setReportData(reportData);
-			}
-		},
-		[reportsMap],
-	);
-
-	/**
-	 * Closes the current report panel
-	 */
-	const closeReport = useCallback(() => {
-		setShowSidePanel(false);
-		setActiveReportId(null);
-	}, []);
+	const openReport = (reportId: string, reportData: string) => {
+		if (reportId && reportData) {
+			setActiveReportId(reportId);
+			setShowSidePanel(true);
+			setPanelContentType('report');
+			setIsGeneratingReport(false);
+			setReportData(reportData);
+		}
+	};
 
 	// Effect: Initialize chat and handle message visibility
 	useEffect(() => {
@@ -339,33 +304,13 @@ export default function AiChatPage() {
 		setShowFileSection(attachedFiles?.length > 0);
 	}, [attachedFiles, isLoading]);
 
-	// Effect: Adjust layout when file section visibility changes
-	useEffect(() => {
-		if (showFileSection) {
-			document.body.style.overflowAnchor = 'none';
-			setTimeout(() => {
-				document.body.style.overflowAnchor = 'auto';
-				scrollToBottom();
-			}, 50);
-		}
-	}, [showFileSection, scrollToBottom]);
-
-	// Effect: Auto-focus textarea when chat starts
-	useEffect(() => {
-		if (chatStarted && textareaRef.current) {
-			setTimeout(() => {
-				textareaRef.current?.focus();
-			}, 500);
-		}
-	}, [chatStarted]);
-
 	// Effect: Handle side panel animation sequencing
 	useEffect(() => {
 		if (showSidePanel) {
 			setPanelExiting(false);
 			const timer = setTimeout(() => {
 				setPanelAnimationComplete(true);
-			}, 300);
+			}, 100);
 			return () => clearTimeout(timer);
 		} else {
 			if (panelAnimationComplete) {
@@ -373,7 +318,7 @@ export default function AiChatPage() {
 				const timer = setTimeout(() => {
 					setPanelAnimationComplete(false);
 					setPanelExiting(false);
-				}, 250);
+				}, 80);
 				return () => clearTimeout(timer);
 			} else {
 				setPanelAnimationComplete(false);
@@ -416,7 +361,7 @@ export default function AiChatPage() {
 						{/* Chat messages container */}
 						<div
 							className={cn(
-								'flex-1 shrink overflow-y-auto rounded-lg border border-border bg-card shadow-xs',
+								'border-border bg-card flex-1 shrink overflow-y-auto rounded-lg border shadow-xs',
 								'transition-all duration-500 ease-in-out',
 								messagesVisible
 									? 'messages-container-active'
@@ -445,7 +390,7 @@ export default function AiChatPage() {
 						{/* Input area container */}
 						<div
 							className={cn(
-								'max-w-[calc(100%-2rem)] rounded-lg border border-border bg-card shadow-xs',
+								'border-border bg-card max-w-[calc(100%-2rem)] rounded-lg border shadow-xs',
 								'transition-all duration-500 ease-in-out',
 								chatStarted
 									? 'input-container-active'
@@ -457,7 +402,7 @@ export default function AiChatPage() {
 							{attachedFiles?.length > 0 && (
 								<div
 									className={cn(
-										'file-section rounded-t-lg border-b bg-peppermint-100 px-4 py-2 dark:bg-peppermint-900',
+										'file-section bg-peppermint-100 dark:bg-peppermint-900 rounded-t-lg border-b px-4 py-2',
 										showFileSection
 											? 'max-h-[500px] opacity-100'
 											: 'max-h-0 py-0 opacity-0',
@@ -487,13 +432,14 @@ export default function AiChatPage() {
 									<textarea
 										ref={textareaRef}
 										value={input}
+										autoFocus
 										onChange={handleInputChange}
 										onKeyDown={handleKeyDown}
 										placeholder="Ask me anything about web vitals..."
 										className={cn(
 											'w-full resize-none rounded-xl p-4',
-											'border border-border bg-background focus:border-peppermint-800 focus:ring-0',
-											'text-foreground outline-hidden transition-all placeholder:text-foreground',
+											'border-border bg-background focus:border-peppermint-800 border focus:ring-0',
+											'text-foreground placeholder:text-foreground outline-hidden transition-all',
 											chatStarted
 												? 'max-h-[200px] min-h-[60px]'
 												: 'min-h-[100px]',
@@ -503,7 +449,7 @@ export default function AiChatPage() {
 										disabled={isLoading}
 									/>
 
-									<div className="pointer-events-auto absolute bottom-4 right-4 flex gap-2">
+									<div className="pointer-events-auto absolute right-4 bottom-4 flex gap-2">
 										<input
 											type="file"
 											ref={fileInputRef}
