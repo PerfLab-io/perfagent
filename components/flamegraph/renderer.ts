@@ -361,21 +361,21 @@ export function drawTimescale(
 
 	// Draw timescale background
 	ctx.fillStyle = '#e8dcc7'; // Beige/tan background matching PerfAgent panels
-	ctx.fillRect(0, 0, width, 30);
+	ctx.fillRect(0, 0, width, TIMESCALE_HEIGHT);
 
 	// Add subtle gradient for retro-futuristic effect
-	const gradient = ctx.createLinearGradient(0, 0, 0, 30);
+	const gradient = ctx.createLinearGradient(0, 0, 0, TIMESCALE_HEIGHT);
 	gradient.addColorStop(0, 'rgba(255, 255, 255, 0.2)');
 	gradient.addColorStop(1, 'rgba(0, 0, 0, 0.05)');
 	ctx.fillStyle = gradient;
-	ctx.fillRect(0, 0, width, 30);
+	ctx.fillRect(0, 0, width, TIMESCALE_HEIGHT);
 
 	// Draw bottom border for the timescale
 	ctx.strokeStyle = '#c9bea7'; // Border color matching PerfAgent panels
 	ctx.lineWidth = 1;
 	ctx.beginPath();
-	ctx.moveTo(0, 30);
-	ctx.lineTo(width, 30);
+	ctx.moveTo(0, TIMESCALE_HEIGHT);
+	ctx.lineTo(width, TIMESCALE_HEIGHT);
 	ctx.stroke();
 
 	// Determine appropriate time interval based on visible range and available width
@@ -430,8 +430,8 @@ export function drawTimescale(
 	ctx.strokeStyle = '#94a3b8';
 	ctx.lineWidth = 1;
 	ctx.beginPath();
-	ctx.moveTo(0, 30);
-	ctx.lineTo(0, 24);
+	ctx.moveTo(0, TIMESCALE_HEIGHT);
+	ctx.lineTo(0, TIMESCALE_HEIGHT - 6);
 	ctx.stroke();
 
 	// Draw regular interval markers
@@ -457,8 +457,8 @@ export function drawTimescale(
 		ctx.strokeStyle = '#94a3b8';
 		ctx.lineWidth = 1;
 		ctx.beginPath();
-		ctx.moveTo(x, 30);
-		ctx.lineTo(x, 24);
+		ctx.moveTo(x, TIMESCALE_HEIGHT);
+		ctx.lineTo(x, TIMESCALE_HEIGHT - 6);
 		ctx.stroke();
 
 		// Draw time label with appropriate precision
@@ -482,8 +482,8 @@ export function drawTimescale(
 	ctx.strokeStyle = '#94a3b8';
 	ctx.lineWidth = 1;
 	ctx.beginPath();
-	ctx.moveTo(width, 30);
-	ctx.lineTo(width, 24);
+	ctx.moveTo(width, TIMESCALE_HEIGHT);
+	ctx.lineTo(width, TIMESCALE_HEIGHT - 6);
 	ctx.stroke();
 
 	// Draw minor ticks for better precision
@@ -505,8 +505,8 @@ export function drawTimescale(
 
 			// Draw minor tick
 			ctx.beginPath();
-			ctx.moveTo(x, 30);
-			ctx.lineTo(x, 27);
+			ctx.moveTo(x, TIMESCALE_HEIGHT);
+			ctx.lineTo(x, TIMESCALE_HEIGHT - 3);
 			ctx.stroke();
 		}
 	}
@@ -517,7 +517,7 @@ export function drawTimescale(
 
 	// Draw grid line for start time
 	ctx.beginPath();
-	ctx.moveTo(0, 30);
+	ctx.moveTo(0, TIMESCALE_HEIGHT);
 	ctx.lineTo(0, height);
 	ctx.stroke();
 
@@ -538,14 +538,14 @@ export function drawTimescale(
 
 		// Draw vertical grid line
 		ctx.beginPath();
-		ctx.moveTo(x, 30);
+		ctx.moveTo(x, TIMESCALE_HEIGHT);
 		ctx.lineTo(x, height);
 		ctx.stroke();
 	}
 
 	// Draw grid line for end time
 	ctx.beginPath();
-	ctx.moveTo(width, 30);
+	ctx.moveTo(width, TIMESCALE_HEIGHT);
 	ctx.lineTo(width, height);
 	ctx.stroke();
 

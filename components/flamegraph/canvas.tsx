@@ -9,6 +9,7 @@ import type {
 	InteractionEvent,
 } from '@/components/flamegraph/types';
 import {
+	INTERACTIONS_ANNOTATIONS_HEIGHT,
 	INTERACTIONS_TRACK_HEIGHT,
 	TIMESCALE_HEIGHT,
 } from '@/components/flamegraph/types';
@@ -61,6 +62,7 @@ export function FlameGraphCanvas({
 	const [showInteractions, setShowInteractions] = useState(true);
 	const [selectedAnnotation, setSelectedAnnotation] =
 		useState<Annotation | null>(null);
+	const [base64IMG, setBase64IMG] = useState<string | undefined>(undefined);
 
 	// View state represents the visible portion of the timeline
 	const [viewState, setViewState] = useState<ViewState>({
@@ -69,6 +71,11 @@ export function FlameGraphCanvas({
 		topDepth: 0,
 		visibleDepthCount: 0,
 	});
+	const canvasHeight = processedData
+		? height
+		: INTERACTIONS_TRACK_HEIGHT +
+			INTERACTIONS_ANNOTATIONS_HEIGHT +
+			TIMESCALE_HEIGHT;
 
 	useEffect(() => {
 		if (!traceData) return;
@@ -106,10 +113,16 @@ export function FlameGraphCanvas({
 		if (!ctx) return;
 
 		// Clear canvas
-		ctx.clearRect(0, 0, width, height);
+		ctx.clearRect(0, 0, width, canvasHeight);
 		// Draw timescale as the first element
 
-		drawTimescale(ctx, width, height, viewState.startTime, viewState.endTime);
+		drawTimescale(
+			ctx,
+			width,
+			canvasHeight,
+			viewState.startTime,
+			viewState.endTime,
+		);
 
 		// Render the flamegraph with current view state
 		if (processedData) {
@@ -145,6 +158,9 @@ export function FlameGraphCanvas({
 				INTERACTIONS_TRACK_HEIGHT,
 			);
 		}
+
+		const base64IMG = canvasRef.current.toDataURL('image/png');
+		setBase64IMG(base64IMG);
 	}, [
 		processedData,
 		timeline,
@@ -163,12 +179,14 @@ export function FlameGraphCanvas({
 			<canvas
 				ref={canvasRef}
 				width={width}
-				height={height}
+				height={canvasHeight}
 				className="border-perfagent-border w-full rounded-md border bg-white"
 				style={{
 					cursor: 'default',
+					display: 'none',
 				}}
 			/>
+			<img src={base64IMG} alt="Flamegraph" />
 		</div>
 	);
 }
