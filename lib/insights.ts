@@ -1,7 +1,7 @@
-import { microSecondsToMilliSeconds } from '@paulirish/trace_engine/core/platform/Timing';
+import { microSecondsToMilliSeconds } from '@perflab/trace_engine/core/platform/Timing';
 import { msOrSDisplay } from './trace';
-import { Handlers } from '@paulirish/trace_engine';
-import * as Trace from '@paulirish/trace_engine/models/trace/trace.js';
+import { Handlers } from '@perflab/trace_engine';
+import * as Trace from '@perflab/trace_engine/models/trace/trace.js';
 
 export enum MetricType {
 	TIME = 'time',

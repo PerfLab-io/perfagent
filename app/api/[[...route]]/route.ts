@@ -6,7 +6,7 @@ import { Hono } from 'hono';
 import { handle } from 'hono/vercel';
 import { stream } from 'hono/streaming';
 import { zValidator } from '@hono/zod-validator';
-import { UserInteractionsData } from '@paulirish/trace_engine/models/trace/handlers/UserInteractionsHandler';
+import { UserInteractionsData } from '@perflab/trace_engine/models/trace/handlers/UserInteractionsHandler';
 import { mastra } from '@/lib/ai/mastra';
 import { langfuse } from '@/lib/tools/langfuse';
 import { routerOutputSchema } from '@/lib/ai/mastra/agents/router';

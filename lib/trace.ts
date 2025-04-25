@@ -1,5 +1,5 @@
-import * as Trace from '@paulirish/trace_engine/models/trace/trace.js';
-import { MetaData } from '@paulirish/trace_engine/models/trace/types/File';
+import * as Trace from '@perflab/trace_engine/models/trace/trace.js';
+import { MetaData } from '@perflab/trace_engine/models/trace/types/File';
 
 export async function analyzeEvents(
 	traceEvents: Trace.Types.Events.Event[],

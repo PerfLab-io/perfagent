@@ -25,7 +25,7 @@ import {
 } from '@/lib/insights';
 import { msOrSDisplay, TraceAnalysis } from '@/lib/trace';
 import { analyseInsightsForCWV } from '@/lib/insights';
-import { microSecondsToMilliSeconds } from '@paulirish/trace_engine/core/platform/Timing';
+import { microSecondsToMilliSeconds } from '@perflab/trace_engine/core/platform/Timing';
 import {
 	Select,
 	SelectContent,
@@ -33,11 +33,13 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from './ui/select';
-import { type SyntheticAnimationFramePair } from '@paulirish/trace_engine/models/trace/types/TraceEvents';
-import { type Micro } from '@paulirish/trace_engine/models/trace/types/Timing';
+import { type SyntheticAnimationFramePair } from '@perflab/trace_engine/models/trace/types/TraceEvents';
+import { type Micro } from '@perflab/trace_engine/models/trace/types/Timing';
 import { MetricGauge } from './trace-details/metric-gauge';
 import { LinePattern } from './line-pattern';
 import { AttachedFile } from '@/lib/hooks/use-chat';
+import { FlameGraphCanvas } from './flamegraph/canvas';
+import { InteractionTimeline } from './trace-details/interaction-timeline';
 
 enum WebVitalsMetric {
 	INP = 'Interaction to Next Paint',
@@ -196,6 +198,30 @@ export function FileContextSection({
 		}
 	};
 
+	const longestInteractionEvent = traceAnalysis.insights.get(
+		selectedNavigation || __insights[0][0],
+	)?.model.InteractionToNextPaint.longestInteractionEvent;
+
+	const formattedEvent = longestInteractionEvent
+		? {
+				ts:
+					longestInteractionEvent.ts -
+					traceAnalysis.parsedTrace.Meta.traceBounds.min,
+				presentationDelay: longestInteractionEvent.presentationDelay / 1000,
+				dur: longestInteractionEvent.dur / 1000,
+				inputDelay: longestInteractionEvent.inputDelay / 1000,
+				processingEnd:
+					longestInteractionEvent.processingEnd -
+					traceAnalysis.parsedTrace.Meta.traceBounds.min,
+				processingStart:
+					longestInteractionEvent.processingStart -
+					traceAnalysis.parsedTrace.Meta.traceBounds.min,
+			}
+		: {};
+
+	const endTime =
+		formattedEvent.ts + formattedEvent.dur + formattedEvent.presentationDelay;
+
 	return (
 		<div
 			className={cn(
@@ -236,6 +262,15 @@ export function FileContextSection({
 			{/* Content */}
 			{isExpanded && (
 				<div className="border-peppermint-200 dark:border-peppermint-900/50 border-t p-3">
+					<div className="w-[500px]">
+						<FlameGraphCanvas
+							timeline={traceAnalysis.parsedTrace.Meta.traceBounds}
+							interactions={[formattedEvent]}
+							startTime={formattedEvent.ts - 30_000}
+							endTime={endTime + 300_000}
+							width={500}
+						/>
+					</div>
 					<div className="flex justify-between">
 						<div className="flex items-center">
 							<div className="border-peppermint-200 dark:border-peppermint-800 dark:bg-peppermint-900/30 shrink-0 rounded border bg-white p-2">
@@ -377,21 +412,21 @@ export function FileContextSection({
 
 					{/* Request Timeline - Updated with overlaid markers 
 					<div className="mt-4">
-						<h4 className="mb-2 text-xs font-semibold text-peppermint-800 dark:text-peppermint-200">
+						<h4 className="text-peppermint-800 dark:text-peppermint-200 mb-2 text-xs font-semibold">
 							Request Timeline
 						</h4>
-						<div className="rounded-lg border border-peppermint-200 bg-white p-3 transition-all duration-300 hover:-translate-y-1 hover:translate-x-1 hover:shadow-[-4px_4px_0_var(--border-color)] dark:border-peppermint-800 dark:bg-peppermint-900/30">
+						<div className="border-peppermint-200 dark:border-peppermint-800 dark:bg-peppermint-900/30 rounded-lg border bg-white p-3 transition-all duration-300 hover:translate-x-1 hover:-translate-y-1 hover:shadow-[-4px_4px_0_var(--border-color)]">
 							<div className="relative">
 								<InteractionTimeline
 									events={timelineEvents}
 									totalDuration={1000}
 								/>
 
-								<div className="absolute left-0 top-0 h-8 w-full">
+								<div className="absolute top-0 left-0 h-8 w-full">
 									<div className="absolute top-0 h-8" style={{ left: '45%' }}>
 										<div className="absolute top-0 h-full w-[1px] bg-red-500"></div>
 										<div className="absolute -top-1 h-2 w-2 -translate-x-1/2 rounded-full bg-red-500"></div>
-										<div className="absolute -bottom-6 -translate-x-1/2 whitespace-nowrap text-[10px] text-red-500">
+										<div className="absolute -bottom-6 -translate-x-1/2 text-[10px] whitespace-nowrap text-red-500">
 											DOMContentLoaded: 450ms
 										</div>
 									</div>
@@ -399,14 +434,14 @@ export function FileContextSection({
 									<div className="absolute top-0 h-8" style={{ left: '85%' }}>
 										<div className="absolute top-0 h-full w-[1px] bg-green-700"></div>
 										<div className="absolute -top-1 h-2 w-2 -translate-x-1/2 rounded-full bg-green-700"></div>
-										<div className="absolute -bottom-6 -translate-x-1/2 whitespace-nowrap text-[10px] text-green-700">
+										<div className="absolute -bottom-6 -translate-x-1/2 text-[10px] whitespace-nowrap text-green-700">
 											Load: 850ms
 										</div>
 									</div>
 								</div>
 							</div>
 
-							<div className="mt-6 flex justify-between text-[10px] text-peppermint-600 dark:text-peppermint-400">
+							<div className="text-peppermint-600 dark:text-peppermint-400 mt-6 flex justify-between text-[10px]">
 								<span>0ms</span>
 								<span>1000ms</span>
 							</div>
@@ -414,31 +449,31 @@ export function FileContextSection({
 							<div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
 								<div className="flex items-center">
 									<div className="mr-1 h-2 w-2 bg-blue-500"></div>
-									<span className="text-[10px] text-peppermint-600 dark:text-peppermint-400">
+									<span className="text-peppermint-600 dark:text-peppermint-400 text-[10px]">
 										HTML
 									</span>
 								</div>
 								<div className="flex items-center">
 									<div className="mr-1 h-2 w-2 bg-purple-500"></div>
-									<span className="text-[10px] text-peppermint-600 dark:text-peppermint-400">
+									<span className="text-peppermint-600 dark:text-peppermint-400 text-[10px]">
 										CSS
 									</span>
 								</div>
 								<div className="flex items-center">
 									<div className="mr-1 h-2 w-2 bg-yellow-500"></div>
-									<span className="text-[10px] text-peppermint-600 dark:text-peppermint-400">
+									<span className="text-peppermint-600 dark:text-peppermint-400 text-[10px]">
 										JavaScript
 									</span>
 								</div>
 								<div className="flex items-center">
 									<div className="mr-1 h-2 w-2 bg-green-500"></div>
-									<span className="text-[10px] text-peppermint-600 dark:text-peppermint-400">
+									<span className="text-peppermint-600 dark:text-peppermint-400 text-[10px]">
 										Images
 									</span>
 								</div>
 								<div className="flex items-center">
 									<div className="mr-1 h-2 w-2 bg-gray-500"></div>
-									<span className="text-[10px] text-peppermint-600 dark:text-peppermint-400">
+									<span className="text-peppermint-600 dark:text-peppermint-400 text-[10px]">
 										Other
 									</span>
 								</div>
