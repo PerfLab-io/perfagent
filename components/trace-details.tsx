@@ -33,13 +33,15 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from './ui/select';
-import { type SyntheticAnimationFramePair } from '@perflab/trace_engine/models/trace/types/TraceEvents';
+import {
+	TraceEventAnimationFrameScriptGroupingEvent,
+	type SyntheticAnimationFramePair,
+} from '@perflab/trace_engine/models/trace/types/TraceEvents';
 import { type Micro } from '@perflab/trace_engine/models/trace/types/Timing';
 import { MetricGauge } from './trace-details/metric-gauge';
 import { LinePattern } from './line-pattern';
 import { AttachedFile } from '@/lib/hooks/use-chat';
 import { FlameGraphCanvas } from './flamegraph/canvas';
-import { InteractionTimeline } from './trace-details/interaction-timeline';
 
 enum WebVitalsMetric {
 	INP = 'Interaction to Next Paint',
@@ -219,8 +221,16 @@ export function FileContextSection({
 			}
 		: {};
 
-	const endTime =
-		formattedEvent.ts + formattedEvent.dur + formattedEvent.presentationDelay;
+	const endTime = formattedEvent.ts + formattedEvent.dur;
+
+	const _animationFrames = longestInteractionEvent
+		? traceAnalysis.parsedTrace.Animations.animationFrames.filter(
+				(frame) =>
+					(frame.ts >= longestInteractionEvent.ts ||
+						frame.ts + frame.dur >= longestInteractionEvent.ts) &&
+					frame.ts <= longestInteractionEvent.ts + longestInteractionEvent.dur,
+			)
+		: undefined;
 
 	return (
 		<div
@@ -262,15 +272,6 @@ export function FileContextSection({
 			{/* Content */}
 			{isExpanded && (
 				<div className="border-peppermint-200 dark:border-peppermint-900/50 border-t p-3">
-					<div className="w-[500px]">
-						<FlameGraphCanvas
-							timeline={traceAnalysis.parsedTrace.Meta.traceBounds}
-							interactions={[formattedEvent]}
-							startTime={formattedEvent.ts - 30_000}
-							endTime={endTime + 300_000}
-							width={500}
-						/>
-					</div>
 					<div className="flex justify-between">
 						<div className="flex items-center">
 							<div className="border-peppermint-200 dark:border-peppermint-800 dark:bg-peppermint-900/30 shrink-0 rounded border bg-white p-2">
@@ -481,6 +482,73 @@ export function FileContextSection({
 						</div>
 					</div>*/}
 
+					{_animationFrames && (
+						<div className="mt-4">
+							<h4 className="text-peppermint-800 dark:text-peppermint-200 mb-2 text-xs font-semibold">
+								Registered events with INP
+							</h4>
+							<div className="dark:bg-peppermint-900/30 border-peppermint-200 dark:border-peppermint-800 rounded-lg border bg-white p-3 transition-all duration-300 hover:translate-x-1 hover:-translate-y-1 hover:shadow-[-4px_4px_0_var(--border-color)]">
+								<div className="space-y-2">
+									{_animationFrames.map((animFrame) =>
+										animFrame.phases
+											.filter(
+												(phase) =>
+													phase.name === 'AnimationFrame::Script::Execute',
+											)
+											.map((phase, index) => {
+												const rawEvent =
+													// @ts-ignore the rawSourceEvent is not typed
+													phase.rawSourceEvent as TraceEventAnimationFrameScriptGroupingEvent;
+												const animationFrameEventMeta =
+													rawEvent.args?.animation_frame_script_timing_info;
+												const eventDuration = microSecondsToMilliSeconds(
+													phase.dur || (0 as Micro),
+												);
+												const eventDurationStr = msOrSDisplay(eventDuration);
+
+												return (
+													<div key={index} className="flex items-center">
+														<div className="w-20 flex-shrink-0">
+															<span className="inline-flex items-center rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-800 dark:text-amber-100">
+																{animationFrameEventMeta?.property_like_name}
+															</span>
+														</div>
+														<div className="ml-2 flex-grow">
+															<div className="h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+																<div
+																	className={cn(
+																		'h-full rounded-full',
+																		eventDuration < 50
+																			? 'bg-green-500'
+																			: eventDuration < 100
+																				? 'bg-amber-500'
+																				: 'bg-red-500',
+																	)}
+																	style={{
+																		width: `${Math.min(eventDuration / 2, 100)}%`,
+																	}}
+																></div>
+															</div>
+														</div>
+														<div className="ml-2 w-16 text-right">
+															<span className="text-peppermint-700 dark:text-peppermint-300 text-xs font-medium">
+																{eventDurationStr}
+															</span>
+														</div>
+														<div className="ml-2 max-w-[120px] flex-grow-0 truncate">
+															<span className="text-peppermint-600 dark:text-peppermint-400 text-xs">
+																{animationFrameEventMeta?.class_like_name}
+															</span>
+														</div>
+													</div>
+												);
+											}),
+									)}
+								</div>
+							</div>
+						</div>
+					)}
+
 					{/* Frame Histogram */}
 					<div className="mt-4">
 						<h4 className="text-peppermint-800 dark:text-peppermint-200 mb-2 text-xs font-semibold">
@@ -525,36 +593,6 @@ export function FileContextSection({
 							Metrics Breakdown
 						</h4>
 						<div className="grid grid-cols-2 gap-3">
-							{/* <FileInsightCard
-								title="JavaScript Execution"
-								value={68}
-								unit="%"
-								icon={<Cpu className="h-3.5 w-3.5" />}
-								status="warning"
-							>
-								<div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
-									<div
-										className="h-full rounded-full bg-amber-500"
-										style={{ width: '68%' }}
-									></div>
-								</div>
-							</FileInsightCard>
-
-							<FileInsightCard
-								title="Rendering & Layout"
-								value={24}
-								unit="%"
-								icon={<Layers className="h-3.5 w-3.5" />}
-								status="neutral"
-							>
-								<div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
-									<div
-										className="h-full rounded-full bg-blue-500"
-										style={{ width: '24%' }}
-									></div>
-								</div>
-							</FileInsightCard> */}
-
 							{loafs.length > 0 && (
 								<FileInsightCard
 									title="Long Tasks (>50ms)"
