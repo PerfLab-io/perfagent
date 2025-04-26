@@ -41,7 +41,6 @@ import { type Micro } from '@perflab/trace_engine/models/trace/types/Timing';
 import { MetricGauge } from './trace-details/metric-gauge';
 import { LinePattern } from './line-pattern';
 import { AttachedFile } from '@/lib/hooks/use-chat';
-import { FlameGraphCanvas } from './flamegraph/canvas';
 
 enum WebVitalsMetric {
 	INP = 'Interaction to Next Paint',
@@ -487,7 +486,7 @@ export function FileContextSection({
 							<h4 className="text-peppermint-800 dark:text-peppermint-200 mb-2 text-xs font-semibold">
 								Registered events within INP timespan
 							</h4>
-							<div className="dark:bg-peppermint-900/30 border-peppermint-200 dark:border-peppermint-800 rounded-lg border bg-white p-3 transition-all duration-300 hover:translate-x-1 hover:-translate-y-1 hover:shadow-[-4px_4px_0_var(--border-color)]">
+							<div className="dark:bg-peppermint-900/30 border-peppermint-200 dark:border-peppermint-800 rounded-lg border bg-white p-3 transition-all duration-300 hover:translate-x-1 hover:-translate-y-1 hover:shadow-[-4px_4px_0_hsl(var(--border-color))]">
 								<div className="space-y-2">
 									{_animationFrames.map((animFrame) =>
 										animFrame.phases
