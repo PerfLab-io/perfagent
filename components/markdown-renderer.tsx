@@ -550,9 +550,7 @@ export function MarkdownRenderer({
 				className,
 			)}
 		>
-			<Marked renderer={renderer} instance={marked}>
-				{content}
-			</Marked>
+			<Marked renderer={renderer}>{content}</Marked>
 		</div>
 	);
 }
