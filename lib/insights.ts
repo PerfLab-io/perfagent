@@ -2,6 +2,8 @@ import { microSecondsToMilliSeconds } from '@perflab/trace_engine/core/platform/
 import { msOrSDisplay } from './trace';
 import { Handlers } from '@perflab/trace_engine';
 import * as Trace from '@perflab/trace_engine/models/trace/trace.js';
+import { InteractionEvent } from '@/components/flamegraph/types';
+import { SyntheticExtendedAnimationFramePair } from '@perflab/trace_engine/models/trace/types/TraceEvents';
 
 export enum MetricType {
 	TIME = 'time',
@@ -55,6 +57,17 @@ export type InsightsReport = {
 	metricScore?: MetricScoreClassification;
 	infoContent?: string;
 	recommendations?: string[];
+	extras?: INPExtras;
+};
+
+export type INPExtras = {
+	formattedEvent: InteractionEvent;
+	timeline: {
+		min: number;
+		max: number;
+		range: number;
+	};
+	animationFrames: SyntheticExtendedAnimationFramePair[];
 };
 
 export function analyseInsightsForCWV(
@@ -282,6 +295,33 @@ export function analyseInsightsForCWV(
 
 			const processing = processingEnd - processingStart;
 
+			const formattedEvent = longestInteractionEvent
+				? {
+						ts: longestInteractionEvent.ts - trace.Meta.traceBounds.min,
+						presentationDelay: longestInteractionEvent.presentationDelay / 1000,
+						dur: longestInteractionEvent.dur / 1000,
+						inputDelay: longestInteractionEvent.inputDelay / 1000,
+						processingEnd:
+							longestInteractionEvent.processingEnd -
+							trace.Meta.traceBounds.min,
+						processingStart:
+							longestInteractionEvent.processingStart -
+							trace.Meta.traceBounds.min,
+					}
+				: {};
+
+			const endTime = (formattedEvent.ts || 0) + (formattedEvent.dur || 0);
+
+			const _animationFrames = longestInteractionEvent
+				? trace.Animations.animationFrames.filter(
+						(frame) =>
+							(frame.ts >= longestInteractionEvent.ts ||
+								frame.ts + frame.dur >= longestInteractionEvent.ts) &&
+							frame.ts <=
+								longestInteractionEvent.ts + longestInteractionEvent.dur,
+					)
+				: undefined;
+
 			INP = {
 				metric: 'INP',
 				metricValue: interactionDur,
@@ -318,6 +358,15 @@ export function analyseInsightsForCWV(
 					),
 				)}.`,
 				rawEvent: longestInteractionEvent,
+				extras: {
+					formattedEvent,
+					timeline: {
+						min: traceWindow.min,
+						max: traceWindow.max,
+						range: traceWindow.range,
+					},
+					animationFrames: _animationFrames,
+				},
 			} as InsightsReport;
 		}
 	}
