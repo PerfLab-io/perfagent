@@ -310,8 +310,6 @@ export function analyseInsightsForCWV(
 					}
 				: {};
 
-			const endTime = (formattedEvent.ts || 0) + (formattedEvent.dur || 0);
-
 			const _animationFrames = longestInteractionEvent
 				? trace.Animations.animationFrames.filter(
 						(frame) =>
