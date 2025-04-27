@@ -216,15 +216,17 @@ export default function AiChatPage() {
 
 			// Only proceed if there's input
 			if (input.trim()) {
+				const insights = traceAnalysis
+					? analyseInsightsForCWV(
+							traceAnalysis.insights ?? new Map(),
+							traceAnalysis.parsedTrace ?? {},
+							currentNavigation ?? '',
+						)
+					: null;
+
 				originalHandleSubmit(e as any, {
 					body: {
-						insights: traceAnalysis
-							? analyseInsightsForCWV(
-									traceAnalysis?.insights ?? new Map(),
-									traceAnalysis?.parsedTrace ?? {},
-									currentNavigation ?? '',
-								)
-							: null,
+						insights,
 						userInteractions: traceAnalysis?.parsedTrace.UserInteractions,
 						traceFile: currentContextFile,
 					},
