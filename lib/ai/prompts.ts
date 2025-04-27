@@ -177,7 +177,7 @@ export const reportFormat = `
 Ensure that the report includes the main metric according to the <topic> chosen but also any relevant metric according to the request and insights data as <subTopic>.
 i.e.: If the question is about a related metric, you should include it in the report as <subTopic>.
 
-\`\`\`
+// begin of the report template
 ## <topic> report based on trace analysis
 
 **Your <topic> value is <metricValue from insights data> and your score is <metricScore from insights data>**
@@ -191,13 +191,29 @@ i.e.: If the question is about a related metric, you should include it in the re
 * <subTopic from insights data>: <insight/recommendation derived from that subTopic>
 
 <closing words with suggested next steps and research topics>
+// end of the report template
+
+For the INP topic, always use the \`extras\` data, present on the given data for the report to be generated, to generate a custom flamegraph for the INP interaction.
+The flamegraph fenced code block should be formatted as follows:
+\`\`\`flamegraph
+{
+  "width": 600,
+  "height": 400,
+  "timeline": extras.timeline,
+  "interactions": [
+    extras.formattedEvent
+  ]
+}
 \`\`\`
+
+**Important:** NEVER wrap the whole report in a code block when generating the report, only the flamegraph fenced code block should be properly enclosed.
+The rest of the report should follow the format above.
 
 **Important:** ALWAYS generate the report on the desired structure, any thoughts or suggestions based on possible missing information or missing data, suggest it on the \`<opening words>\` or/and \`<closing words>\` sections.
 
 - This format uses Markdown. The \`<topic>\` will usually be the name of a metric or area (e.g., “LCP”, “Performance”, “INP”) as given in the trace insights.
-- Do not include Markdown code blocks (\`\`\`) on the report unless it's for code examples or code snippets.
-- Do **not** wrap the report in code blocks! It is supposed to be a markdown document and not a code block.
+- DO NOT include Markdown code blocks (\`\`\`) on the report unless it's for code examples, code snippets or flamegraphs when necessary, or as specifically requested by the user.
+- DO NOT wrap the report in code blocks! This is extremely important. It is supposed to be a markdown document and not a code block.
 - The **“Actionable Optimizations”** section should be a high-level statement of the metric’s value and score from the data provided, followed by a detailed breakdown and key suggestions based on your grounding and data for analysis.
 - Ensure the content in this section directly reflects the data you received.
 - Do **not** deviate from this structure unless explicitly instructed by the user to provide a different format.
