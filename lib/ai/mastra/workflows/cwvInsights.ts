@@ -3,6 +3,7 @@ import { coreMessageSchema, DataStreamWriter } from 'ai';
 
 import { Step, Workflow } from '@mastra/core/workflows';
 import { z } from 'zod';
+import dedent from 'dedent';
 
 const messageSchema = coreMessageSchema;
 
@@ -85,6 +86,21 @@ const insightReportSchema = z.object({
 	metricScore: z
 		.enum(['good', 'needs improvement', 'bad', 'unclassified'])
 		.optional(),
+	extras: z.object({
+		formattedEvent: z.object({
+			ts: z.number(),
+			dur: z.number(),
+			inputDelay: z.number(),
+			processingStart: z.number(),
+			processingEnd: z.number(),
+			presentationDelay: z.number(),
+		}),
+		timeline: z.object({
+			min: z.number(),
+			max: z.number(),
+			range: z.number(),
+		}),
+	}),
 });
 
 const insightsSchema = z.object({
@@ -177,11 +193,20 @@ const analyzeTrace = new Step({
 				},
 				{
 					role: 'user',
-					content: `Data for the report: ${JSON.stringify(insightsForTopic)}`,
+					content: dedent`
+					Data for the report on the ${topic} metric:
+					\`\`\`json
+					${JSON.stringify(insightsForTopic, null, 2)}
+					\`\`\`
+					`,
 				},
 			]);
 
+			let report = '';
 			for await (const chunk of reportStream.textStream) {
+				report += chunk;
+
+				console.log('report: ', report);
 				dataStreamWriter.writeData({
 					type: 'text',
 					runId,
