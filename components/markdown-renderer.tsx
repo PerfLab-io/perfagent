@@ -13,6 +13,10 @@ import { ArrowLeftRight, Check, Copy, Loader2, WrapText } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { fetchMetadata, type LinkMetadata } from '@/lib/utils/metadata';
+import {
+	FlameGraphCanvas,
+	FlameGraphCanvasProps,
+} from '@/components/flamegraph/canvas';
 
 /**
  * Types and Interfaces
@@ -314,7 +318,7 @@ export function MarkdownRenderer({
 						target="_blank"
 						rel="noopener noreferrer"
 						className={
-							'm-0 cursor-pointer rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary no-underline dark:bg-primary/20'
+							'bg-primary/10 text-primary dark:bg-primary/20 m-0 cursor-pointer rounded-full px-1.5 py-0.5 text-xs font-medium no-underline'
 						}
 					>
 						*
@@ -363,6 +367,24 @@ export function MarkdownRenderer({
 
 			// Code block rendering
 			code(children: string, language?: string) {
+				if (language === 'flamegraph') {
+					let data = null as FlameGraphCanvasProps | null;
+					try {
+						data = JSON.parse(children);
+					} catch (error) {
+						console.error('Error parsing flamegraph data:', error);
+					}
+					if (!data)
+						return <CodeBlock language={language}>{children}</CodeBlock>;
+
+					const props = data;
+					const interaction = props.interactions?.at(-1);
+					props.startTime = (interaction?.ts || 0) - 30_000;
+					const endTime =
+						(interaction?.ts || 0) + (interaction?.dur || 0) + 300_000;
+					props.endTime = endTime;
+					return <FlameGraphCanvas {...props} />;
+				}
 				return <CodeBlock language={language}>{children}</CodeBlock>;
 			},
 
@@ -381,7 +403,7 @@ export function MarkdownRenderer({
 				) : (
 					<a
 						href={href}
-						className="dark:text-primary-light font-medium text-primary hover:underline"
+						className="dark:text-primary-light text-primary font-medium hover:underline"
 					>
 						{text}
 					</a>
@@ -419,7 +441,7 @@ export function MarkdownRenderer({
 			// Blockquote rendering
 			blockquote(children: React.ReactNode) {
 				return (
-					<blockquote className="my-6 rounded-r-md border-l-4 border-primary/30 bg-neutral-50 py-1 pl-4 italic text-neutral-700 dark:border-primary/20 dark:bg-neutral-900/50 dark:text-neutral-300">
+					<blockquote className="border-primary/30 dark:border-primary/20 my-6 rounded-r-md border-l-4 bg-neutral-50 py-1 pl-4 text-neutral-700 italic dark:bg-neutral-900/50 dark:text-neutral-300">
 						{children}
 					</blockquote>
 				);
@@ -528,7 +550,9 @@ export function MarkdownRenderer({
 				className,
 			)}
 		>
-			<Marked renderer={renderer}>{content}</Marked>
+			<Marked renderer={renderer} instance={marked}>
+				{content}
+			</Marked>
 		</div>
 	);
 }
