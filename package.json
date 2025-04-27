@@ -58,6 +58,7 @@
     "@vercel/otel": "^1.10.4",
     "ai": "^4.2.0",
     "autoprefixer": "^10.4.21",
+    "canvas": "^3.1.0",
     "chrome-ai": "^1.11.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
