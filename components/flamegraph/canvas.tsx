@@ -40,6 +40,72 @@ export interface FlameGraphCanvasProps {
 	endTime?: number;
 }
 
+export const renderFlameGraphCanvas = (options: {
+	ctx: CanvasRenderingContext2D;
+	width: number;
+	height: number;
+	viewState: ViewState;
+	processedData: ProcessedTrace | null;
+	showInteractions: boolean;
+	showAnnotations: boolean;
+	interactions?: InteractionEvent[];
+	annotations?: Annotation[];
+	selectedAnnotation?: Annotation | null;
+}) => {
+	const {
+		ctx,
+		width,
+		height,
+		viewState,
+		processedData,
+		showInteractions,
+		showAnnotations,
+		interactions,
+		annotations,
+		selectedAnnotation,
+	} = options;
+	// Clear canvas
+	ctx.clearRect(0, 0, width, height);
+	// Draw timescale as the first element
+
+	drawTimescale(ctx, width, height, viewState.startTime, viewState.endTime);
+
+	// Render the flamegraph with current view state
+	if (processedData) {
+		renderFlameGraph(ctx, processedData, {
+			width,
+			height,
+			viewState,
+		});
+	}
+	// Render interactions track if enabled
+	if (showInteractions) {
+		renderInteractionsTrack(ctx, interactions ?? [], viewState, width);
+	}
+	// Render task threshold indicators
+	renderTaskThresholds(
+		ctx,
+		processedData?.frames ?? [],
+		viewState,
+		width,
+		height,
+	);
+
+	// Render annotations if enabled
+	if (showAnnotations && processedData) {
+		renderAnnotations(
+			ctx,
+			annotations ?? [],
+			viewState,
+			{ width, height },
+			processedData.frameMap,
+			selectedAnnotation?.id,
+			// Add offset for interactions track
+			INTERACTIONS_TRACK_HEIGHT,
+		);
+	}
+};
+
 // Add constants for vertical navigation
 const ROW_HEIGHT = 24; // Height of each row in pixels
 
@@ -105,6 +171,7 @@ export function FlameGraphCanvas({
 			visibleDepthCount: 0,
 		});
 	}, [startTime, endTime, timeline]);
+
 	// Render the flamegraph
 	useEffect(() => {
 		if (!canvasRef.current) return;
@@ -112,52 +179,18 @@ export function FlameGraphCanvas({
 		const ctx = canvasRef.current.getContext('2d');
 		if (!ctx) return;
 
-		// Clear canvas
-		ctx.clearRect(0, 0, width, canvasHeight);
-		// Draw timescale as the first element
-
-		drawTimescale(
+		renderFlameGraphCanvas({
 			ctx,
-			width,
-			canvasHeight,
-			viewState.startTime,
-			viewState.endTime,
-		);
-
-		// Render the flamegraph with current view state
-		if (processedData) {
-			renderFlameGraph(ctx, processedData, {
-				width,
-				height,
-				viewState,
-			});
-		}
-		// Render interactions track if enabled
-		if (showInteractions) {
-			renderInteractionsTrack(ctx, interactions ?? [], viewState, width);
-		}
-		// Render task threshold indicators
-		renderTaskThresholds(
-			ctx,
-			processedData?.frames ?? [],
-			viewState,
 			width,
 			height,
-		);
-
-		// Render annotations if enabled
-		if (showAnnotations && processedData) {
-			renderAnnotations(
-				ctx,
-				annotations ?? [],
-				viewState,
-				{ width, height },
-				processedData.frameMap,
-				selectedAnnotation?.id,
-				// Add offset for interactions track
-				INTERACTIONS_TRACK_HEIGHT,
-			);
-		}
+			viewState,
+			processedData,
+			showInteractions,
+			showAnnotations,
+			interactions,
+			annotations,
+			selectedAnnotation,
+		});
 
 		const base64IMG = canvasRef.current.toDataURL('image/png');
 		setBase64IMG(base64IMG);
