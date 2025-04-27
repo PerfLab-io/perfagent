@@ -203,25 +203,6 @@ export function FileContextSection({
 		selectedNavigation || __insights[0][0],
 	)?.model.InteractionToNextPaint.longestInteractionEvent;
 
-	const formattedEvent = longestInteractionEvent
-		? {
-				ts:
-					longestInteractionEvent.ts -
-					traceAnalysis.parsedTrace.Meta.traceBounds.min,
-				presentationDelay: longestInteractionEvent.presentationDelay / 1000,
-				dur: longestInteractionEvent.dur / 1000,
-				inputDelay: longestInteractionEvent.inputDelay / 1000,
-				processingEnd:
-					longestInteractionEvent.processingEnd -
-					traceAnalysis.parsedTrace.Meta.traceBounds.min,
-				processingStart:
-					longestInteractionEvent.processingStart -
-					traceAnalysis.parsedTrace.Meta.traceBounds.min,
-			}
-		: {};
-
-	const endTime = formattedEvent.ts + formattedEvent.dur;
-
 	const _animationFrames = longestInteractionEvent
 		? traceAnalysis.parsedTrace.Animations.animationFrames.filter(
 				(frame) =>
@@ -506,7 +487,10 @@ export function FileContextSection({
 												const eventDurationStr = msOrSDisplay(eventDuration);
 
 												return (
-													<div key={index} className="flex items-center">
+													<div
+														key={phase.id2?.local || '' + index}
+														className="flex items-center"
+													>
 														<div className="w-20 flex-shrink-0">
 															<span className="inline-flex items-center rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-800 dark:text-amber-100">
 																{animationFrameEventMeta?.property_like_name}
