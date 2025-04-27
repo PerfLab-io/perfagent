@@ -4,6 +4,13 @@ import { coreMessageSchema, DataStreamWriter } from 'ai';
 import { Step, Workflow } from '@mastra/core/workflows';
 import { z } from 'zod';
 import dedent from 'dedent';
+import { renderFlameGraphCanvas } from '@/components/flamegraph/canvas';
+
+import { createRequire } from 'module';
+import { microSecondsToMilliSeconds } from '@perflab/trace_engine/core/platform/Timing';
+import { msOrSDisplay } from '@/lib/trace';
+import { Micro } from '@perflab/trace_engine/models/trace/types/Timing';
+const require = createRequire(import.meta.url);
 
 const messageSchema = coreMessageSchema;
 
@@ -86,21 +93,35 @@ const insightReportSchema = z.object({
 	metricScore: z
 		.enum(['good', 'needs improvement', 'bad', 'unclassified'])
 		.optional(),
-	extras: z.object({
-		formattedEvent: z.object({
-			ts: z.number(),
-			dur: z.number(),
-			inputDelay: z.number(),
-			processingStart: z.number(),
-			processingEnd: z.number(),
-			presentationDelay: z.number(),
-		}),
-		timeline: z.object({
-			min: z.number(),
-			max: z.number(),
-			range: z.number(),
-		}),
-	}),
+	extras: z
+		.object({
+			formattedEvent: z.object({
+				ts: z.number(),
+				dur: z.number(),
+				inputDelay: z.number(),
+				processingStart: z.number(),
+				processingEnd: z.number(),
+				presentationDelay: z.number(),
+			}),
+			timeline: z.object({
+				min: z.number(),
+				max: z.number(),
+				range: z.number(),
+			}),
+			animationFrames: z.array(
+				z.object({
+					phases: z.array(
+						z.object({
+							name: z.string(),
+							dur: z.number(),
+							ts: z.number(),
+							rawSourceEvent: z.any(),
+						}),
+					),
+				}),
+			),
+		})
+		.optional(),
 });
 
 const insightsSchema = z.object({
@@ -109,9 +130,9 @@ const insightsSchema = z.object({
 	INP: insightReportSchema,
 });
 
-const analyzeTrace = new Step({
-	id: 'analyze-trace',
-	description: 'Analyzes a trace insights',
+const extractInsightData = new Step({
+	id: 'extract-insight-data',
+	description: 'Extracts the insight data from the insights',
 	execute: async ({ context, mastra, runId }) => {
 		const triggerData = context?.getStepResult<{
 			insights: z.infer<typeof insightsSchema>;
@@ -128,7 +149,7 @@ const analyzeTrace = new Step({
 			throw new Error('Mastra not found');
 		}
 
-		const { dataStream: dataStreamWriter, insights } = triggerData;
+		const { dataStream: dataStreamWriter } = triggerData;
 		const { topic } = topicStepResult;
 
 		dataStreamWriter.writeData({
@@ -159,12 +180,178 @@ const analyzeTrace = new Step({
 			}
 		})(topicStepResult.topic);
 
+		return {
+			insightsForTopic,
+			topic,
+		};
+	},
+});
+
+const generateExtraReportData = new Step({
+	id: 'generate-extra-report-data',
+	description: 'Generates the extra report data',
+	execute: async ({ context }) => {
+		const { insightsForTopic, topic } = context?.getStepResult<{
+			insightsForTopic: z.infer<
+				(typeof insightsSchema.shape)['CLS' | 'INP' | 'LCP']
+			>;
+			topic: string;
+		}>('extract-insight-data');
+
+		if (topic === 'INP' && insightsForTopic.extras) {
+			let reportDetails: {
+				reportImage?: string;
+				reportMarkdown?: string;
+			} = {};
+
+			const interaction = insightsForTopic.extras.formattedEvent;
+			const startTime = (interaction?.ts || 0) - 30_000;
+			const endTime =
+				(interaction?.ts || 0) + (interaction?.dur || 0) + 300_000;
+			const timeline = insightsForTopic.extras.timeline;
+
+			try {
+				// Try to load the node canvas module and render the interactions track
+				const { createCanvas } = require('canvas');
+				const canvas = createCanvas(600, 400);
+				// @ts-ignore the types are meant to be equivalent
+				const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
+
+				if (!ctx) {
+					throw new Error('Failed to create canvas context');
+				}
+
+				renderFlameGraphCanvas({
+					ctx,
+					width: 600,
+					height: 400,
+					viewState: {
+						startTime,
+						endTime,
+						topDepth: 0,
+						visibleDepthCount: 0,
+					},
+					processedData: null,
+					showInteractions: true,
+					showAnnotations: false,
+					interactions: [insightsForTopic.extras.formattedEvent],
+					annotations: [],
+					selectedAnnotation: null,
+				});
+
+				reportDetails = {
+					reportImage: dedent`
+						Use the following image as the flamegraph data for the INP interaction:
+
+						![INP Interaction on timeline](data:image/png;base64,${canvas.toDataURL('image/png')})
+					`,
+				};
+			} catch (e) {
+				console.error(e);
+				reportDetails = {
+					reportMarkdown: dedent`
+					Here's the flamegraph data for the INP interaction (include the fenced code block on the report on a section to explain the interaction data):
+					\`\`\`flamegraph
+					{
+						"width": 600,
+						"height": 400,
+						"timeline": ${JSON.stringify(timeline, null, 2)},
+						"interactions": [
+							${JSON.stringify(interaction, null, 2)}
+						]
+					}
+					\`\`\`
+					`,
+				};
+			}
+
+			if (insightsForTopic.extras.animationFrames.length > 0) {
+				const eventsOnAnimationFrames =
+					insightsForTopic.extras.animationFrames.map((animationFrame) => {
+						return animationFrame.phases.map((phase) => {
+							const rawEvent =
+								// @ts-ignore the rawSourceEvent is not typed
+								phase.rawSourceEvent as TraceEventAnimationFrameScriptGroupingEvent;
+							const animationFrameEventMeta =
+								rawEvent.args?.animation_frame_script_timing_info;
+							const eventDuration = microSecondsToMilliSeconds(
+								(phase.dur as Micro) || (0 as Micro),
+							);
+							const eventDurationStr = msOrSDisplay(eventDuration);
+							return {
+								animationFrameEventMeta,
+								eventDurationStr,
+							};
+						});
+					});
+
+				reportDetails.reportMarkdown =
+					reportDetails.reportMarkdown +
+					dedent`
+				Animation frames events within INP interaction (do not include the fenced code block, use the JSON data instead):
+				\`\`\`json
+				${JSON.stringify(eventsOnAnimationFrames, null, 2)}
+				\`\`\`
+
+				Use the JSON data above to generate some insights about the different events that happens on the INP interaction.
+				Be insightful and provide some recommendations based on the data.
+				`;
+			}
+			return {
+				reportDetails,
+			};
+		} else {
+			return {
+				reportDetails: undefined,
+			};
+		}
+	},
+});
+
+const analyzeTrace = new Step({
+	id: 'analyze-trace',
+	description: 'Analyzes a trace insights',
+	execute: async ({ context, mastra, runId }) => {
+		const triggerData = context?.getStepResult<{
+			dataStream: DataStreamWriter;
+		}>('trigger');
+
+		const { insightsForTopic, topic } = context?.getStepResult<{
+			insightsForTopic: z.infer<
+				(typeof insightsSchema.shape)['CLS' | 'INP' | 'LCP']
+			>;
+			topic: string;
+		}>('extract-insight-data');
+
+		const { reportDetails } = context?.getStepResult<{
+			reportDetails: {
+				reportImage?: string;
+				reportMarkdown?: string;
+			};
+		}>('generate-extra-report-data');
+
+		console.log('reportDetails: ', reportDetails);
+
+		if (!triggerData) {
+			throw new Error('Trigger data not found');
+		}
+		if (!mastra) {
+			throw new Error('Mastra not found');
+		}
+
+		const { dataStream: dataStreamWriter } = triggerData;
+
 		try {
 			if (!insightsForTopic) {
 				return {
 					type: 'trace_analysis',
 					error: 'No trace data provided',
 				};
+			}
+
+			if (insightsForTopic.extras) {
+				// we don't want the extras being handled by the agent directly
+				insightsForTopic.extras = undefined;
 			}
 
 			dataStreamWriter.writeData({
@@ -198,6 +385,16 @@ const analyzeTrace = new Step({
 					\`\`\`json
 					${JSON.stringify(insightsForTopic, null, 2)}
 					\`\`\`
+
+					${
+						reportDetails
+							? dedent`And some additional data that must be used to generate the report (do not include the fenced code block, use the data instead):
+					\`\`\`json
+					${JSON.stringify(reportDetails, null, 2)}
+					\`\`\`
+					`
+							: ''
+					}
 					`,
 				},
 			]);
@@ -281,6 +478,8 @@ const cwvInsightsWorkflow = new Workflow({
 	}),
 })
 	.step(topicStep)
+	.then(extractInsightData)
+	.then(generateExtraReportData)
 	.then(analyzeTrace);
 
 cwvInsightsWorkflow.commit();

@@ -193,20 +193,7 @@ i.e.: If the question is about a related metric, you should include it in the re
 <closing words with suggested next steps and research topics>
 // end of the report template
 
-For the INP topic, always use the \`extras\` data, present on the given data for the report to be generated, to generate a custom flamegraph for the INP interaction.
-The flamegraph fenced code block should be formatted as follows:
-\`\`\`flamegraph
-{
-  "width": 600,
-  "height": 400,
-  "timeline": extras.timeline,
-  "interactions": [
-    extras.formattedEvent
-  ]
-}
-\`\`\`
-
-**Important:** NEVER wrap the whole report in a code block when generating the report, only the flamegraph fenced code block should be properly enclosed.
+**Important:** NEVER wrap the whole report in a code block when generating the report, only any fenced code block either requested or provided by the user should be properly enclosed.
 The rest of the report should follow the format above.
 
 **Important:** ALWAYS generate the report on the desired structure, any thoughts or suggestions based on possible missing information or missing data, suggest it on the \`<opening words>\` or/and \`<closing words>\` sections.
@@ -216,6 +203,7 @@ The rest of the report should follow the format above.
 - DO NOT wrap the report in code blocks! This is extremely important. It is supposed to be a markdown document and not a code block.
 - The **“Actionable Optimizations”** section should be a high-level statement of the metric’s value and score from the data provided, followed by a detailed breakdown and key suggestions based on your grounding and data for analysis.
 - Ensure the content in this section directly reflects the data you received.
+- Analyze and provide insightful recommendations based on the data provided by the user. Include any potential issues or opportunities for improvement based on the data and your grounding.
 - Do **not** deviate from this structure unless explicitly instructed by the user to provide a different format.
 - Whenever more data is needed, refers to it as 'trace data' not 'report'.
 `;
