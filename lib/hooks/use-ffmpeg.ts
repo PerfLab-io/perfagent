@@ -49,9 +49,7 @@ export function useFFmpeg(): UseFFmpegReturn {
 
 	useEffect(() => {
 		const initFFmpeg = async () => {
-			const { FFmpeg } = await import(
-				/* webpackChunkName: "ffmpeg" */ '@ffmpeg/ffmpeg'
-			);
+			const { FFmpeg } = await import('@ffmpeg/ffmpeg');
 			ffmpegRef.current = new FFmpeg();
 		};
 		initFFmpeg();
