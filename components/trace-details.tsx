@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
 	ChevronDown,
 	ChevronRight,
@@ -34,12 +34,14 @@ import {
 	SelectValue,
 } from './ui/select';
 import {
+	SyntheticExtendedAnimationFramePair,
 	TraceEventAnimationFrameScriptGroupingEvent,
 	type SyntheticAnimationFramePair,
 } from '@perflab/trace_engine/models/trace/types/TraceEvents';
 import { type Micro } from '@perflab/trace_engine/models/trace/types/Timing';
 import { MetricGauge } from './trace-details/metric-gauge';
 import { LinePattern } from './line-pattern';
+import { useFFmpeg } from '@/lib/hooks/use-ffmpeg';
 import { AttachedFile } from '@/app/chat/page';
 
 enum WebVitalsMetric {
@@ -59,6 +61,10 @@ interface FileContextSectionProps {
 	isVisible: boolean;
 	traceAnalysis: TraceAnalysis | null;
 	onTraceNavigationChange: (navigationId: string) => void;
+	metrics: ReturnType<typeof analyseInsightsForCWV> | null;
+	onINPInteractionAnimationChange?: (
+		animationFrameInteractionImage: string,
+	) => void;
 }
 
 export function FileContextSection({
@@ -66,6 +72,8 @@ export function FileContextSection({
 	isVisible,
 	traceAnalysis,
 	onTraceNavigationChange,
+	metrics,
+	onINPInteractionAnimationChange,
 }: FileContextSectionProps) {
 	// First, add a max-height to the main container when expanded
 	// Add a new state to track the initial animation
@@ -75,6 +83,130 @@ export function FileContextSection({
 	const [selectedNavigation, setSelectedNavigation] = useState<string | null>(
 		null,
 	);
+
+	const { convertToFormat, isLoading, progress, error } = useFFmpeg();
+	const [inpAnimationFrames, setInpAnimationFrames] = useState<
+		SyntheticExtendedAnimationFramePair[] | undefined
+	>();
+
+	const handleConvert = async (files: Array<File | Blob | string>) => {
+		const output = await convertToFormat('webp', files, { outputType: 'url' });
+		if (output && typeof output === 'string') {
+			onINPInteractionAnimationChange?.(output);
+		}
+	};
+
+	const { __insights } = useMemo(() => {
+		if (!traceAnalysis) return { __insights: null };
+
+		const __insights = Array.from(traceAnalysis.insights.entries()).filter(
+			([_, insight]) => insight.url.host !== 'new-tab-page',
+		);
+
+		return { __insights };
+	}, [traceAnalysis, selectedNavigation]);
+
+	useEffect(() => {
+		if (!traceAnalysis || !__insights) return;
+
+		const longestInteractionEvent = traceAnalysis.insights.get(
+			selectedNavigation || __insights[0][0],
+		)?.model.InteractionToNextPaint.longestInteractionEvent;
+
+		if (
+			!longestInteractionEvent ||
+			!traceAnalysis.parsedTrace.Screenshots.legacySyntheticScreenshots
+		) {
+			setInpAnimationFrames(undefined);
+			return;
+		}
+
+		const screenShotStrings =
+			traceAnalysis.parsedTrace.Screenshots.legacySyntheticScreenshots
+				.filter(
+					(screenshot) =>
+						(screenshot.ts >= longestInteractionEvent.ts ||
+							screenshot.ts + (screenshot.dur || 0) >=
+								longestInteractionEvent.ts ||
+							screenshot.ts >= longestInteractionEvent.ts - 500_000) &&
+						(screenshot.ts <=
+							longestInteractionEvent.ts + longestInteractionEvent.dur ||
+							screenshot.ts <=
+								longestInteractionEvent.ts +
+									longestInteractionEvent.dur +
+									500_000),
+				)
+				.map((screenshot) => screenshot.args.dataUri);
+
+		const _animationFrames = longestInteractionEvent
+			? traceAnalysis.parsedTrace.Animations.animationFrames.filter(
+					(frame) =>
+						(frame.ts >= longestInteractionEvent.ts ||
+							frame.ts + frame.dur >= longestInteractionEvent.ts) &&
+						frame.ts <=
+							longestInteractionEvent.ts + longestInteractionEvent.dur,
+				)
+			: undefined;
+
+		setInpAnimationFrames(_animationFrames);
+
+		handleConvert(screenShotStrings);
+	}, [traceAnalysis, selectedNavigation, __insights]);
+
+	const {
+		loafs,
+		longestAnimationFrameDuration,
+		frameDurations,
+		interactionsClassification,
+	} = useMemo(() => {
+		const frameDurations: number[] = [];
+
+		if (!traceAnalysis)
+			return {
+				loafs: [],
+				longestAnimationFrameDuration: 0,
+				frameDurations,
+				interactionsClassification: null,
+			};
+
+		const { animationFrames } = traceAnalysis.parsedTrace.AnimationFrames;
+		const LONG_TASK_THRESHOLD = 50 * 1000; // 50ms in microseconds
+		const loafs: SyntheticAnimationFramePair[] = [];
+		let longestAnimationFrame: SyntheticAnimationFramePair | null = null;
+
+		for (const frame of animationFrames) {
+			frameDurations.push(microSecondsToMilliSeconds(frame.dur));
+			if (frame.dur > LONG_TASK_THRESHOLD) {
+				loafs.push(frame);
+			}
+			if (frame.dur > (longestAnimationFrame?.dur ?? 0)) {
+				longestAnimationFrame = frame;
+			}
+		}
+		const longestAnimationFrameDuration = microSecondsToMilliSeconds(
+			longestAnimationFrame?.dur ?? (0 as Micro),
+		);
+
+		const { interactionEvents } = traceAnalysis.parsedTrace.UserInteractions;
+		const interactionsClassification = interactionEvents.reduce(
+			(acc, interaction) => {
+				if (interaction.type === 'click') {
+					acc.clicks += 1;
+				} else if (interaction.type.includes('pointer')) {
+					acc.pointers += 1;
+				}
+				return acc;
+			},
+			{ clicks: 0, pointers: 0 },
+		);
+
+		return {
+			loafs,
+			longestAnimationFrameDuration,
+			frameDurations,
+			interactionsClassification,
+		};
+	}, [traceAnalysis]);
 
 	// Add useEffect to handle the animation sequence
 	useEffect(() => {
@@ -96,10 +228,10 @@ export function FileContextSection({
 	}, [isVisible, isInitialRender]);
 
 	useEffect(() => {
-		if (traceAnalysis) {
+		if (traceAnalysis && __insights) {
 			onTraceNavigationChange(selectedNavigation || __insights[0][0]);
 		}
-	}, [traceAnalysis, onTraceNavigationChange]);
+	}, [traceAnalysis, onTraceNavigationChange, __insights]);
 
 	const handleTraceNavigationChange = (navigationId: string) => {
 		setSelectedNavigation(navigationId);
@@ -109,16 +241,6 @@ export function FileContextSection({
 	if (!traceAnalysis || !true || !currentFile) {
 		return null;
 	}
-
-	const __insights = Array.from(traceAnalysis.insights.entries()).filter(
-		([_, insight]) => insight.url.host !== 'new-tab-page',
-	);
-
-	const metrics = analyseInsightsForCWV(
-		traceAnalysis.insights,
-		traceAnalysis.parsedTrace,
-		selectedNavigation || __insights[0][0],
-	);
 
 	// Format file size
 	const formatFileSize = (bytes: number): string => {
@@ -143,40 +265,6 @@ export function FileContextSection({
 		return <File className="h-8 w-8 text-gray-500" />;
 	};
 
-	// Mock frame duration data for histogram
-	const frameDurations = [];
-
-	const { animationFrames } = traceAnalysis.parsedTrace.AnimationFrames;
-	const LONG_TASK_THRESHOLD = 50 * 1000; // 50ms in microseconds
-	const loafs: SyntheticAnimationFramePair[] = [];
-	let longestAnimationFrame: SyntheticAnimationFramePair | null = null;
-
-	for (const frame of animationFrames) {
-		frameDurations.push(microSecondsToMilliSeconds(frame.dur));
-		if (frame.dur > LONG_TASK_THRESHOLD) {
-			loafs.push(frame);
-		}
-		if (frame.dur > (longestAnimationFrame?.dur ?? 0)) {
-			longestAnimationFrame = frame;
-		}
-	}
-	const longestAnimationFrameDuration = microSecondsToMilliSeconds(
-		longestAnimationFrame?.dur ?? (0 as Micro),
-	);
-
-	const { interactionEvents } = traceAnalysis.parsedTrace.UserInteractions;
-	const interactionsClassification = interactionEvents.reduce(
-		(acc, interaction) => {
-			if (interaction.type === 'click') {
-				acc.clicks += 1;
-			} else if (interaction.type.includes('pointer')) {
-				acc.pointers += 1;
-			}
-			return acc;
-		},
-		{ clicks: 0, pointers: 0 },
-	);
-
 	// Mock timeline events
 	// const timelineEvents = [
 	// 	{ type: 'HTML', startTime: 0, duration: 120, color: 'bg-blue-500/70' },
@@ -198,19 +286,6 @@ export function FileContextSection({
 				return 'good';
 		}
 	};
-
-	const longestInteractionEvent = traceAnalysis.insights.get(
-		selectedNavigation || __insights[0][0],
-	)?.model.InteractionToNextPaint.longestInteractionEvent;
-
-	const _animationFrames = longestInteractionEvent
-		? traceAnalysis.parsedTrace.Animations.animationFrames.filter(
-				(frame) =>
-					(frame.ts >= longestInteractionEvent.ts ||
-						frame.ts + frame.dur >= longestInteractionEvent.ts) &&
-					frame.ts <= longestInteractionEvent.ts + longestInteractionEvent.dur,
-			)
-		: undefined;
 
 	return (
 		<div
@@ -287,14 +362,14 @@ export function FileContextSection({
 							</div>
 						</div>
 						<Select
-							value={selectedNavigation || __insights[0][0]}
+							value={selectedNavigation || __insights?.[0]?.[0]}
 							onValueChange={handleTraceNavigationChange}
 						>
 							<SelectTrigger className="border-peppermint-400 text-peppermint-800 focus:ring-peppermint-300 w-48 border border-dashed">
 								<SelectValue placeholder="Choose a navigation" />
 							</SelectTrigger>
 							<SelectContent className="border-peppermint-400 text-peppermint-800 focus:ring-peppermint-300 border border-dashed">
-								{__insights.map(([navigationId, insight]) => (
+								{__insights?.map(([navigationId, insight]) => (
 									<SelectItem
 										className="focus:bg-peppermint-100 focus:text-peppermint-900 dark:focus:bg-peppermint-900/40 dark:focus:text-peppermint-100"
 										key={navigationId}
@@ -312,32 +387,35 @@ export function FileContextSection({
 						<h4 className="text-peppermint-800 dark:text-peppermint-200 mb-2 max-w-96 truncate text-xs font-semibold">
 							Core Web Vitals for:{' '}
 							{
-								__insights.find(([nav, _in]) => {
+								__insights?.find(([nav, _in]) => {
 									return nav === selectedNavigation;
 								})?.[1]?.url?.href
 							}
 						</h4>
 						<div className="grid grid-cols-1 gap-3 md:grid-cols-3 lg:gap-6">
-							{Object.keys(metrics).map((metric) => {
-								const metricValue = metrics[metric as keyof typeof metrics];
-								const metricIcon =
-									WebVitalsMetricIcons[metric as keyof typeof WebVitalsMetric];
+							{metrics &&
+								Object.keys(metrics).map((metric) => {
+									const metricValue = metrics[metric as keyof typeof metrics];
+									const metricIcon =
+										WebVitalsMetricIcons[
+											metric as keyof typeof WebVitalsMetric
+										];
 
-								return (
-									<FileInsightCard
-										key={`metric-${metric}-${selectedNavigation}`}
-										title={
-											WebVitalsMetric[metric as keyof typeof WebVitalsMetric]
-										}
-										value={
-											metricValue?.metricType === MetricType.TIME
-												? msOrSDisplay(metricValue?.metricValue || 0)
-												: metricValue?.metricValue || 0
-										}
-										icon={metricIcon}
-										status={getMetricVariant(metricValue?.metricScore)}
-									>
-										{/* <div className="mt-1 flex items-center justify-between">
+									return (
+										<FileInsightCard
+											key={`metric-${metric}-${selectedNavigation}`}
+											title={
+												WebVitalsMetric[metric as keyof typeof WebVitalsMetric]
+											}
+											value={
+												metricValue?.metricType === MetricType.TIME
+													? msOrSDisplay(metricValue?.metricValue || 0)
+													: metricValue?.metricValue || 0
+											}
+											icon={metricIcon}
+											status={getMetricVariant(metricValue?.metricScore)}
+										>
+											{/* <div className="mt-1 flex items-center justify-between">
 											<div className="flex items-center">
 												<div
 													className={cn(
@@ -348,7 +426,7 @@ export function FileContextSection({
 															: metricValue?.metricScore ===
 																  MetricScoreClassification.OK
 																? 'bg-amber-200 text-amber-700'
-																: 'bg-green-200 text-green-700',
+															: 'bg-green-200 text-green-700',
 													)}
 												>
 													<LinePattern
@@ -369,25 +447,25 @@ export function FileContextSection({
 												<span className="font-medium">Target: &lt;100ms</span>
 											</div>
 										</div> */}
-										<MetricGauge
-											value={metricValue?.metricValue || 0}
-											metricType={metricValue?.metricType}
-											thresholds={
-												metricsThresholds.get(metric) as {
-													good: number;
-													needsImprovement: number;
+											<MetricGauge
+												value={metricValue?.metricValue || 0}
+												metricType={metricValue?.metricType}
+												thresholds={
+													metricsThresholds.get(metric) as {
+														good: number;
+														needsImprovement: number;
+													}
 												}
-											}
-										/>
-										{/* Add some extra insights here
+											/>
+											{/* Add some extra insights here
 										
 										<div className="mt-1 text-[10px] text-peppermint-600 dark:text-peppermint-400">
 											<span className="font-medium">Slowest:</span> Click on
 											product-card (285.3ms)
 										</div> */}
-									</FileInsightCard>
-								);
-							})}
+										</FileInsightCard>
+									);
+								})}
 						</div>
 					</div>
 
@@ -462,14 +540,14 @@ export function FileContextSection({
 						</div>
 					</div>*/}
 
-					{_animationFrames && (
+					{inpAnimationFrames && (
 						<div className="mt-4">
 							<h4 className="text-peppermint-800 dark:text-peppermint-200 mb-2 text-xs font-semibold">
 								Registered events within INP timespan
 							</h4>
 							<div className="dark:bg-peppermint-900/30 border-peppermint-200 dark:border-peppermint-800 rounded-lg border bg-white p-3 transition-all duration-300 hover:translate-x-1 hover:-translate-y-1 hover:shadow-[-4px_4px_0_hsl(var(--border-color))]">
 								<div className="space-y-2">
-									{_animationFrames.map((animFrame) =>
+									{inpAnimationFrames.map((animFrame) =>
 										animFrame.phases
 											.filter(
 												(phase) =>
@@ -578,8 +656,8 @@ export function FileContextSection({
 						<div className="grid grid-cols-2 gap-3">
 							{loafs.length > 0 && (
 								<FileInsightCard
-									title="Long Tasks (>50ms)"
-									value={12}
+									title="Long Animation Frames (>50ms)"
+									value={loafs.length}
 									icon={<BarChart3 className="h-3.5 w-3.5" />}
 									status={
 										longestAnimationFrameDuration > 500
@@ -611,27 +689,29 @@ export function FileContextSection({
 								</FileInsightCard>
 							)}
 
-							<FileInsightCard
-								title="Intearction Events"
-								value={
-									interactionsClassification.clicks +
-									interactionsClassification.pointers
-								}
-								icon={<Pointer className="h-3.5 w-3.5" />}
-								status="neutral"
-							>
-								<div className="mt-1 flex items-center">
-									<div className="relative mr-1 h-2 w-2 bg-slate-200 text-slate-700">
-										<LinePattern
-											id={`interaction-events-${selectedNavigation}-values`}
-										/>
+							{interactionsClassification && (
+								<FileInsightCard
+									title="Intearction Events"
+									value={
+										interactionsClassification.clicks +
+										interactionsClassification.pointers
+									}
+									icon={<Pointer className="h-3.5 w-3.5" />}
+									status="neutral"
+								>
+									<div className="mt-1 flex items-center">
+										<div className="relative mr-1 h-2 w-2 bg-slate-200 text-slate-700">
+											<LinePattern
+												id={`interaction-events-${selectedNavigation}-values`}
+											/>
+										</div>
+										<span className="text-peppermint-600 dark:text-peppermint-400 text-[10px]">
+											{interactionsClassification.clicks} click,{' '}
+											{interactionsClassification.pointers} pointer events
+										</span>
 									</div>
-									<span className="text-peppermint-600 dark:text-peppermint-400 text-[10px]">
-										{interactionsClassification.clicks} click,{' '}
-										{interactionsClassification.pointers} pointer events
-									</span>
-								</div>
-							</FileInsightCard>
+								</FileInsightCard>
+							)}
 						</div>
 					</div>
 				</div>
