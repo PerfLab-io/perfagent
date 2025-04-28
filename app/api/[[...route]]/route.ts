@@ -22,6 +22,7 @@ const requestSchema = z.object({
 	userInteractions: z.any().default(null),
 	model: z.string().default('default_model'),
 	traceFile: z.any().default(null),
+	inpInteractionAnimation: z.string().default(''),
 });
 
 // Create Hono app for chat API
@@ -37,6 +38,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 		const userInteractions: UserInteractionsData = body.userInteractions;
 		const model = body.model;
 		const traceFile = body.traceFile;
+		const inpInteractionAnimation = body.inpInteractionAnimation;
 
 		if (messages.length === 0) {
 			return c.json({ error: 'No messages provided' }, 400);
@@ -90,9 +92,11 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 
 								const _run = await run.start({
 									triggerData: {
+										// @ts-expect-error - TODO: fix this type error
 										insights,
 										dataStream: dataStreamWriter,
 										messages,
+										inpInteractionAnimation,
 									},
 								});
 

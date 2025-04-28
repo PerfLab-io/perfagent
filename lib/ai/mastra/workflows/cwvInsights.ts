@@ -314,6 +314,7 @@ const analyzeTrace = new Step({
 	execute: async ({ context, mastra, runId }) => {
 		const triggerData = context?.getStepResult<{
 			dataStream: DataStreamWriter;
+			inpInteractionAnimation: string;
 		}>('trigger');
 
 		const { insightsForTopic, topic } = context?.getStepResult<{
@@ -393,6 +394,13 @@ const analyzeTrace = new Step({
 					${JSON.stringify(reportDetails, null, 2)}
 					\`\`\`
 					`
+							: ''
+					}
+					
+					${
+						topic === 'INP'
+							? `Use the following image on the same section of the report as the flamegraph data for the INP interaction, as it represents the moment of the interaction captured from the trace screenshots as an animated webp image:
+					![INP Interaction on timeline](${triggerData.inpInteractionAnimation})`
 							: ''
 					}
 					`,
@@ -475,6 +483,9 @@ const cwvInsightsWorkflow = new Workflow({
 		}),
 		messages: z.array(messageSchema),
 		insights: insightsSchema.describe('The insights to analyze'),
+		inpInteractionAnimation: z
+			.string()
+			.describe('The INP interaction animation'),
 	}),
 })
 	.step(topicStep)
