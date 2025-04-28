@@ -1,7 +1,7 @@
 'use client';
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile } from '@ffmpeg/util';
-import type { FFmpeg } from '@ffmpeg/ffmpeg';
 
 /**
  * Options for converting frames to a format.
@@ -48,11 +48,7 @@ export function useFFmpeg(): UseFFmpegReturn {
 	const [error, setError] = useState<string | null>(null);
 
 	useEffect(() => {
-		const initFFmpeg = async () => {
-			const { FFmpeg } = await import('@ffmpeg/ffmpeg');
-			ffmpegRef.current = new FFmpeg();
-		};
-		initFFmpeg();
+		ffmpegRef.current = new FFmpeg();
 	}, []);
 
 	const convertToFormat = useCallback(
