@@ -89,6 +89,13 @@ export default function AiChatPage() {
 	const [currentContextFile, setCurrentContextFile] =
 		useState<AttachedFile | null>(null);
 	const [showContextFile, setShowContextFile] = useState(false);
+	const [contextFileInsights, setContextFileInsights] = useState<ReturnType<
+		typeof analyseInsightsForCWV
+	> | null>(null);
+	const [
+		contextFileINPInteractionAnimation,
+		setContextFileINPInteractionAnimation,
+	] = useState<string | null>(null);
 
 	// Refs
 	const fileInputRef = useRef<HTMLInputElement>(null);
@@ -161,6 +168,7 @@ export default function AiChatPage() {
 
 							setSuggestions(suggestedMessages);
 							setSuggestionsLoading(false);
+							setContextFileInsights(insights);
 						});
 					});
 				}, 100);
@@ -203,8 +211,18 @@ export default function AiChatPage() {
 	const handleTraceNavigationChange = useCallback(
 		(navigationId: string) => {
 			setCurrentNavigation(navigationId);
+
+			if (!traceAnalysis) return;
+
+			const insights = analyseInsightsForCWV(
+				traceAnalysis.insights ?? new Map(),
+				traceAnalysis.parsedTrace ?? {},
+				navigationId,
+			);
+
+			setContextFileInsights(insights);
 		},
-		[setCurrentNavigation],
+		[setCurrentNavigation, traceAnalysis],
 	);
 
 	/**
@@ -216,19 +234,12 @@ export default function AiChatPage() {
 
 			// Only proceed if there's input
 			if (input.trim()) {
-				const insights = traceAnalysis
-					? analyseInsightsForCWV(
-							traceAnalysis.insights ?? new Map(),
-							traceAnalysis.parsedTrace ?? {},
-							currentNavigation ?? '',
-						)
-					: null;
-
 				originalHandleSubmit(e as any, {
 					body: {
-						insights,
+						insights: contextFileInsights,
 						userInteractions: traceAnalysis?.parsedTrace.UserInteractions,
 						traceFile: currentContextFile,
+						inpInteractionAnimation: contextFileINPInteractionAnimation,
 					},
 				});
 				// Hide file section after submission
@@ -355,10 +366,14 @@ export default function AiChatPage() {
 					>
 						{/* File context section */}
 						<FileContextSection
+							metrics={contextFileInsights}
 							onTraceNavigationChange={handleTraceNavigationChange}
 							currentFile={currentContextFile}
 							isVisible={showContextFile}
 							traceAnalysis={traceAnalysis}
+							onINPInteractionAnimationChange={
+								setContextFileINPInteractionAnimation
+							}
 						/>
 						{/* Chat messages container */}
 						<div
