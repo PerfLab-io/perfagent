@@ -278,8 +278,6 @@ export function MarkdownRenderer({
 	const [metadataCache, setMetadataCache] = useState<
 		Record<string, LinkMetadata>
 	>({});
-	const { theme } = useTheme();
-
 	// Extract citation links from content
 	const citationLinks = useMemo<CitationLink[]>(() => {
 		return Array.from(content.matchAll(/\[([^\]]+)\]\(\(([^)]+)\)\)/g)).map(
@@ -523,13 +521,12 @@ export function MarkdownRenderer({
 			image(src: string, alt: string, title?: string) {
 				return (
 					<>
-						<Image
+						<img
 							src={src || '/placeholder.svg'}
 							alt={alt || ''}
 							title={title || alt || ''}
-							width={800}
-							height={450}
-							className="h-auto w-full object-cover"
+							height={350}
+							className="w-auto object-cover"
 						/>
 						{title && (
 							<span className="border-t border-neutral-200 bg-neutral-50 px-4 py-2 text-sm text-neutral-600 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-400">
