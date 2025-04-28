@@ -40,7 +40,7 @@ import {
 import { type Micro } from '@perflab/trace_engine/models/trace/types/Timing';
 import { MetricGauge } from './trace-details/metric-gauge';
 import { LinePattern } from './line-pattern';
-import { AttachedFile } from '@/lib/hooks/use-chat';
+import { AttachedFile } from '@/app/chat/page';
 
 enum WebVitalsMetric {
 	INP = 'Interaction to Next Paint',
