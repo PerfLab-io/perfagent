@@ -244,14 +244,14 @@ const generateExtraReportData = new Step({
 						Use the following image as the flamegraph data for the INP interaction:
 
 						![INP Interaction on timeline](data:image/png;base64,${canvas.toDataURL('image/png')})
-						Use the image above on the report on a section to explain the interaction data.
+						The data on the block above will be read and rendered as a visualization showing the different timmings of the INP interaction.
 					`,
 				};
 			} catch (e) {
 				console.error(e);
 				reportDetails = {
 					reportMarkdown: dedent`
-					Here's the flamegraph data for the INP interaction (make sure to include the fenced code block as is below):
+					Here's the flamegraph data for the INP interaction visualization (make sure to include the fenced code block as is below):
 					\`\`\`flamegraph
 					{
 						"width": 600,
@@ -262,8 +262,8 @@ const generateExtraReportData = new Step({
 						]
 					}
 					\`\`\`
-
-					Use the block above on the report on a section to explain the interaction data.
+					The data on the block above will be read and rendered as a visualization showing the different timmings of the INP interaction.
+					The section itself should not be named as 'flamegraph' but instead as 'INP interaction on timeline' or something similar to be friendlier to users that are not familiar with the 'flamegraph' term.
 
 					`,
 				};
@@ -407,8 +407,10 @@ const analyzeTrace = new Step({
 					
 					${
 						topic === 'INP' && triggerData.inpInteractionAnimation
-							? `Use the following image on the same section of the report as the flamegraph data for the INP interaction, as it represents the moment of the interaction captured from the trace screenshots as an animated webp image:
-					![INP Interaction on timeline](${triggerData.inpInteractionAnimation})`
+							? `Use the following image on the same section of the report as the flamegraph data visualization for the INP interaction, as it represents the moment of the interaction captured from the trace screenshots as an animated webp image:
+					![INP Interaction on timeline](${triggerData.inpInteractionAnimation})
+					Make sure to include the image above the flamegraph data visualization on the same section of the report.
+					`
 							: ''
 					}
 					`,
