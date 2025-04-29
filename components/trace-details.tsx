@@ -62,9 +62,12 @@ interface FileContextSectionProps {
 	traceAnalysis: TraceAnalysis | null;
 	onTraceNavigationChange: (navigationId: string) => void;
 	metrics: ReturnType<typeof analyseInsightsForCWV> | null;
-	onINPInteractionAnimationChange?: (
-		animationFrameInteractionImage: string,
-	) => void;
+	onINPInteractionAnimationChange?: (options: {
+		animationFrameInteractionImageUrl: string | null;
+		isLoading: boolean;
+		progress: number;
+		error: string | null;
+	}) => void;
 }
 
 export function FileContextSection({
@@ -88,11 +91,23 @@ export function FileContextSection({
 	const [inpAnimationFrames, setInpAnimationFrames] = useState<
 		SyntheticExtendedAnimationFramePair[] | undefined
 	>();
+	const [inpInteractionAnimation, setInpInteractionAnimation] = useState<
+		string | null
+	>(null);
+
+	useEffect(() => {
+		onINPInteractionAnimationChange?.({
+			animationFrameInteractionImageUrl: inpInteractionAnimation,
+			isLoading,
+			progress,
+			error,
+		});
+	}, [isLoading, progress, error, inpInteractionAnimation]);
 
 	const handleConvert = async (files: Array<File | Blob | string>) => {
 		const output = await convertToFormat('webp', files, { outputType: 'url' });
 		if (output && typeof output === 'string') {
-			onINPInteractionAnimationChange?.(output);
+			setInpInteractionAnimation(output);
 		}
 	};
 
@@ -316,9 +331,14 @@ export function FileContextSection({
 				</div>
 				<div className="flex items-center space-x-2">
 					<div className="border-peppermint-200 group-hover:bg-peppermint-200 dark:bg-peppermint-900/40 flex items-center space-x-1 rounded border bg-transparent px-2 py-0.5 text-xs">
-						<span className="inline-block h-2 w-2 animate-pulse rounded-full bg-green-500"></span>
+						<span
+							className={cn(
+								'inline-block h-2 w-2 animate-pulse rounded-full',
+								isLoading ? 'bg-amber-500' : 'bg-green-500',
+							)}
+						></span>
 						<span className="text-peppermint-700 group-hover:text-peppermint-900 dark:text-peppermint-300">
-							Processing
+							{isLoading ? 'Processing trace details' : 'Ready'}
 						</span>
 					</div>
 				</div>

@@ -95,7 +95,12 @@ export default function AiChatPage() {
 	const [
 		contextFileINPInteractionAnimation,
 		setContextFileINPInteractionAnimation,
-	] = useState<string | null>(null);
+	] = useState<{
+		animationFrameInteractionImageUrl?: string;
+		isLoading: boolean;
+		progress: number;
+		error: string | null;
+	} | null>(null);
 
 	// Refs
 	const fileInputRef = useRef<HTMLInputElement>(null);
@@ -234,13 +239,17 @@ export default function AiChatPage() {
 
 			// Only proceed if there's input
 			if (input.trim()) {
+				const body = {
+					insights: contextFileInsights,
+					userInteractions: traceAnalysis?.parsedTrace.UserInteractions,
+					traceFile: currentContextFile,
+					inpInteractionAnimation:
+						contextFileINPInteractionAnimation?.animationFrameInteractionImageUrl ??
+						null,
+				};
+
 				originalHandleSubmit(e as any, {
-					body: {
-						insights: contextFileInsights,
-						userInteractions: traceAnalysis?.parsedTrace.UserInteractions,
-						traceFile: currentContextFile,
-						inpInteractionAnimation: contextFileINPInteractionAnimation,
-					},
+					body,
 				});
 				// Hide file section after submission
 				setShowFileSection(false);
