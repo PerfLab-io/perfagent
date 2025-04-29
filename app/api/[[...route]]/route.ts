@@ -22,7 +22,7 @@ const requestSchema = z.object({
 	userInteractions: z.any().default(null),
 	model: z.string().default('default_model'),
 	traceFile: z.any().default(null),
-	inpInteractionAnimation: z.string().default(''),
+	inpInteractionAnimation: z.string().or(z.null()).default(null),
 });
 
 // Create Hono app for chat API

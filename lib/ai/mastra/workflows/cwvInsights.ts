@@ -244,13 +244,14 @@ const generateExtraReportData = new Step({
 						Use the following image as the flamegraph data for the INP interaction:
 
 						![INP Interaction on timeline](data:image/png;base64,${canvas.toDataURL('image/png')})
+						Use the image above on the report on a section to explain the interaction data.
 					`,
 				};
 			} catch (e) {
 				console.error(e);
 				reportDetails = {
 					reportMarkdown: dedent`
-					Here's the flamegraph data for the INP interaction (include the fenced code block on the report on a section to explain the interaction data):
+					Here's the flamegraph data for the INP interaction (make sure to include the fenced code block as is below):
 					\`\`\`flamegraph
 					{
 						"width": 600,
@@ -261,6 +262,9 @@ const generateExtraReportData = new Step({
 						]
 					}
 					\`\`\`
+
+					Use the block above on the report on a section to explain the interaction data.
+
 					`,
 				};
 			}
@@ -288,13 +292,13 @@ const generateExtraReportData = new Step({
 				reportDetails.reportMarkdown =
 					reportDetails.reportMarkdown +
 					dedent`
-				Animation frames events within INP interaction (do not include the fenced code block, use the JSON data instead):
+				Here's the animation frames events data within INP interaction (do not include the fenced code block, use the JSON data in it to provide insights in the report):
 				\`\`\`json
 				${JSON.stringify(eventsOnAnimationFrames, null, 2)}
 				\`\`\`
 
 				Use the JSON data above to generate some insights about the different events that happens on the INP interaction.
-				Be insightful and provide some recommendations based on the data.
+				Providing some recommendations based on the data.
 				`;
 			}
 			return {
@@ -314,7 +318,7 @@ const analyzeTrace = new Step({
 	execute: async ({ context, mastra, runId }) => {
 		const triggerData = context?.getStepResult<{
 			dataStream: DataStreamWriter;
-			inpInteractionAnimation: string;
+			inpInteractionAnimation: string | null;
 		}>('trigger');
 
 		const { insightsForTopic, topic } = context?.getStepResult<{
@@ -372,13 +376,17 @@ const analyzeTrace = new Step({
 			});
 
 			console.log('insightsForTopic complete: ', insightsForTopic.metric);
+			console.log(
+				'insightsForTopic: ',
+				JSON.stringify(insightsForTopic, null, 2),
+			);
+			console.log(
+				'inpInteractionAnimation: ',
+				triggerData.inpInteractionAnimation,
+			);
 
 			// Generate the analysis content
-			const reportStream = await mastra.getAgent('largeAssistant').stream([
-				{
-					role: 'user',
-					content: reportFormat,
-				},
+			const reportStream = await mastra.getAgent('reportAssistant').stream([
 				{
 					role: 'user',
 					content: dedent`
@@ -398,7 +406,7 @@ const analyzeTrace = new Step({
 					}
 					
 					${
-						topic === 'INP'
+						topic === 'INP' && triggerData.inpInteractionAnimation
 							? `Use the following image on the same section of the report as the flamegraph data for the INP interaction, as it represents the moment of the interaction captured from the trace screenshots as an animated webp image:
 					![INP Interaction on timeline](${triggerData.inpInteractionAnimation})`
 							: ''
@@ -407,11 +415,7 @@ const analyzeTrace = new Step({
 				},
 			]);
 
-			let report = '';
 			for await (const chunk of reportStream.textStream) {
-				report += chunk;
-
-				console.log('report: ', report);
 				dataStreamWriter.writeData({
 					type: 'text',
 					runId,
@@ -485,6 +489,7 @@ const cwvInsightsWorkflow = new Workflow({
 		insights: insightsSchema.describe('The insights to analyze'),
 		inpInteractionAnimation: z
 			.string()
+			.or(z.null())
 			.describe('The INP interaction animation'),
 	}),
 })
