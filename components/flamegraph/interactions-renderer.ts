@@ -128,7 +128,6 @@ export function renderInteractionsTrack(
 		const trackCenterY = TIMESCALE_HEIGHT + INTERACTIONS_TRACK_HEIGHT / 2;
 		const barHeight = 16; // Height of the main interaction bar
 
-		// Draw the main interaction bar
 		// Draw the main interaction bar with diagonal pattern
 		if (interactionPattern) {
 			ctx.fillStyle = interactionPattern;
@@ -232,19 +231,23 @@ export function renderInteractionsTrack(
 
 		// Render interaction breakdown if enabled
 		if (showBreakdown && Boolean(interaction.dur)) {
-			renderInteractionBreakdown(
-				ctx,
-				interaction,
-				startX,
-				processingStartX,
-				processingEndX,
-				endX,
-				TIMESCALE_HEIGHT + INTERACTIONS_TRACK_HEIGHT,
-				breakdownHeight,
-				timeRange,
-				startTime,
-				width,
-			);
+			try {
+				renderInteractionBreakdown(
+					ctx,
+					interaction,
+					startX,
+					processingStartX,
+					processingEndX,
+					endX,
+					TIMESCALE_HEIGHT + INTERACTIONS_TRACK_HEIGHT,
+					breakdownHeight,
+					timeRange,
+					startTime,
+					width,
+				);
+			} catch (error) {
+				console.error('Error rendering interaction breakdown:', error);
+			}
 		}
 	});
 }
@@ -325,27 +328,27 @@ function renderInteractionBreakdown(
 
 	// Draw small vertical lines at the whisker ends with matching colors
 	const whiskerEndHeight = 8;
-	// Start whisker end
+	// End whisker end
 	ctx.beginPath();
 	ctx.moveTo(
-		startX,
+		endX,
 		TIMESCALE_HEIGHT + INTERACTIONS_TRACK_HEIGHT / 2 - whiskerEndHeight / 2,
 	);
 	ctx.lineTo(
-		startX,
+		endX,
 		TIMESCALE_HEIGHT + INTERACTIONS_TRACK_HEIGHT / 2 + whiskerEndHeight / 2,
 	);
 	ctx.stroke();
 
-	// End whisker end
-	ctx.strokeStyle = segments[2].color;
+	// Start whisker end
+	ctx.strokeStyle = segments[0].color;
 	ctx.beginPath();
 	ctx.moveTo(
-		endX,
+		startX,
 		TIMESCALE_HEIGHT + INTERACTIONS_TRACK_HEIGHT / 2 - whiskerEndHeight / 2,
 	);
 	ctx.lineTo(
-		endX,
+		startX,
 		TIMESCALE_HEIGHT + INTERACTIONS_TRACK_HEIGHT / 2 + whiskerEndHeight / 2,
 	);
 	ctx.stroke();
