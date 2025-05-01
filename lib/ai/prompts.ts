@@ -1,3 +1,4 @@
+import { preamble } from '@perflab/trace_engine/panels/ai_assistance/standalone';
 export const grounding = `
 **Knowledge Constraints:**
 - **Use Only Provided Information**: You must **only** use information given in this system prompt and from the outputs of your available tools to formulate responses. **Ignore any internal or prior knowledge** not present in these sources. If you have an answer from memory that isn’t supported by the provided info, do **not** use it.
@@ -243,6 +244,12 @@ Do not deviate from the provided format in your response and do not respond to a
 ${formattingGuidelines}
 
 ${grounding}
+`;
+
+export const traceAssistantSystemPrompt = `
+${preamble}
+
+**Important:** Do not use Top level headings (#) in your response. But create a well formatted markdown response based on your instructions and the data provided. Open up with a ## Trace events analysis
 `;
 
 export const largeModelSystemPrompt = `

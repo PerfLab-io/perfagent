@@ -319,6 +319,7 @@ const analyzeTrace = new Step({
 		const triggerData = context?.getStepResult<{
 			dataStream: DataStreamWriter;
 			inpInteractionAnimation: string | null;
+			aiContext: string | null;
 		}>('trigger');
 
 		const { insightsForTopic, topic } = context?.getStepResult<{
@@ -429,6 +430,54 @@ const analyzeTrace = new Step({
 				});
 			}
 
+			if (triggerData.aiContext) {
+				dataStreamWriter.writeData({
+					type: 'text',
+					runId,
+					status: 'in-progress',
+					content: {
+						type: 'text-delta',
+						data: `\n\n`,
+					},
+				});
+
+				dataStreamWriter.writeData({
+					type: 'text',
+					runId,
+					status: 'in-progress',
+					content: {
+						type: 'trace-insight',
+						data: {
+							id: 'trace-insight',
+							type: 'trace-insight',
+							timestamp: Date.now(),
+							title: 'Trace Analysis',
+							message: `Analyzing relevant trace events ...`,
+						},
+					},
+				});
+
+				const traceAssistant = mastra.getAgent('traceAssistant');
+				const traceAssistantStream = await traceAssistant.stream([
+					{
+						role: 'user',
+						content: triggerData.aiContext,
+					},
+				]);
+
+				for await (const chunk of traceAssistantStream.textStream) {
+					dataStreamWriter.writeData({
+						type: 'text',
+						runId,
+						status: 'in-progress',
+						content: {
+							type: 'text-delta',
+							data: chunk,
+						},
+					});
+				}
+			}
+
 			dataStreamWriter.writeData({
 				type: 'text',
 				runId,
@@ -493,6 +542,10 @@ const cwvInsightsWorkflow = new Workflow({
 			.string()
 			.or(z.null())
 			.describe('The INP interaction animation'),
+		aiContext: z
+			.string()
+			.or(z.null())
+			.describe('The call tree context serialized'),
 	}),
 })
 	.step(topicStep)
