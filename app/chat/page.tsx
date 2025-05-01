@@ -16,6 +16,7 @@ import { analyzeTraceFromFile, TraceAnalysis } from '@/lib/trace';
 import { FileContextSection } from '@/components/trace-details';
 import { analyseInsightsForCWV } from '@/lib/insights';
 import { DataStreamHandler } from '@/components/data-stream-handler';
+import type { StandaloneCallTreeContext } from '@perflab/trace_engine/panels/ai_assistance/standalone';
 
 export interface AttachedFile {
 	id: string;
@@ -96,11 +97,18 @@ export default function AiChatPage() {
 		contextFileINPInteractionAnimation,
 		setContextFileINPInteractionAnimation,
 	] = useState<{
-		animationFrameInteractionImageUrl?: string;
+		animationFrameInteractionImageUrl: string | null;
 		isLoading: boolean;
 		progress: number;
 		error: string | null;
 	} | null>(null);
+
+	const [aiContext, setAiContext] = useState<StandaloneCallTreeContext | null>(
+		null,
+	);
+	const [serializedContext, setSerializedContext] = useState<string | null>(
+		null,
+	);
 
 	// Refs
 	const fileInputRef = useRef<HTMLInputElement>(null);
@@ -230,6 +238,14 @@ export default function AiChatPage() {
 		[setCurrentNavigation, traceAnalysis],
 	);
 
+	const handleAIContextChange = useCallback(
+		(callTreeContext: StandaloneCallTreeContext) => {
+			setAiContext(callTreeContext);
+			setSerializedContext(callTreeContext.getItem().serialize());
+		},
+		[setAiContext],
+	);
+
 	/**
 	 * Handles submission of chat messages
 	 */
@@ -246,6 +262,7 @@ export default function AiChatPage() {
 					inpInteractionAnimation:
 						contextFileINPInteractionAnimation?.animationFrameInteractionImageUrl ??
 						null,
+					aiContext: serializedContext,
 				};
 
 				originalHandleSubmit(e as any, {
@@ -383,6 +400,7 @@ export default function AiChatPage() {
 							onINPInteractionAnimationChange={
 								setContextFileINPInteractionAnimation
 							}
+							onAIContextChange={handleAIContextChange}
 						/>
 						{/* Chat messages container */}
 						<div

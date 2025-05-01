@@ -43,6 +43,8 @@ import { MetricGauge } from './trace-details/metric-gauge';
 import { LinePattern } from './line-pattern';
 import { useFFmpeg } from '@/lib/hooks/use-ffmpeg';
 import { AttachedFile } from '@/app/chat/page';
+import { AICallTree } from '@perflab/trace_engine/panels/timeline/utils/AICallTree';
+import { StandaloneCallTreeContext } from '@perflab/trace_engine/panels/ai_assistance/standalone';
 
 enum WebVitalsMetric {
 	INP = 'Interaction to Next Paint',
@@ -68,6 +70,7 @@ interface FileContextSectionProps {
 		progress: number;
 		error: string | null;
 	}) => void;
+	onAIContextChange?: (callTreeContext: StandaloneCallTreeContext) => void;
 }
 
 export function FileContextSection({
@@ -77,6 +80,7 @@ export function FileContextSection({
 	onTraceNavigationChange,
 	metrics,
 	onINPInteractionAnimationChange,
+	onAIContextChange,
 }: FileContextSectionProps) {
 	// First, add a max-height to the main container when expanded
 	// Add a new state to track the initial animation
@@ -127,6 +131,53 @@ export function FileContextSection({
 		const longestInteractionEvent = traceAnalysis.insights.get(
 			selectedNavigation || __insights[0][0],
 		)?.model.InteractionToNextPaint.longestInteractionEvent;
+
+		if (longestInteractionEvent) {
+			try {
+				// const evalScriptEvent =
+				// 	traceAnalysis.parsedTrace.Renderer.allTraceEntries
+				// 		.filter(
+				// 			(event) =>
+				// 				event.name === 'EventDispatch' &&
+				// 				(event.ts >= longestInteractionEvent.ts ||
+				// 					event.ts + (event.dur ?? 0) >= longestInteractionEvent.ts) &&
+				// 				event.ts <=
+				// 					longestInteractionEvent.ts + longestInteractionEvent.dur,
+				// 		)
+				// 		.sort((a, b) => (b.dur ?? 0) - (a.dur ?? 0))[0];
+
+				requestAnimationFrame(() => {
+					const timerangeCallTree = AICallTree.fromTimeOnThread({
+						thread: {
+							pid: longestInteractionEvent.pid,
+							tid: longestInteractionEvent.tid,
+						},
+						bounds: {
+							min: longestInteractionEvent.ts,
+							max: (longestInteractionEvent.ts +
+								longestInteractionEvent.dur) as Micro,
+							range: (longestInteractionEvent.ts +
+								longestInteractionEvent.dur) as Micro,
+						},
+						parsedTrace: traceAnalysis.parsedTrace,
+					});
+
+					const aiCallTree = AICallTree.fromEvent(
+						timerangeCallTree?.rootNode.event,
+						traceAnalysis.parsedTrace,
+					);
+
+					requestAnimationFrame(() => {
+						const callTreeContext = new StandaloneCallTreeContext(aiCallTree);
+
+						// console.log('ITS ALIVE!', callTreeContext.getItem().serialize());
+						onAIContextChange?.(callTreeContext);
+					});
+				});
+			} catch (e) {
+				console.error(e);
+			}
+		}
 
 		if (
 			!longestInteractionEvent ||
