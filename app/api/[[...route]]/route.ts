@@ -23,6 +23,7 @@ const requestSchema = z.object({
 	model: z.string().default('default_model'),
 	traceFile: z.any().default(null),
 	inpInteractionAnimation: z.string().or(z.null()).default(null),
+	aiContext: z.string().or(z.null()).default(null),
 });
 
 // Create Hono app for chat API
@@ -39,6 +40,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 		const model = body.model;
 		const traceFile = body.traceFile;
 		const inpInteractionAnimation = body.inpInteractionAnimation;
+		const aiContext = body.aiContext;
 
 		if (messages.length === 0) {
 			return c.json({ error: 'No messages provided' }, 400);
@@ -47,13 +49,6 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 		const dataStream = createDataStream({
 			execute: async (dataStreamWriter) => {
 				dataStreamWriter.writeData('initialized call');
-				console.log(
-					'######################### traceReportStream #################################',
-					insights,
-					userInteractions?.interactionEvents?.length,
-				);
-
-				console.log('insights ', insights);
 
 				const routerAgent = mastra.getAgent('routerAgent');
 
@@ -61,7 +56,6 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 					output: routerOutputSchema,
 				});
 
-				console.log('object ', object);
 				const smallAssistant = mastra.getAgent('smallAssistant');
 
 				if (object.certainty < 0.5) {
@@ -97,10 +91,10 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 										dataStream: dataStreamWriter,
 										messages,
 										inpInteractionAnimation,
+										aiContext,
 									},
 								});
 
-								console.log('run', _run);
 								unsubscribe();
 							} else {
 								const stream = await smallAssistant.stream([
@@ -129,7 +123,6 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 								},
 							});
 
-							console.log('run', _run);
 							unsubscribe();
 							break;
 						default:
@@ -154,7 +147,11 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 		c.header('X-Vercel-AI-Data-Stream', 'v1');
 		c.header('Content-Type', 'text/plain; charset=utf-8');
 
-		await langfuse.flushAsync();
+		try {
+			await langfuse.flushAsync();
+		} catch (e) {
+			console.error(e);
+		}
 
 		return stream(c, (stream) =>
 			stream.pipe(dataStream.pipeThrough(new TextEncoderStream())),
