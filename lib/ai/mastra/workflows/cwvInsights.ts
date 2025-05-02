@@ -475,7 +475,7 @@ const analyzeTrace = new Step({
 					{
 						role: 'user',
 						content: dedent`
-						also add a code block with the following information just after the opening heading:
+						also add a code block with the following information first thing after the opening heading (Trace events analysis):
 
 						\`\`\`flamegraph
 						{
