@@ -12,11 +12,12 @@ import { DataPanel } from '@/components/data-panel';
 import { MarkdownReport } from '@/components/markdown-report';
 import { cn, yieldToMain } from '@/lib/utils';
 import { useChat } from '@ai-sdk/react';
-import { analyzeTraceFromFile, TraceAnalysis } from '@/lib/trace';
+import { analyzeTrace, analyzeTraceFromFile, TraceAnalysis } from '@/lib/trace';
 import { FileContextSection } from '@/components/trace-details';
 import { analyseInsightsForCWV } from '@/lib/insights';
 import { DataStreamHandler } from '@/components/data-stream-handler';
 import type { StandaloneCallTreeContext } from '@perflab/trace_engine/panels/ai_assistance/standalone';
+import { useSerializationWorker } from '../hooks/useSerializationWorker';
 
 export interface AttachedFile {
 	id: string;
@@ -70,6 +71,7 @@ export default function AiChatPage() {
 	const [panelContentType, setPanelContentType] = useState<'data' | 'report'>(
 		'data',
 	);
+	const [traceContents, setTraceContents] = useState<string | null>(null);
 
 	// Report state management
 	const [isGeneratingReport, setIsGeneratingReport] = useState(false);
@@ -119,6 +121,8 @@ export default function AiChatPage() {
 	// Check if a message is currently being streamed
 	const isLoading = status === 'submitted' || status === 'streaming';
 
+	const { serializeInWorker } = useSerializationWorker();
+
 	/**
 	 * Smoothly scrolls to the bottom of the chat messages
 	 */
@@ -161,29 +165,34 @@ export default function AiChatPage() {
 				await yieldToMain();
 
 				setTimeout(() => {
-					analyzeTraceFromFile(file).then((trace) => {
-						setTraceAnalysis(trace);
+					analyzeTraceFromFile(file)
+						.then((contents) => {
+							setTraceContents(contents);
+							return analyzeTrace(contents);
+						})
+						.then((trace) => {
+							setTraceAnalysis(trace);
 
-						setCurrentContextFile(newFile);
-						setShowContextFile(true);
+							setCurrentContextFile(newFile);
+							setShowContextFile(true);
 
-						requestAnimationFrame(async () => {
-							const insights = analyseInsightsForCWV(
-								trace?.insights ?? new Map(),
-								trace?.parsedTrace ?? {},
-								currentNavigation ?? '',
-							);
+							requestAnimationFrame(async () => {
+								const insights = analyseInsightsForCWV(
+									trace?.insights ?? new Map(),
+									trace?.parsedTrace ?? {},
+									currentNavigation ?? '',
+								);
 
-							const suggestedMessages = await fetch('/api/suggest', {
-								method: 'POST',
-								body: JSON.stringify({ insights }),
-							}).then((res) => res.json());
+								const suggestedMessages = await fetch('/api/suggest', {
+									method: 'POST',
+									body: JSON.stringify({ insights }),
+								}).then((res) => res.json());
 
-							setSuggestions(suggestedMessages);
-							setSuggestionsLoading(false);
-							setContextFileInsights(insights);
+								setSuggestions(suggestedMessages);
+								setSuggestionsLoading(false);
+								setContextFileInsights(insights);
+							});
 						});
-					});
 				}, 100);
 			});
 
@@ -241,9 +250,23 @@ export default function AiChatPage() {
 	const handleAIContextChange = useCallback(
 		(callTreeContext: StandaloneCallTreeContext) => {
 			setAiContext(callTreeContext);
-			setSerializedContext(callTreeContext.getItem().serialize());
+			if (!traceContents || !currentNavigation) return;
+
+			serializeInWorker(traceContents, currentNavigation)
+				.then((serializedData) => {
+					requestAnimationFrame(() => {
+						setSerializedContext(serializedData);
+					});
+				})
+				.catch((error) => {
+					console.error('Error serializing context:', error);
+					// Fallback to synchronous serialization if worker fails
+					requestAnimationFrame(() => {
+						setSerializedContext(callTreeContext.getItem()?.serialize());
+					});
+				});
 		},
-		[setAiContext],
+		[traceContents, currentNavigation, serializeInWorker],
 	);
 
 	/**

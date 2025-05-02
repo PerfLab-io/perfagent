@@ -42,6 +42,7 @@ export interface FrameNode {
 	sourceScript?: string; // Source script information
 	args?: any; // Additional arguments
 	cat?: string; // Category (input, timer, etc.)
+	included?: boolean; // Whether the frame is included in the flamegraph
 }
 
 export interface ProcessedTrace {

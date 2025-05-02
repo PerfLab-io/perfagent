@@ -15,7 +15,7 @@ import {
 	MousePointer,
 	Pointer,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, debounce } from '@/lib/utils';
 import { FileInsightCard } from './trace-details/trace-insight-card';
 import { FrameHistogram } from './trace-details/trace-histogram';
 import {
@@ -34,6 +34,7 @@ import {
 	SelectValue,
 } from './ui/select';
 import {
+	Event,
 	SyntheticExtendedAnimationFramePair,
 	TraceEventAnimationFrameScriptGroupingEvent,
 	type SyntheticAnimationFramePair,
@@ -45,6 +46,11 @@ import { useFFmpeg } from '@/lib/hooks/use-ffmpeg';
 import { AttachedFile } from '@/app/chat/page';
 import { AICallTree } from '@perflab/trace_engine/panels/timeline/utils/AICallTree';
 import { StandaloneCallTreeContext } from '@perflab/trace_engine/panels/ai_assistance/standalone';
+import { walkTreeFromEntry } from '@perflab/trace_engine/models/trace/helpers/TreeHelpers';
+import { FrameNode, ProcessedTrace } from './flamegraph/types';
+import { generateRandomColor } from './flamegraph/trace-processor';
+import { microToMilli } from '@perflab/trace_engine/models/trace/helpers/Timing';
+import { FlameGraphCanvas, FlameGraphCanvasProps } from './flamegraph/canvas';
 
 enum WebVitalsMetric {
 	INP = 'Interaction to Next Paint',
@@ -58,7 +64,7 @@ const WebVitalsMetricIcons = {
 	LCP: <Activity className="h-3.5 w-3.5" />,
 };
 
-interface FileContextSectionProps {
+export interface FileContextSectionProps {
 	currentFile: AttachedFile | null;
 	isVisible: boolean;
 	traceAnalysis: TraceAnalysis | null;
@@ -98,6 +104,13 @@ export function FileContextSection({
 	const [inpInteractionAnimation, setInpInteractionAnimation] = useState<
 		string | null
 	>(null);
+
+	const [_processedTrace, setProcessedTrace] = useState<
+		ProcessedTrace | undefined
+	>(undefined);
+	const [flamegraphProps, setFlameGraphProps] = useState<FlameGraphCanvasProps>(
+		{} as FlameGraphCanvasProps,
+	);
 
 	useEffect(() => {
 		onINPInteractionAnimationChange?.({
@@ -146,6 +159,11 @@ export function FileContextSection({
 				// 		)
 				// 		.sort((a, b) => (b.dur ?? 0) - (a.dur ?? 0))[0];
 
+				const _update = debounce((processedTrace: ProcessedTrace) => {
+					setProcessedTrace(processedTrace);
+				}, 300);
+
+				// Process the trace events for the AI call tree
 				requestAnimationFrame(() => {
 					const timerangeCallTree = AICallTree.fromTimeOnThread({
 						thread: {
@@ -162,16 +180,161 @@ export function FileContextSection({
 						parsedTrace: traceAnalysis.parsedTrace,
 					});
 
+					if (!timerangeCallTree?.rootNode.event) {
+						throw new Error('Failed to create timerange call tree');
+					}
+
 					const aiCallTree = AICallTree.fromEvent(
-						timerangeCallTree?.rootNode.event,
+						timerangeCallTree.rootNode.event,
 						traceAnalysis.parsedTrace,
 					);
 
+					if (!aiCallTree) {
+						throw new Error('Failed to create AI call tree');
+					}
+
+					const processedTrace: ProcessedTrace = {
+						startTime: microToMilli(
+							(timerangeCallTree.rootNode.event.ts || 0) as Micro,
+						),
+						endTime: microToMilli(
+							((timerangeCallTree.rootNode.event.ts || 0) +
+								(timerangeCallTree.rootNode.event.dur || 0)) as Micro,
+						),
+						rootIds: [timerangeCallTree.rootNode.event.ts.toString() || ''],
+						frames: [],
+						maxDepth: 0,
+						totalTime: 0,
+						frameMap: new Map(),
+						sourceScriptColors: new Map(),
+					};
+
+					setFlameGraphProps({
+						timeline: {
+							min: processedTrace.startTime - 3_000,
+							max: processedTrace.endTime + 3_000,
+							range: processedTrace.endTime,
+						},
+						startTime: processedTrace.startTime,
+						endTime: processedTrace.endTime,
+					});
+
+					let depth = -1;
+					const sourceScriptColors = new Map<string, string>();
+					let parentIds: string[] = [];
+
+					const onFrameStart = (entry: Event) => {
+						if (
+							!entry.name.includes('ProfileCall') &&
+							!entry.name.includes('FunctionCall') &&
+							!entry.name.includes('RunMicrotasks') &&
+							!entry.name.includes('RequestAnimationFrame')
+						) {
+							return;
+						}
+						depth += 1;
+						const _parent = processedTrace.frames.at(-1);
+						let parent = undefined;
+
+						if (depth !== 0 && _parent) {
+							parentIds.push(_parent.id);
+							parent = processedTrace.frames.find(
+								({ id }) => id === _parent.id,
+							);
+						}
+
+						let color = '#f5d76e';
+						let id = entry.ts.toString();
+						let name = entry.name;
+						let sourceScript = undefined;
+						let cat = entry.cat;
+
+						if (entry.name === 'ProfileCall') {
+							// @ts-ignore
+							sourceScript = entry.callFrame?.url;
+							// @ts-ignore
+							cat = entry.callFrame?.codeType?.toLowerCase();
+							// @ts-ignore
+							id = entry.nodeId || id;
+							// @ts-ignore
+							const _name: string | undefined = entry.callFrame?.functionName;
+							name = _name ? _name : '(anonymous)';
+
+							if (sourceScript) {
+								// Check if we already have a color for this source script
+								if (!sourceScriptColors.has(sourceScript)) {
+									// Generate a new random color for this source script
+									sourceScriptColors.set(sourceScript, generateRandomColor());
+								}
+								// Use the assigned color for this source script
+								color = sourceScriptColors.get(sourceScript) || color;
+							}
+						}
+
+						const frame: FrameNode = {
+							color,
+							id,
+							value: microToMilli((entry.ts + (entry.dur || 0)) as Micro),
+							start: microToMilli(entry.ts) / 1000,
+							end: microToMilli((entry.ts + (entry.dur || 0)) as Micro) / 1000,
+							depth,
+							name,
+							parent: parentIds.at(-1),
+							children: [],
+							sourceScript,
+							cat,
+							args: entry.args,
+							included:
+								entry.name.includes('ProfileCall') ||
+								entry.name.includes('FunctionCall') ||
+								entry.name.includes('RunMicrotasks') ||
+								entry.name.includes('RequestAnimationFrame'),
+						};
+
+						parent?.children.push(frame.id.toString());
+
+						processedTrace.frames.push(frame);
+						processedTrace.maxDepth =
+							depth > processedTrace.maxDepth ? depth : processedTrace.maxDepth;
+						processedTrace.sourceScriptColors = sourceScriptColors;
+					};
+
+					const onFrameEnd = (entry: Event) => {
+						if (
+							!entry.name.includes('ProfileCall') &&
+							!entry.name.includes('FunctionCall') &&
+							!entry.name.includes('RunMicrotasks') &&
+							!entry.name.includes('RequestAnimationFrame')
+						) {
+							return;
+						}
+						depth -= 1;
+						parentIds.pop();
+
+						_update(processedTrace);
+					};
+
+					console.time('walkTreeFromEntry');
+					walkTreeFromEntry(
+						traceAnalysis.parsedTrace.Renderer.entryToNode,
+						timerangeCallTree.rootNode.event,
+						onFrameStart,
+						onFrameEnd,
+					);
+					console.timeEnd('walkTreeFromEntry');
+
+					console.log(processedTrace);
+
 					requestAnimationFrame(() => {
+						console.log('aiCallTree', aiCallTree);
+						console.time('StandaloneCallTreeContext');
 						const callTreeContext = new StandaloneCallTreeContext(aiCallTree);
+						console.timeEnd('StandaloneCallTreeContext');
 
 						// console.log('ITS ALIVE!', callTreeContext.getItem().serialize());
+						console.time('onAIContextChange');
 						onAIContextChange?.(callTreeContext);
+						console.timeEnd('onAIContextChange');
 					});
 				});
 			} catch (e) {

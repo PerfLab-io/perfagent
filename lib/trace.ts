@@ -72,7 +72,7 @@ export type TraceAnalysis = {
 export async function analyzeTraceFromFile(
 	file: File,
 	_topic?: TraceTopic,
-): Promise<TraceAnalysis> {
+): Promise<string> {
 	const contents = await file.text();
-	return await analyzeTrace(contents);
+	return contents;
 }
