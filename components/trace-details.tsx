@@ -220,6 +220,7 @@ export function FileContextSection({
 					});
 
 					let depth = -1;
+					let nodeId = 0;
 					const sourceScriptColors = new Map<string, string>();
 					let parentIds: string[] = [];
 
@@ -244,7 +245,8 @@ export function FileContextSection({
 						}
 
 						let color = '#f5d76e';
-						let id = entry.ts.toString();
+						nodeId += 1;
+						let id = nodeId.toString();
 						let name = entry.name;
 						let sourceScript = undefined;
 						let cat = entry.cat;
@@ -254,8 +256,6 @@ export function FileContextSection({
 							sourceScript = entry.callFrame?.url;
 							// @ts-ignore
 							cat = entry.callFrame?.codeType?.toLowerCase();
-							// @ts-ignore
-							id = entry.nodeId || id;
 							// @ts-ignore
 							const _name: string | undefined = entry.callFrame?.functionName;
 							name = _name ? _name : '(anonymous)';
@@ -561,6 +561,12 @@ export function FileContextSection({
 			{/* Content */}
 			{isExpanded && (
 				<div className="border-peppermint-200 dark:border-peppermint-900/50 border-t p-3">
+					{_processedTrace && (
+						<FlameGraphCanvas
+							processedTrace={_processedTrace}
+							{...flamegraphProps}
+						/>
+					)}
 					<div className="flex justify-between">
 						<div className="flex items-center">
 							<div className="border-peppermint-200 dark:border-peppermint-800 dark:bg-peppermint-900/30 shrink-0 rounded border bg-white p-2">

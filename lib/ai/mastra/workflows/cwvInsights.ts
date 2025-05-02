@@ -1,4 +1,3 @@
-import { reportFormat } from '@/lib/ai/prompts';
 import { coreMessageSchema, DataStreamWriter } from 'ai';
 
 import { Step, Workflow } from '@mastra/core/workflows';
@@ -93,6 +92,14 @@ const insightReportSchema = z.object({
 	metricScore: z
 		.enum(['good', 'needs improvement', 'bad', 'unclassified'])
 		.optional(),
+	rawEvent: z
+		.object({
+			ts: z.number(),
+			pid: z.number(),
+			tid: z.number(),
+			dur: z.number().optional(),
+		})
+		.optional(),
 	extras: z
 		.object({
 			formattedEvent: z.object({
@@ -179,6 +186,8 @@ const extractInsightData = new Step({
 				return triggerData.insights.INP;
 			}
 		})(topicStepResult.topic);
+
+		console.log('insightsForTopic: ', insightsForTopic);
 
 		return {
 			insightsForTopic,
@@ -430,7 +439,7 @@ const analyzeTrace = new Step({
 				});
 			}
 
-			if (triggerData.aiContext) {
+			if (triggerData.aiContext && topic === 'INP') {
 				dataStreamWriter.writeData({
 					type: 'text',
 					runId,

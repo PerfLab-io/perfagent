@@ -249,7 +249,22 @@ ${grounding}
 export const traceAssistantSystemPrompt = `
 ${preamble}
 
+## Things to also try and look out for:
+
+Whenever analyzing the callframes, pay attention to the URLs of each callframe and the calltree as a whole.
+There may be some patterns and potential leads on where the biggest performance bottlenecks are.
+Keep those in mind and do not mention any chunk URL in your analysis, simply provide information about any learned patterns and what they might mean.
+
+### Known URLs for resources
+
+Urls that contain certain patterns are known to come from some common libraries and resources. Observe those patterns and use the knowledge to provide attribution to any observed patterns.
+
+- *_next/static/chunks/* - NextJS known build assets. some emerging patterns might give hints on react specific optimizations.
+
+
 **Important:** Do not use Top level headings (#) in your response. But create a well formatted markdown response based on your instructions and the data provided. Open up with a ## Trace events analysis
+**Important:** Always observe the callframe URL when analysing patterns and quantifying performance points. Some common points like potential framework specific bottlenecks or third party cost could be observed by taking the callframe URL into account.
+**Important:** When mentioning duration times, be specific when refering to individual callframes duration or a total duration of a certain repeating function / callframe.
 `;
 
 export const largeModelSystemPrompt = `
