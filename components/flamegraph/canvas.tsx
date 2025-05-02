@@ -38,6 +38,7 @@ export interface FlameGraphCanvasProps {
 	};
 	startTime?: number;
 	endTime?: number;
+	processedTrace?: ProcessedTrace;
 }
 
 export const renderFlameGraphCanvas = (options: {
@@ -72,6 +73,7 @@ export const renderFlameGraphCanvas = (options: {
 
 	// Render the flamegraph with current view state
 	if (processedData) {
+		console.log('have trace data!', processedData);
 		renderFlameGraph(ctx, processedData, {
 			width,
 			height,
@@ -83,13 +85,13 @@ export const renderFlameGraphCanvas = (options: {
 		renderInteractionsTrack(ctx, interactions ?? [], viewState, width);
 	}
 	// Render task threshold indicators
-	renderTaskThresholds(
-		ctx,
-		processedData?.frames ?? [],
-		viewState,
-		width,
-		height,
-	);
+	// renderTaskThresholds(
+	// 	ctx,
+	// 	processedData?.frames ?? [],
+	// 	viewState,
+	// 	width,
+	// 	height,
+	// );
 
 	// Render annotations if enabled
 	if (showAnnotations && processedData) {
@@ -118,6 +120,7 @@ export function FlameGraphCanvas({
 	timeline,
 	startTime,
 	endTime,
+	processedTrace,
 }: FlameGraphCanvasProps) {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const [processedData, setProcessedData] = useState<ProcessedTrace | null>(
@@ -143,11 +146,30 @@ export function FlameGraphCanvas({
 			INTERACTIONS_ANNOTATIONS_HEIGHT +
 			TIMESCALE_HEIGHT;
 
-	useEffect(() => {
-		if (!traceData) return;
-		const processed = processTraceData(traceData);
-		setProcessedData(processed);
+	// useEffect(() => {
+	// 	if (!traceData) return;
+	// 	const processed = processTraceData(traceData);
+	// 	setProcessedData(processed);
 
+	// 	// Initialize view state to show the entire timeline
+	// 	setViewState({
+	// 		startTime: viewState.startTime,
+	// 		endTime: viewState.endTime,
+	// 		topDepth: 0,
+	// 		// Subtract timescale and interactions track height from available height
+	// 		visibleDepthCount: Math.min(
+	// 			processed.maxDepth + 1,
+	// 			Math.floor(
+	// 				(height - TIMESCALE_HEIGHT - INTERACTIONS_TRACK_HEIGHT) / ROW_HEIGHT,
+	// 			),
+	// 		),
+	// 	});
+	// }, [traceData, height]);
+
+	useEffect(() => {
+		if (!processedTrace) return;
+
+		setProcessedData(processedTrace);
 		// Initialize view state to show the entire timeline
 		setViewState({
 			startTime: viewState.startTime,
@@ -155,20 +177,31 @@ export function FlameGraphCanvas({
 			topDepth: 0,
 			// Subtract timescale and interactions track height from available height
 			visibleDepthCount: Math.min(
-				processed.maxDepth + 1,
+				processedTrace.maxDepth + 1,
 				Math.floor(
-					(height - TIMESCALE_HEIGHT - INTERACTIONS_TRACK_HEIGHT) / ROW_HEIGHT,
+					(height -
+						TIMESCALE_HEIGHT -
+						(interactions ? INTERACTIONS_TRACK_HEIGHT : 0)) /
+						ROW_HEIGHT,
 				),
 			),
 		});
-	}, [traceData, height]);
+	}, [processedTrace]);
 
 	useEffect(() => {
 		setViewState({
 			startTime: startTime ? startTime / 1000 : 0,
 			endTime: endTime ? endTime / 1000 : timeline.range / 1000,
 			topDepth: 0,
-			visibleDepthCount: 0,
+			visibleDepthCount: Math.min(
+				(processedTrace?.maxDepth || 0) + 1,
+				Math.floor(
+					(height -
+						TIMESCALE_HEIGHT -
+						(interactions ? INTERACTIONS_TRACK_HEIGHT : 0)) /
+						ROW_HEIGHT,
+				),
+			),
 		});
 	}, [startTime, endTime, timeline]);
 
@@ -184,7 +217,7 @@ export function FlameGraphCanvas({
 			width,
 			height,
 			viewState,
-			processedData,
+			processedData: processedTrace || processedData,
 			showInteractions,
 			showAnnotations,
 			interactions,
