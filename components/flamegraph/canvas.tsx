@@ -1,8 +1,7 @@
 'use client';
 
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import type {
-	TraceEvent,
 	ProcessedTrace,
 	ViewState,
 	Annotation,
@@ -12,20 +11,37 @@ import {
 	INTERACTIONS_ANNOTATIONS_HEIGHT,
 	INTERACTIONS_TRACK_HEIGHT,
 	TIMESCALE_HEIGHT,
+	FrameNode,
 } from '@/components/flamegraph/types';
 import {
 	drawTimescale,
 	renderFlameGraph,
 } from '@/components/flamegraph/renderer';
-import {
-	renderInteractionsTrack,
-	renderTaskThresholds,
-} from '@/components/flamegraph/interactions-renderer';
+import { generateRandomColor } from '@/components/flamegraph/trace-processor';
+import { renderInteractionsTrack } from '@/components/flamegraph/interactions-renderer';
 import { renderAnnotations } from '@/components/flamegraph/annotations';
-import { processTraceData } from './trace-processor';
+import { debounce } from '@/lib/utils';
+import {
+	Event,
+	ProcessID,
+	ThreadID,
+} from '@perflab/trace_engine/models/trace/types/TraceEvents';
+import { type Micro } from '@perflab/trace_engine/models/trace/types/Timing';
+import { AICallTree } from '@perflab/trace_engine/panels/timeline/utils/AICallTree';
+import { StandaloneCallTreeContext } from '@perflab/trace_engine/panels/ai_assistance/standalone';
+import { walkTreeFromEntry } from '@perflab/trace_engine/models/trace/helpers/TreeHelpers';
+import { microToMilli } from '@perflab/trace_engine/models/trace/helpers/Timing';
+import useSWR from 'swr';
+import { TraceAnalysis } from '@/lib/trace';
 
 export interface FlameGraphCanvasProps {
-	traceData?: TraceEvent[];
+	searchEvent?: {
+		pid: number;
+		tid: number;
+		min: number;
+		max: number;
+		range: number;
+	};
 	width?: number;
 	height?: number;
 	className?: string;
@@ -112,7 +128,7 @@ export const renderFlameGraphCanvas = (options: {
 const ROW_HEIGHT = 24; // Height of each row in pixels
 
 export function FlameGraphCanvas({
-	traceData,
+	searchEvent,
 	width = 1200,
 	height = 400,
 	annotations,
@@ -123,6 +139,14 @@ export function FlameGraphCanvas({
 	processedTrace,
 }: FlameGraphCanvasProps) {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
+	const { data: traceAnalysis } = useSWR<TraceAnalysis | null>(
+		'trace-analysis',
+		null,
+		{
+			fallbackData: null,
+		},
+	);
+
 	const [processedData, setProcessedData] = useState<ProcessedTrace | null>(
 		null,
 	);
@@ -146,25 +170,168 @@ export function FlameGraphCanvas({
 			INTERACTIONS_ANNOTATIONS_HEIGHT +
 			TIMESCALE_HEIGHT;
 
-	// useEffect(() => {
-	// 	if (!traceData) return;
-	// 	const processed = processTraceData(traceData);
-	// 	setProcessedData(processed);
+	const _update = useCallback(
+		debounce((processedTrace: ProcessedTrace) => {
+			setProcessedData(processedTrace);
+		}, 300),
+		[setProcessedData],
+	);
 
-	// 	// Initialize view state to show the entire timeline
-	// 	setViewState({
-	// 		startTime: viewState.startTime,
-	// 		endTime: viewState.endTime,
-	// 		topDepth: 0,
-	// 		// Subtract timescale and interactions track height from available height
-	// 		visibleDepthCount: Math.min(
-	// 			processed.maxDepth + 1,
-	// 			Math.floor(
-	// 				(height - TIMESCALE_HEIGHT - INTERACTIONS_TRACK_HEIGHT) / ROW_HEIGHT,
-	// 			),
-	// 		),
-	// 	});
-	// }, [traceData, height]);
+	useEffect(() => {
+		if (!searchEvent || !traceAnalysis) return;
+
+		// Process the trace events for the AI call tree
+		requestAnimationFrame(() => {
+			const timerangeCallTree = AICallTree.fromTimeOnThread({
+				thread: {
+					pid: searchEvent.pid as ProcessID,
+					tid: searchEvent.tid as ThreadID,
+				},
+				bounds: {
+					min: searchEvent.min as Micro,
+					max: searchEvent.max as Micro,
+					range: searchEvent.range as Micro,
+				},
+				parsedTrace: traceAnalysis.parsedTrace,
+			});
+
+			if (!timerangeCallTree?.rootNode.event) {
+				throw new Error('Failed to create timerange call tree');
+			}
+
+			const aiCallTree = AICallTree.fromEvent(
+				timerangeCallTree.rootNode.event,
+				traceAnalysis.parsedTrace,
+			);
+
+			if (!aiCallTree) {
+				throw new Error('Failed to create AI call tree');
+			}
+
+			const processedTrace: ProcessedTrace = {
+				startTime: microToMilli(
+					(timerangeCallTree.rootNode.event.ts || 0) as Micro,
+				),
+				endTime: microToMilli(
+					((timerangeCallTree.rootNode.event.ts || 0) +
+						(timerangeCallTree.rootNode.event.dur || 0)) as Micro,
+				),
+				rootIds: [timerangeCallTree.rootNode.event.ts.toString() || ''],
+				frames: [],
+				maxDepth: 0,
+				totalTime: 0,
+				frameMap: new Map(),
+				sourceScriptColors: new Map(),
+			};
+
+			setViewState({
+				...viewState,
+				startTime: processedTrace.startTime / 1000,
+				endTime: processedTrace.endTime / 1000,
+				visibleDepthCount: 40,
+			});
+
+			let depth = -1;
+			let nodeId = 0;
+			const sourceScriptColors = new Map<string, string>();
+			let parentIds: string[] = [];
+
+			const onFrameStart = (entry: Event) => {
+				if (
+					!entry.name.includes('ProfileCall') &&
+					!entry.name.includes('FunctionCall') &&
+					!entry.name.includes('RunMicrotasks') &&
+					!entry.name.includes('RequestAnimationFrame')
+				) {
+					return;
+				}
+				depth += 1;
+				const _parent = processedTrace.frames.at(-1);
+				let parent = undefined;
+
+				if (depth !== 0 && _parent) {
+					parentIds.push(_parent.id);
+					parent = processedTrace.frames.find(({ id }) => id === _parent.id);
+				}
+
+				let color = '#f5d76e';
+				nodeId += 1;
+				let id = nodeId.toString();
+				let name = entry.name;
+				let sourceScript = undefined;
+				let cat = entry.cat;
+
+				if (entry.name === 'ProfileCall') {
+					// @ts-ignore
+					sourceScript = entry.callFrame?.url;
+					// @ts-ignore
+					cat = entry.callFrame?.codeType?.toLowerCase();
+					// @ts-ignore
+					const _name: string | undefined = entry.callFrame?.functionName;
+					name = _name ? _name : '(anonymous)';
+
+					if (sourceScript) {
+						// Check if we already have a color for this source script
+						if (!sourceScriptColors.has(sourceScript)) {
+							// Generate a new random color for this source script
+							sourceScriptColors.set(sourceScript, generateRandomColor());
+						}
+						// Use the assigned color for this source script
+						color = sourceScriptColors.get(sourceScript) || color;
+					}
+				}
+
+				const frame: FrameNode = {
+					color,
+					id,
+					value: microToMilli((entry.ts + (entry.dur || 0)) as Micro) / 1000,
+					start: microToMilli(entry.ts) / 1000,
+					end: microToMilli((entry.ts + (entry.dur || 0)) as Micro) / 1000,
+					depth,
+					name,
+					parent: parentIds.at(-1),
+					children: [],
+					sourceScript,
+					cat,
+					args: entry.args,
+					included:
+						entry.name.includes('ProfileCall') ||
+						entry.name.includes('FunctionCall') ||
+						entry.name.includes('RunMicrotasks') ||
+						entry.name.includes('RequestAnimationFrame'),
+				};
+
+				parent?.children.push(frame.id.toString());
+
+				processedTrace.frames.push(frame);
+				processedTrace.maxDepth =
+					depth > processedTrace.maxDepth ? depth : processedTrace.maxDepth;
+				processedTrace.sourceScriptColors = sourceScriptColors;
+			};
+
+			const onFrameEnd = (entry: Event) => {
+				if (
+					!entry.name.includes('ProfileCall') &&
+					!entry.name.includes('FunctionCall') &&
+					!entry.name.includes('RunMicrotasks') &&
+					!entry.name.includes('RequestAnimationFrame')
+				) {
+					return;
+				}
+				depth -= 1;
+				parentIds.pop();
+
+				_update(processedTrace);
+			};
+
+			walkTreeFromEntry(
+				traceAnalysis.parsedTrace.Renderer.entryToNode,
+				timerangeCallTree.rootNode.event,
+				onFrameStart,
+				onFrameEnd,
+			);
+		});
+	}, [searchEvent]);
 
 	useEffect(() => {
 		if (!processedTrace) return;
@@ -211,6 +378,8 @@ export function FlameGraphCanvas({
 
 		const ctx = canvasRef.current.getContext('2d');
 		if (!ctx) return;
+
+		console.log('viewState', viewState);
 
 		renderFlameGraphCanvas({
 			ctx,

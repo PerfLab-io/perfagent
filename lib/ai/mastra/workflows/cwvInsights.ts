@@ -472,6 +472,43 @@ const analyzeTrace = new Step({
 						role: 'user',
 						content: triggerData.aiContext,
 					},
+					{
+						role: 'user',
+						content: dedent`
+						also add a code block with the following information just after the opening heading:
+
+						\`\`\`flamegraph
+						{
+						"width": 600,
+						"height": 400,
+						"timeline": {
+							"min": ${insightsForTopic.rawEvent?.ts || 1000 / 1000},
+							"max": ${
+								(insightsForTopic.rawEvent?.ts || 1000) / 1000 +
+								(insightsForTopic.rawEvent?.dur || 1000) / 1000
+							},
+							"range": ${
+								(insightsForTopic.rawEvent?.ts || 1000) / 1000 +
+								(insightsForTopic.rawEvent?.dur || 1000) / 1000
+							}
+						},
+						"searchEvent": {
+							"pid": ${insightsForTopic.rawEvent?.pid},
+							"tid": ${insightsForTopic.rawEvent?.tid},
+							"min": ${insightsForTopic.rawEvent?.ts},
+							"max": ${
+								(insightsForTopic.rawEvent?.ts || 0) +
+								(insightsForTopic.rawEvent?.dur || 0)
+							},
+							"range": ${
+								(insightsForTopic.rawEvent?.ts || 0) +
+								(insightsForTopic.rawEvent?.dur || 0)
+							}
+						}
+					}
+						\`\`\`
+						`,
+					},
 				]);
 
 				for await (const chunk of traceAssistantStream.textStream) {

@@ -18,6 +18,7 @@ import { analyseInsightsForCWV } from '@/lib/insights';
 import { DataStreamHandler } from '@/components/data-stream-handler';
 import type { StandaloneCallTreeContext } from '@perflab/trace_engine/panels/ai_assistance/standalone';
 import { useSerializationWorker } from '../hooks/useSerializationWorker';
+import useSWR from 'swr';
 
 export interface AttachedFile {
 	id: string;
@@ -85,9 +86,11 @@ export default function AiChatPage() {
 	const [suggestionsLoading, setSuggestionsLoading] = useState(false);
 	const [suggestions, setSuggestions] = useState<string[]>([]);
 
-	const [traceAnalysis, setTraceAnalysis] = useState<TraceAnalysis | null>(
-		null,
-	);
+	const { data: traceAnalysis, mutate: setTraceAnalysis } =
+		useSWR<TraceAnalysis | null>('trace-analysis', null, {
+			fallbackData: null,
+		});
+
 	// Add a new state for the current file in context
 	const [currentContextFile, setCurrentContextFile] =
 		useState<AttachedFile | null>(null);
@@ -255,6 +258,7 @@ export default function AiChatPage() {
 			serializeInWorker(traceContents, currentNavigation)
 				.then((serializedData) => {
 					requestAnimationFrame(() => {
+						console.log('serializedData', serializedData);
 						setSerializedContext(serializedData);
 					});
 				})
@@ -419,7 +423,7 @@ export default function AiChatPage() {
 							onTraceNavigationChange={handleTraceNavigationChange}
 							currentFile={currentContextFile}
 							isVisible={showContextFile}
-							traceAnalysis={traceAnalysis}
+							traceAnalysis={traceAnalysis || null}
 							onINPInteractionAnimationChange={
 								setContextFileINPInteractionAnimation
 							}

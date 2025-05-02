@@ -377,10 +377,12 @@ export function MarkdownRenderer({
 
 					const props = data;
 					const interaction = props.interactions?.at(-1);
-					props.startTime = (interaction?.ts || 0) - 30_000;
-					const endTime =
-						(interaction?.ts || 0) + (interaction?.dur || 0) + 300_000;
-					props.endTime = endTime;
+					if (interaction) {
+						props.startTime = (interaction.ts || 0) - 30_000;
+						const endTime =
+							(interaction.ts || 0) + (interaction.dur || 0) + 300_000;
+						props.endTime = endTime;
+					}
 					return <FlameGraphCanvas {...props} />;
 				}
 				return <CodeBlock language={language}>{children}</CodeBlock>;
