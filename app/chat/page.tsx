@@ -258,7 +258,6 @@ export default function AiChatPage() {
 			serializeInWorker(traceContents, currentNavigation)
 				.then((serializedData) => {
 					requestAnimationFrame(() => {
-						console.log('serializedData', serializedData);
 						setSerializedContext(serializedData);
 					});
 				})
