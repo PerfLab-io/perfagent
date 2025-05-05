@@ -379,8 +379,6 @@ export function FlameGraphCanvas({
 		const ctx = canvasRef.current.getContext('2d');
 		if (!ctx) return;
 
-		console.log('viewState', viewState);
-
 		renderFlameGraphCanvas({
 			ctx,
 			width,
