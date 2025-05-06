@@ -3,7 +3,7 @@ import { msOrSDisplay } from './trace';
 import { Handlers } from '@perflab/trace_engine';
 import * as Trace from '@perflab/trace_engine/models/trace/trace.js';
 import { InteractionEvent } from '@/components/flamegraph/types';
-import { SyntheticExtendedAnimationFramePair } from '@perflab/trace_engine/models/trace/types/TraceEvents';
+import { Micro } from '@perflab/trace_engine/models/trace/types/Timing';
 
 export enum MetricType {
 	TIME = 'time',
@@ -67,7 +67,10 @@ export type INPExtras = {
 		max: number;
 		range: number;
 	};
-	animationFrames: SyntheticExtendedAnimationFramePair[];
+	animationFrames?: {
+		animationFrameEventMeta: any;
+		eventDurationStr: string;
+	}[][];
 };
 
 export function analyseInsightsForCWV(
@@ -320,6 +323,24 @@ export function analyseInsightsForCWV(
 					)
 				: undefined;
 
+			const mappedAnimationFrames = _animationFrames?.map((animationFrame) => {
+				return animationFrame.phases.map((phase) => {
+					const rawEvent =
+						// @ts-ignore the rawSourceEvent is not typed
+						phase.rawSourceEvent as TraceEventAnimationFrameScriptGroupingEvent;
+					const animationFrameEventMeta =
+						rawEvent.args?.animation_frame_script_timing_info;
+					const eventDuration = microSecondsToMilliSeconds(
+						(phase.dur as Micro) || (0 as Micro),
+					);
+					const eventDurationStr = msOrSDisplay(eventDuration);
+					return {
+						animationFrameEventMeta,
+						eventDurationStr,
+					};
+				});
+			});
+
 			INP = {
 				metric: 'INP',
 				metricValue: interactionDur,
@@ -355,7 +376,12 @@ export function analyseInsightsForCWV(
 						longestInteractionEvent.ts - (traceWindow.min || 0),
 					),
 				)}.`,
-				rawEvent: longestInteractionEvent,
+				rawEvent: {
+					ts: longestInteractionEvent.ts,
+					dur: longestInteractionEvent.dur,
+					pid: longestInteractionEvent.pid,
+					tid: longestInteractionEvent.tid,
+				},
 				extras: {
 					formattedEvent,
 					timeline: {
@@ -363,7 +389,7 @@ export function analyseInsightsForCWV(
 						max: traceWindow.max,
 						range: traceWindow.range,
 					},
-					animationFrames: _animationFrames,
+					animationFrames: mappedAnimationFrames,
 				},
 			} as InsightsReport;
 		}

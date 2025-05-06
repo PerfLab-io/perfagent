@@ -279,24 +279,7 @@ const generateExtraReportData = new Step({
 			}
 
 			if (insightsForTopic.extras.animationFrames.length > 0) {
-				const eventsOnAnimationFrames =
-					insightsForTopic.extras.animationFrames.map((animationFrame) => {
-						return animationFrame.phases.map((phase) => {
-							const rawEvent =
-								// @ts-ignore the rawSourceEvent is not typed
-								phase.rawSourceEvent as TraceEventAnimationFrameScriptGroupingEvent;
-							const animationFrameEventMeta =
-								rawEvent.args?.animation_frame_script_timing_info;
-							const eventDuration = microSecondsToMilliSeconds(
-								(phase.dur as Micro) || (0 as Micro),
-							);
-							const eventDurationStr = msOrSDisplay(eventDuration);
-							return {
-								animationFrameEventMeta,
-								eventDurationStr,
-							};
-						});
-					});
+				const eventsOnAnimationFrames = insightsForTopic.extras.animationFrames;
 
 				reportDetails.reportMarkdown =
 					reportDetails.reportMarkdown +
