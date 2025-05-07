@@ -233,7 +233,7 @@ export default function AiChatPage() {
 				navigationId,
 			);
 
-			setContextFileInsights(insights);
+			requestAnimationFrame(() => setContextFileInsights(insights));
 		},
 		[setCurrentNavigation, traceAnalysis],
 	);
