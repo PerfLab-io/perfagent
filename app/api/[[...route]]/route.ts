@@ -177,36 +177,23 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 
 chat.post('/suggest', zValidator('json', requestSchema), async (c) => {
 	const body = c.req.valid('json');
-	const messages = body.messages;
 
 	const insights: ReturnType<typeof analyseInsightsForCWV> = body.insights;
 
-	const smallAssistant = mastra.getAgent('smallAssistant');
-
-	const stream = await smallAssistant.generate(
+	const suggestionsAssistant = mastra.getAgent('suggestionsAssistant');
+	const stream = await suggestionsAssistant.generate(
 		[
-			...messages,
 			{
-				role: 'assistant',
+				role: 'user',
 				content: dedent`
-			I should suggest of least 5 but at most 7 messages to the user based on the insights data I have here.
-			Each suggestion context phrasing should refer to the insights data I have here, but as the user would ask it.
-			The suggestions should be based on what is the most relevant question for the user based on the insights data.
-			I should keep in mind that the user is a web developer and the suggestions should be related to web performance.
-			I should also keep in mind that the user might not know the terminology, so I should include one suggestion about the most relevant metric according to the insights data.
-			I should only return the suggested questions, no other text.
-			I should avoid questions that are too broad, keeping it as contextualized to the relevant insights data as possible, or aimed to explain an important metric according to the insights data.
-			I should keep the suggestions short and concise, maximum 100 characters each.
-			I should avoid using the 'full name' of a metric on the questions, use the abbreviation instead, even on a possible suggestion to explain a metric.
-
-			Here is the insights data:
-			\`\`\`json
-			${JSON.stringify(insights, null, 2)}
-			\`\`\`
-			`,
+					Here is the insights data:
+					\`\`\`json
+					${JSON.stringify(insights, null, 2)}
+					\`\`\`
+				`,
 			},
 		],
-		{ output: z.array(z.string()).min(5).max(7) },
+		{ output: z.array(z.string()).min(4).max(5) },
 	);
 
 	return c.json(stream.object);

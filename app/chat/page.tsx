@@ -169,22 +169,6 @@ export default function AiChatPage() {
 							setTraceAnalysis(trace);
 
 							setCurrentContextFile(newFile);
-
-							requestAnimationFrame(async () => {
-								const insights = analyseInsightsForCWV(
-									trace?.insights ?? new Map(),
-									trace?.parsedTrace ?? {},
-									currentNavigation ?? '',
-								);
-
-								const suggestedMessages = await fetch('/api/suggest', {
-									method: 'POST',
-									body: JSON.stringify({ insights }),
-								}).then((res) => res.json());
-
-								setSuggestions(suggestedMessages);
-								setContextFileInsights(insights);
-							});
 						});
 				}, 100);
 			});
@@ -196,6 +180,46 @@ export default function AiChatPage() {
 		},
 		[],
 	);
+
+	useEffect(() => {
+		if (!contextFileInsights) return;
+		setSuggestions([]);
+
+		requestAnimationFrame(async () => {
+			const insights = (
+				Object.keys(contextFileInsights) as Array<
+					keyof typeof contextFileInsights
+				>
+			).reduce(
+				(acc, key) => ({
+					...acc,
+					[key]: {
+						// Map insights to remove noise out of the request
+						// The suggestions assitant does not require any of the 'extras' or 'rawEvent' info
+						metric: contextFileInsights[key].metric,
+						metricValue: contextFileInsights[key].metricValue,
+						metricType: contextFileInsights[key].metricType,
+						metricBreakdown: contextFileInsights[key].metricBreakdown,
+						metricScore: contextFileInsights[key].metricScore,
+						infoContent: contextFileInsights[key].infoContent,
+						recommendations: contextFileInsights[key].recommendations,
+					},
+				}),
+				{},
+			);
+
+			const suggestedMessages = await fetch('/api/suggest', {
+				method: 'POST',
+				headers: {
+					Accept: 'application/json',
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({ insights }),
+			}).then((res) => res.json());
+
+			setSuggestions(suggestedMessages);
+		});
+	}, [contextFileInsights]);
 
 	const handleFileChange = processFiles;
 
