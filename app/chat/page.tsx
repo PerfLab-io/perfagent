@@ -81,20 +81,16 @@ export default function AiChatPage() {
 	const [currentNavigation, setCurrentNavigation] = useState<string | null>(
 		null,
 	);
-
 	const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
-	const [suggestionsLoading, setSuggestionsLoading] = useState(false);
 	const [suggestions, setSuggestions] = useState<string[]>([]);
-
 	const { data: traceAnalysis, mutate: setTraceAnalysis } =
 		useSWR<TraceAnalysis | null>('trace-analysis', null, {
 			fallbackData: null,
 		});
 
-	// Add a new state for the current file in context
+	// AI context state
 	const [currentContextFile, setCurrentContextFile] =
 		useState<AttachedFile | null>(null);
-	const [showContextFile, setShowContextFile] = useState(false);
 	const [contextFileInsights, setContextFileInsights] = useState<ReturnType<
 		typeof analyseInsightsForCWV
 	> | null>(null);
@@ -107,10 +103,6 @@ export default function AiChatPage() {
 		progress: number;
 		error: string | null;
 	} | null>(null);
-
-	const [aiContext, setAiContext] = useState<StandaloneCallTreeContext | null>(
-		null,
-	);
 	const [serializedContext, setSerializedContext] = useState<string | null>(
 		null,
 	);
@@ -177,7 +169,6 @@ export default function AiChatPage() {
 							setTraceAnalysis(trace);
 
 							setCurrentContextFile(newFile);
-							setShowContextFile(true);
 
 							requestAnimationFrame(async () => {
 								const insights = analyseInsightsForCWV(
@@ -192,7 +183,6 @@ export default function AiChatPage() {
 								}).then((res) => res.json());
 
 								setSuggestions(suggestedMessages);
-								setSuggestionsLoading(false);
 								setContextFileInsights(insights);
 							});
 						});
@@ -202,8 +192,7 @@ export default function AiChatPage() {
 			// Replace any existing files with just this one
 			setAttachedFiles([newFile]);
 
-			// Trigger suggestions for the new file
-			setSuggestionsLoading(true);
+			setSuggestions([]);
 		},
 		[],
 	);
@@ -224,13 +213,12 @@ export default function AiChatPage() {
 				// If all files are removed, reset suggestions
 				if (updated.length === 0) {
 					setSuggestions([]);
-					setSuggestionsLoading(false);
 				}
 
 				return updated;
 			});
 		},
-		[setAttachedFiles, setSuggestions, setSuggestionsLoading],
+		[setAttachedFiles, setSuggestions],
 	);
 
 	const handleTraceNavigationChange = useCallback(
@@ -252,7 +240,6 @@ export default function AiChatPage() {
 
 	const handleAIContextChange = useCallback(
 		(callTreeContext: StandaloneCallTreeContext) => {
-			setAiContext(callTreeContext);
 			if (!traceContents || !currentNavigation) return;
 
 			serializeInWorker(traceContents, currentNavigation)
@@ -296,11 +283,9 @@ export default function AiChatPage() {
 				});
 				// Hide file section after submission
 				setShowFileSection(false);
-				setShowContextFile(true);
 				setAttachedFiles([]);
 				// Clear suggestions when submitting a message
 				setSuggestions([]);
-				setSuggestionsLoading(false);
 				scrollToBottom();
 			}
 		},
@@ -421,7 +406,7 @@ export default function AiChatPage() {
 							metrics={contextFileInsights}
 							onTraceNavigationChange={handleTraceNavigationChange}
 							currentFile={currentContextFile}
-							isVisible={showContextFile}
+							isVisible={currentContextFile != null}
 							traceAnalysis={traceAnalysis || null}
 							onINPInteractionAnimationChange={
 								setContextFileINPInteractionAnimation
@@ -490,7 +475,7 @@ export default function AiChatPage() {
 									<SuggestedMessages
 										files={attachedFiles}
 										onSelectSuggestion={setInput}
-										isLoading={suggestionsLoading}
+										isLoading={Boolean(!suggestions.length)}
 										suggestions={suggestions}
 									/>
 								</div>
@@ -532,7 +517,6 @@ export default function AiChatPage() {
 											variant="outline"
 											size="icon"
 											onClick={() => fileInputRef.current?.click()}
-											title="Attach file"
 											disabled={isLoading}
 										>
 											<Paperclip className="h-5 w-5" />
