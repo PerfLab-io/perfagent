@@ -449,7 +449,7 @@ export default function AiChatPage() {
 								'transition-all duration-500 ease-in-out',
 								chatStarted
 									? 'input-container-active'
-									: 'input-container-initial translate-x-[25%] translate-y-[26%] xl:translate-y-[-50%]',
+									: 'input-container-initial translate-x-[25%] translate-y-[-20dvh]',
 							)}
 							style={{ transformOrigin: 'center bottom' }}
 						>
