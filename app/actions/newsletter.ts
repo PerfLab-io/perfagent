@@ -101,7 +101,7 @@ export async function sendNewsletter(
 					subject: subject,
 					react: NewsletterEmail({
 						...processedNewsletterData,
-						unsubscribeUrl: `${process.env.NEXT_PUBLIC_APP_URL}/unsubscribe`,
+						unsubscribeUrl: `https://agent.perflab.io/unsubscribe`,
 					}),
 				});
 
@@ -143,7 +143,7 @@ export async function sendNewsletter(
 		const results = await Promise.all(
 			recipients.map(async (email) => {
 				try {
-					const unsubscribeUrl = `${process.env.NEXT_PUBLIC_APP_URL}/unsubscribe?email=${encodeURIComponent(email)}`;
+					const unsubscribeUrl = `https://agent.perflab.io/unsubscribe?email=${encodeURIComponent(email)}`;
 
 					const data = await resend.emails.send({
 						from: 'PerfAgent <support@perflab.io>',

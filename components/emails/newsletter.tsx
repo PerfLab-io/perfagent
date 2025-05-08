@@ -38,37 +38,13 @@ interface NewsletterEmailProps {
 export const NewsletterEmail = ({
 	previewText = 'Latest updates from PerfAgent - Your Performance Optimization Platform',
 	headline = 'Performance Insights: May Edition',
-	heroImageUrl = 'https://example.com/newsletter-hero.webp',
+	heroImageUrl = '',
 	heroImageAlt = 'PerfAgent Newsletter Hero Image',
 	heroLinkUrl,
-	updates = [
-		{
-			title: 'Core Web Vitals Update',
-			content:
-				"Google has released new thresholds for Core Web Vitals. Learn how these changes affect your site's performance score and what you can do to stay ahead.",
-			imageUrl: 'https://example.com/web-vitals-update.png',
-			linkUrl: 'https://perfagent.dev/blog/core-web-vitals-update',
-			linkText: 'Read More',
-		},
-		{
-			title: 'Performance Analysis Breakthrough',
-			content:
-				'Our AI has learned to identify complex performance bottlenecks with 40% more accuracy. Discover how this improvement helps pinpoint issues that traditional tools miss.',
-			linkUrl: 'https://perfagent.dev/blog/ai-breakthrough',
-			linkText: 'Learn More',
-		},
-		{
-			title: 'Case Study: E-commerce Speed Optimization',
-			content:
-				'See how we helped an e-commerce client improve conversion rates by 23% through targeted performance optimizations to their product pages.',
-			imageUrl: 'https://example.com/case-study.png',
-			linkUrl: 'https://perfagent.dev/case-studies/ecommerce',
-			linkText: 'View Case Study',
-		},
-	],
+	updates = [],
 	ctaText = 'Try PerfAgent Today',
-	ctaUrl = 'https://perfagent.dev/signup',
-	unsubscribeUrl = 'https://perfagent.dev/unsubscribe',
+	ctaUrl = 'https://agent.perflab.io',
+	unsubscribeUrl = 'https://agent.perflab.io/unsubscribe',
 	currentDate = new Date().toLocaleDateString('en-US', {
 		month: 'long',
 		year: 'numeric',

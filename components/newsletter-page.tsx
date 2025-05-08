@@ -16,38 +16,31 @@ import {
 
 import type { ListAudiencesResponseSuccess } from 'resend';
 
+export type NewsletterUpdate = {
+	title: string;
+	content: string;
+	imageUrl?: string;
+	linkUrl?: string;
+	linkText?: string;
+};
+
 export function NewsLetterPage({
 	audiences,
 }: {
 	audiences: ListAudiencesResponseSuccess['data'];
 }) {
-	const [subject, setSubject] = useState('PerfAgent Newsletter - May 2023');
-	const [headline, setHeadline] = useState('Performance Insights: May Edition');
-	const [heroImageUrl, setHeroImageUrl] = useState(
-		'https://example.com/newsletter-hero.webp',
+	const [subject, setSubject] = useState(
+		`PerfAgent Newsletter - ${new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`,
 	);
+	const [headline, setHeadline] = useState('');
+	const [heroImageUrl, setHeroImageUrl] = useState('');
 	const [recipients, setRecipients] = useState('test@example.com');
 	const [recipientType, setRecipientType] = useState<'individual' | 'audience'>(
 		'individual',
 	);
 	const [selectedAudience, setSelectedAudience] = useState<string>('');
-	const [updates, setUpdates] = useState([
-		{
-			title: 'Core Web Vitals Update',
-			content:
-				"Google has released new thresholds for Core Web Vitals. Learn how these changes affect your site's performance score and what you can do to stay ahead.",
-			imageUrl: 'https://example.com/web-vitals-update.png',
-			linkUrl: 'https://perfagent.dev/blog/core-web-vitals-update',
-			linkText: 'Read More',
-		},
-		{
-			title: 'Performance Analysis Breakthrough',
-			content:
-				'Our AI has learned to identify complex performance bottlenecks with 40% more accuracy. Discover how this improvement helps pinpoint issues that traditional tools miss.',
-			linkUrl: 'https://perfagent.dev/blog/ai-breakthrough',
-			linkText: 'Learn More',
-		},
-	]);
+
+	const [updates, setUpdates] = useState<NewsletterUpdate[]>([]);
 	const [status, setStatus] = useState<null | {
 		success: boolean;
 		message: string;
