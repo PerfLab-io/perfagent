@@ -13,7 +13,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from '@/components/ui/select';
-import { resend } from '@/lib/resend';
+
 import type { ListAudiencesResponseSuccess } from 'resend';
 
 export function NewsLetterPage({
@@ -187,15 +187,20 @@ export function NewsLetterPage({
 
 					<div>
 						<label className="mb-2 block font-mono text-[#67cb87]">
-							Hero Image URL
+							Hero Image URL or YouTube Video URL
 						</label>
 						<input
 							type="text"
 							value={heroImageUrl}
 							onChange={(e) => setHeroImageUrl(e.target.value)}
 							className="w-full rounded-md border border-[#67cb87] bg-[#0d312d] p-2 font-mono text-[#c3e6d4]"
+							placeholder="Enter image URL or YouTube video URL"
 							required
 						/>
+						<p className="mt-1 font-mono text-xs text-[#c3e6d4]">
+							For YouTube videos, the thumbnail will be used as the image and
+							link to the video
+						</p>
 					</div>
 
 					<div className="space-y-4">
@@ -339,7 +344,7 @@ export function NewsLetterPage({
 
 									<div>
 										<label className="mb-1 block font-mono text-sm text-[#67cb87]">
-											Image URL (optional)
+											Image URL or YouTube Video URL (optional)
 										</label>
 										<input
 											type="text"
@@ -347,8 +352,13 @@ export function NewsLetterPage({
 											onChange={(e) =>
 												handleUpdateChange(index, 'imageUrl', e.target.value)
 											}
+											placeholder="Enter image URL or YouTube video URL"
 											className="w-full rounded-md border border-[#67cb87] bg-[#0a2824] p-2 font-mono text-sm text-[#c3e6d4]"
 										/>
+										<p className="mt-1 font-mono text-xs text-[#c3e6d4]">
+											For YouTube videos, the thumbnail will be used as the
+											image and link to the video
+										</p>
 									</div>
 
 									<div className="grid grid-cols-2 gap-3">

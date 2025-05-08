@@ -3,6 +3,46 @@
 import NewsletterEmail from '@/components/emails/newsletter';
 import { resend } from '@/lib/resend';
 
+// Helper functions for YouTube URL processing
+function isYouTubeUrl(url: string): boolean {
+	const youtubeRegex =
+		/^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+	return youtubeRegex.test(url);
+}
+
+function extractYouTubeVideoId(url: string): string | null {
+	const youtubeRegex =
+		/^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+	const match = url.match(youtubeRegex);
+	return match ? match[4] : null;
+}
+
+function getYouTubeThumbnailUrl(videoId: string): string {
+	// Use the high-quality thumbnail
+	return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+}
+
+// Process image URLs to handle YouTube links
+function processImageUrl(url: string | undefined): {
+	imageUrl: string | undefined;
+	linkUrl: string | undefined;
+} {
+	if (!url) return { imageUrl: undefined, linkUrl: undefined };
+
+	if (isYouTubeUrl(url)) {
+		const videoId = extractYouTubeVideoId(url);
+		if (videoId) {
+			return {
+				imageUrl: getYouTubeThumbnailUrl(videoId),
+				linkUrl: url, // Keep the original YouTube URL for linking
+			};
+		}
+	}
+
+	// If not a YouTube URL, return the original URL with no link
+	return { imageUrl: url, linkUrl: undefined };
+}
+
 export async function sendNewsletter(
 	recipients: string[],
 	subject: string,
@@ -25,6 +65,31 @@ export async function sendNewsletter(
 	audienceId?: string,
 ) {
 	try {
+		// Process hero image URL for YouTube videos
+		const { imageUrl: processedHeroImageUrl, linkUrl: heroLinkUrl } =
+			processImageUrl(newsletterData.heroImageUrl);
+
+		// Process update image URLs for YouTube videos
+		const processedUpdates = newsletterData.updates?.map((update) => {
+			const { imageUrl: processedImageUrl, linkUrl: imageLinkUrl } =
+				processImageUrl(update.imageUrl);
+
+			return {
+				...update,
+				imageUrl: processedImageUrl,
+				// If the image is a YouTube video and no explicit link is provided, use the YouTube link
+				linkUrl: update.linkUrl || imageLinkUrl || undefined,
+			};
+		});
+
+		// Prepare the newsletter data with processed URLs
+		const processedNewsletterData = {
+			...newsletterData,
+			heroImageUrl: processedHeroImageUrl,
+			heroLinkUrl, // Add the hero link URL if it's a YouTube video
+			updates: processedUpdates,
+		};
+
 		// If audienceId is provided, create and send a broadcast to the audience
 		if (audienceId) {
 			try {
@@ -34,7 +99,7 @@ export async function sendNewsletter(
 					from: 'PerfAgent <support@perflab.io>',
 					subject: subject,
 					react: NewsletterEmail({
-						...newsletterData,
+						...processedNewsletterData,
 						unsubscribeUrl: `${process.env.NEXT_PUBLIC_APP_URL}/unsubscribe`,
 					}),
 				});
@@ -84,7 +149,7 @@ export async function sendNewsletter(
 						to: email,
 						subject: subject,
 						react: NewsletterEmail({
-							...newsletterData,
+							...processedNewsletterData,
 							unsubscribeUrl,
 							recipientEmail: email,
 						}),

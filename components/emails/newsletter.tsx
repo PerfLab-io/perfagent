@@ -20,6 +20,7 @@ interface NewsletterEmailProps {
 	headline?: string;
 	heroImageUrl?: string;
 	heroImageAlt?: string;
+	heroLinkUrl?: string;
 	updates?: {
 		title: string;
 		content: string;
@@ -39,6 +40,7 @@ export const NewsletterEmail = ({
 	headline = 'Performance Insights: May Edition',
 	heroImageUrl = 'https://example.com/newsletter-hero.webp',
 	heroImageAlt = 'PerfAgent Newsletter Hero Image',
+	heroLinkUrl,
 	updates = [
 		{
 			title: 'Core Web Vitals Update',
@@ -99,13 +101,23 @@ export const NewsletterEmail = ({
 
 							{/* Hero Section */}
 							<Section className="m-0 p-0">
-								<Img
-									src={heroImageUrl}
-									alt={heroImageAlt}
-									width="600"
-									height="300"
-									className="w-full max-w-full"
-								/>
+								{heroLinkUrl ? (
+									<Link href={heroLinkUrl}>
+										<Img
+											src={heroImageUrl}
+											alt={heroImageAlt || 'PerfAgent Newsletter Hero Image'}
+											width="600"
+											className="w-full max-w-full"
+										/>
+									</Link>
+								) : (
+									<Img
+										src={heroImageUrl}
+										alt={heroImageAlt || 'PerfAgent Newsletter Hero Image'}
+										width="600"
+										className="w-full max-w-full"
+									/>
+								)}
 							</Section>
 
 							{/* Main Content */}
@@ -140,14 +152,24 @@ export const NewsletterEmail = ({
 												{update.content}
 											</Text>
 
-											{update.imageUrl && (
-												<Img
-													src={update.imageUrl}
-													alt={`Image for ${update.title}`}
-													width="500"
-													className="border-opacity-50 mt-4 rounded-md border border-[#67cb87]"
-												/>
-											)}
+											{update.imageUrl &&
+												(update.linkUrl ? (
+													<Link href={update.linkUrl}>
+														<Img
+															src={update.imageUrl}
+															alt={`Image for ${update.title}`}
+															width="500"
+															className="border-opacity-50 mt-4 rounded-md border border-[#67cb87]"
+														/>
+													</Link>
+												) : (
+													<Img
+														src={update.imageUrl}
+														alt={`Image for ${update.title}`}
+														width="500"
+														className="border-opacity-50 mt-4 rounded-md border border-[#67cb87]"
+													/>
+												))}
 
 											{update.linkUrl && (
 												<Section className="mt-4">
