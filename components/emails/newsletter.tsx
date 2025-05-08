@@ -101,6 +101,11 @@ export const NewsletterEmail = ({
 
 							{/* Hero Section */}
 							<Section className="m-0 p-0">
+								{/* Terminal-style headline */}
+								<Heading className="mb-6 pl-8 font-mono text-2xl font-bold text-[#67cb87]">
+									<span className="text-[#67cb87]">{'>'}</span> {headline}
+								</Heading>
+
 								{heroLinkUrl ? (
 									<Link href={heroLinkUrl}>
 										<Img
@@ -122,16 +127,6 @@ export const NewsletterEmail = ({
 
 							{/* Main Content */}
 							<Section className="relative p-8">
-								{/* Terminal-style headline */}
-								<Heading className="mb-6 font-mono text-2xl font-bold text-[#67cb87]">
-									<span className="text-[#67cb87]">{'>'}</span> {headline}
-								</Heading>
-
-								<Text className="mb-6 font-mono text-[#c3e6d4]">
-									Welcome to our latest performance insights newsletter. Here's
-									what's new in the world of web performance optimization.
-								</Text>
-
 								{/* Command prompt divider */}
 								<Section className="mb-6 rounded-md border border-dashed border-[#67cb87] p-2">
 									<Text className="m-0 text-center font-mono text-[#67cb87]">
@@ -184,7 +179,7 @@ export const NewsletterEmail = ({
 										</Section>
 
 										{index < updates.length - 1 && (
-											<Text className="m-0 text-center font-mono text-sm text-[#67cb87]">
+											<Text className="mt-4 text-center font-mono text-sm text-[#67cb87]">
 												# # # # #
 											</Text>
 										)}
@@ -200,12 +195,6 @@ export const NewsletterEmail = ({
 										{ctaText}
 									</Button>
 								</Section> */}
-
-								{/* Terminal-style closing */}
-								<Text className="mt-6 font-mono text-sm text-[#c3e6d4]">
-									Thank you for being part of our community. We're excited to
-									continue helping you optimize your web performance.
-								</Text>
 							</Section>
 
 							{/* Footer */}

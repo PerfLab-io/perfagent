@@ -96,6 +96,7 @@ export async function sendNewsletter(
 				// Step 1: Create a broadcast
 				const { data } = await resend.broadcasts.create({
 					audienceId: audienceId,
+					name: subject,
 					from: 'PerfAgent <support@perflab.io>',
 					subject: subject,
 					react: NewsletterEmail({
