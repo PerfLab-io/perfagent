@@ -1,12 +1,8 @@
 'use server';
 
-import { Resend } from 'resend';
+import { resend } from '@/lib/resend';
 import { emailSchema } from '@/lib/validations/email';
 import { SignupEmail } from '@/components/emails/signup-confirmation';
-import { z } from 'zod';
-
-// Initialize Resend with your API key
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Check if we're in a local/development environment
 const isLocalEnvironment = process.env.NODE_ENV === 'development';
