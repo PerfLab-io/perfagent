@@ -19,6 +19,7 @@ import { DataStreamHandler } from '@/components/data-stream-handler';
 import type { StandaloneCallTreeContext } from '@perflab/trace_engine/panels/ai_assistance/standalone';
 import { useSerializationWorker } from '../hooks/useSerializationWorker';
 import useSWR from 'swr';
+import { useScrollToBottom } from '@/lib/hooks/use-scroll-to-bottom';
 
 export interface AttachedFile {
 	id: string;
@@ -109,21 +110,18 @@ export default function AiChatPage() {
 
 	// Refs
 	const fileInputRef = useRef<HTMLInputElement>(null);
-	const messagesEndRef = useRef<HTMLDivElement>(null);
+
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const formRef = useRef<HTMLFormElement>(null);
 
 	// Check if a message is currently being streamed
 	const isLoading = status === 'submitted' || status === 'streaming';
+	const [messagesContainerRef, messagesEndRef] = useCallback(
+		() => useScrollToBottom<HTMLDivElement>(),
+		[],
+	)();
 
 	const { serializeInWorker } = useSerializationWorker();
-
-	/**
-	 * Smoothly scrolls to the bottom of the chat messages
-	 */
-	const scrollToBottom = useCallback(() => {
-		messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-	}, []);
 
 	const processFiles = useCallback(
 		(
@@ -310,7 +308,6 @@ export default function AiChatPage() {
 				setAttachedFiles([]);
 				// Clear suggestions when submitting a message
 				setSuggestions([]);
-				scrollToBottom();
 			}
 		},
 		[input, attachedFiles?.length, originalHandleSubmit],
@@ -448,7 +445,7 @@ export default function AiChatPage() {
 								showFileSection ? 'messages-with-files' : '',
 							)}
 						>
-							<div className="space-y-4 p-4 pb-20">
+							<div className="space-y-4 p-4 pb-20" ref={messagesContainerRef}>
 								{messages.map((message, index) => (
 									<ChatMessage
 										key={message.id}
@@ -462,7 +459,14 @@ export default function AiChatPage() {
 									chatId="current-chat"
 									currentMessageId={currentAssistantMessageId}
 								/>
-								<div ref={messagesEndRef} />
+								<div
+									ref={
+										status === 'streaming' || status === 'submitted'
+											? messagesEndRef
+											: null
+									}
+									className="min-h-[24px] min-w-[24px] shrink-0"
+								/>
 							</div>
 						</div>
 

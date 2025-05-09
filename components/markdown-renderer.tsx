@@ -17,6 +17,7 @@ import {
 	FlameGraphCanvas,
 	FlameGraphCanvasProps,
 } from '@/components/flamegraph/canvas';
+import { useScrollToBottom } from '@/lib/hooks/use-scroll-to-bottom';
 
 /**
  * Types and Interfaces
@@ -24,6 +25,7 @@ import {
 interface MarkdownRendererProps {
 	content: string;
 	className?: string;
+	autoScroll?: boolean;
 }
 
 interface CitationLink {
@@ -274,6 +276,7 @@ const LinkPreview: React.FC<{ href: string }> = ({ href }) => {
 export function MarkdownRenderer({
 	content,
 	className,
+	autoScroll = false,
 }: MarkdownRendererProps) {
 	const [metadataCache, setMetadataCache] = useState<
 		Record<string, LinkMetadata>
@@ -284,6 +287,9 @@ export function MarkdownRenderer({
 			([_, text, link]) => ({ text, link }),
 		);
 	}, [content]);
+
+	const [messagesContainerRef, messagesEndRef] =
+		useScrollToBottom<HTMLDivElement>();
 
 	// Fetch metadata with caching
 	const fetchMetadataWithCache = useCallback(
@@ -548,8 +554,15 @@ export function MarkdownRenderer({
 				'markdown-body prose prose-neutral dark:prose-invert max-w-none font-sans dark:text-neutral-200',
 				className,
 			)}
+			ref={messagesContainerRef}
 		>
 			<Marked renderer={renderer}>{content}</Marked>
+			{autoScroll && (
+				<div
+					ref={messagesEndRef}
+					className="min-h-[24px] min-w-[24px] shrink-0"
+				/>
+			)}
 		</div>
 	);
 }
