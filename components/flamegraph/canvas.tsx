@@ -222,11 +222,11 @@ export function FlameGraphCanvas({
 				startTime: microToMilli(annotationStart) / 1000,
 				endTime: microToMilli(annotationEnd as Micro) / 1000,
 				label: 'Longest subtree',
-				color: '#e6d7c3',
+				color: '#e8c4d4',
 			} as Annotation;
 
 			console.log('annotation', annotation);
-			setProcessedAnnotations([...processedAnnotations, annotation]);
+			setProcessedAnnotations([...(annotations || []), annotation]);
 
 			if (!aiCallTree) {
 				throw new Error('Failed to create AI call tree');
