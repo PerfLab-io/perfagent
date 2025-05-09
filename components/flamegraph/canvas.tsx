@@ -89,7 +89,6 @@ export const renderFlameGraphCanvas = (options: {
 
 	// Render the flamegraph with current view state
 	if (processedData) {
-		console.log('have trace data!', processedData);
 		renderFlameGraph(ctx, processedData, {
 			width,
 			height,
@@ -225,7 +224,6 @@ export function FlameGraphCanvas({
 				color: '#e8c4d4',
 			} as Annotation;
 
-			console.log('annotation', annotation);
 			setProcessedAnnotations([...(annotations || []), annotation]);
 
 			if (!aiCallTree) {
@@ -247,13 +245,6 @@ export function FlameGraphCanvas({
 				frameMap: new Map(),
 				sourceScriptColors: new Map(),
 			};
-
-			console.log('processed trace', {
-				...viewState,
-				startTime: processedTrace.startTime / 1000,
-				endTime: processedTrace.endTime / 1000,
-				visibleDepthCount: 40,
-			});
 
 			setViewState({
 				...viewState,
