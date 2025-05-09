@@ -1,7 +1,6 @@
 import { convertToCoreMessages, createDataStream } from 'ai';
 import { analyseInsightsForCWV } from '@/lib/insights';
 import { z } from 'zod';
-import { largeModelSystemPrompt } from '@/lib/ai/prompts';
 import { Hono } from 'hono';
 import { handle } from 'hono/vercel';
 import { stream } from 'hono/streaming';
@@ -128,9 +127,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 						default:
 							const stream = await mastra
 								.getAgent('largeAssistant')
-								.stream(messages, {
-									system: largeModelSystemPrompt,
-								});
+								.stream(messages);
 							stream.mergeIntoDataStream(dataStreamWriter, {
 								sendReasoning: true,
 								sendSources: true,
