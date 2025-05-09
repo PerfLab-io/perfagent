@@ -119,7 +119,7 @@ export const renderFlameGraphCanvas = (options: {
 			processedData.frameMap,
 			selectedAnnotation?.id,
 			// Add offset for interactions track
-			INTERACTIONS_TRACK_HEIGHT,
+			interactions ? INTERACTIONS_TRACK_HEIGHT : 0,
 		);
 	}
 };
@@ -156,6 +156,9 @@ export function FlameGraphCanvas({
 	const [selectedAnnotation, setSelectedAnnotation] =
 		useState<Annotation | null>(null);
 	const [base64IMG, setBase64IMG] = useState<string | undefined>(undefined);
+	const [processedAnnotations, setProcessedAnnotations] = useState<
+		Annotation[]
+	>(annotations || []);
 
 	// View state represents the visible portion of the timeline
 	const [viewState, setViewState] = useState<ViewState>({
@@ -204,6 +207,27 @@ export function FlameGraphCanvas({
 				traceAnalysis.parsedTrace,
 			);
 
+			// Grab the longest function call subtree to render an annotation
+			const longestCall = timerangeCallTree.rootNode.events
+				.toSorted((entry, entry2) => (entry2.dur || 0) - (entry.dur || 0))
+				.filter((entry) => entry.name === 'FunctionCall')
+				.at(0);
+
+			const annotationStart = (longestCall?.ts || 0) as Micro;
+			const annotationEnd = (longestCall?.dur || 0) + annotationStart;
+
+			const annotation = {
+				id: 'processed-1',
+				type: 'highlight',
+				startTime: microToMilli(annotationStart) / 1000,
+				endTime: microToMilli(annotationEnd as Micro) / 1000,
+				label: 'Longest subtree',
+				color: '#e6d7c3',
+			} as Annotation;
+
+			console.log('annotation', annotation);
+			setProcessedAnnotations([...processedAnnotations, annotation]);
+
 			if (!aiCallTree) {
 				throw new Error('Failed to create AI call tree');
 			}
@@ -223,6 +247,13 @@ export function FlameGraphCanvas({
 				frameMap: new Map(),
 				sourceScriptColors: new Map(),
 			};
+
+			console.log('processed trace', {
+				...viewState,
+				startTime: processedTrace.startTime / 1000,
+				endTime: processedTrace.endTime / 1000,
+				visibleDepthCount: 40,
+			});
 
 			setViewState({
 				...viewState,
@@ -388,7 +419,7 @@ export function FlameGraphCanvas({
 			showInteractions,
 			showAnnotations,
 			interactions,
-			annotations,
+			annotations: processedAnnotations,
 			selectedAnnotation,
 		});
 
@@ -402,7 +433,7 @@ export function FlameGraphCanvas({
 		viewState,
 		showAnnotations,
 		showInteractions,
-		annotations,
+		processedAnnotations,
 		interactions,
 		selectedAnnotation,
 	]);
