@@ -4,6 +4,7 @@ import { Handlers } from '@perflab/trace_engine';
 import * as Trace from '@perflab/trace_engine/models/trace/trace.js';
 import { InteractionEvent } from '@/components/flamegraph/types';
 import { Micro } from '@perflab/trace_engine/models/trace/types/Timing';
+import dedent from 'dedent';
 
 export enum MetricType {
 	TIME = 'time',
@@ -88,8 +89,6 @@ export function analyseInsightsForCWV(
 
 	const mainFrameMetrics = PageLoadMetrics.allMarkerEvents;
 
-	// INFO: TODO: The main frame may have multiple navigations, depending on the trace
-	// we must account for that in the future.
 	const insights = traceInsights.get(selectedNavigation);
 
 	const LCPEvent = mainFrameMetrics.find(
@@ -153,8 +152,7 @@ export function analyseInsightsForCWV(
 				}
 
 				_lcp.infoContent = `The LCP event happened at ${msOrSDisplay(
-					// @ts-expect-error
-					microSecondsToMilliSeconds(LCPEvent.ts - (traceWindow.min || 0)),
+					microSecondsToMilliSeconds(_lcp.metricValue as Micro),
 				)}.`;
 
 				if (
@@ -173,44 +171,30 @@ export function analyseInsightsForCWV(
 
 						_lcp.metricBreakdown.push({
 							label: LCPMetricPhases[key as keyof typeof LCPMetricPhases],
-							value: value,
+							value: Math.ceil(Math.round(value * 100) / 100),
 						});
 					});
+
 					_lcp.recommendations = [
 						insights?.model.LCPDiscovery.strings.description,
-					];
-
-					if (
-						insights.model.LCPDiscovery.checklist &&
-						!insights.model.LCPDiscovery.checklist.priorityHinted
-					) {
-						_lcp.recommendations.push(
-							`Increase priority hint for the LCP resource.
-                    This resource is critical for the user experience and should use fetchpriorit=high.`,
-						);
-					}
-					if (
-						insights.model.LCPDiscovery.checklist &&
-						!insights.model.LCPDiscovery.checklist.requestDiscoverable
-					) {
-						_lcp.recommendations.push(
-							`Consider preload the LCP image, or have it being discovered on the initial document load.
-                    This LCP image has a total load delay of ${msOrSDisplay(
-											insights.model.LCPPhases.phases?.loadDelay || 0,
-										)}.
-                    Sometimes your LCP image may be correctly placed in the document but other resources from
-                    part of the [critical rendering path](https://web.dev/learn/performance/understanding-the-critical-path) are blocking its discovery till a later time.`,
-						);
-					}
-					if (
-						insights.model.LCPDiscovery.checklist &&
-						!insights.model.LCPDiscovery.checklist.eagerlyLoaded
-					) {
-						_lcp.recommendations.push(
-							`Remove lazy loading from the LCP image.
-                    The LCP image should be loaded as soon as possible to avoid a delay in rendering.`,
-						);
-					}
+						!insights.model.LCPDiscovery.checklist?.priorityHinted.value
+							? dedent`
+							Increase priority hint for the LCP resource.
+							This resource is critical for the user experience and should use fetchpriorit=high.`
+							: '',
+						!insights.model.LCPDiscovery.checklist?.requestDiscoverable.value
+							? dedent`
+							Consider preload the LCP image, or have it being discovered on the initial document load.
+							This LCP image has a total load delay of ${msOrSDisplay(insights.model.LCPPhases.phases?.loadDelay || 0)}.
+							Sometimes your LCP image may be correctly placed in the document but other resources from
+							part of the [critical rendering path](https://web.dev/learn/performance/understanding-the-critical-path) are blocking its discovery till a later time.`
+							: '',
+						!insights.model.LCPDiscovery.checklist?.eagerlyLoaded.value
+							? dedent`
+							Remove lazy loading from the LCP image.
+							The LCP image should be loaded as soon as possible to avoid a delay in rendering.`
+							: '',
+					].filter(Boolean);
 				}
 
 				LCP = _lcp;

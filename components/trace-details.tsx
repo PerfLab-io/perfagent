@@ -326,15 +326,10 @@ export function FileContextSection({
 					// console.log(processedTrace);
 
 					requestAnimationFrame(() => {
-						console.log('aiCallTree', aiCallTree);
-						console.time('StandaloneCallTreeContext');
 						const callTreeContext = new StandaloneCallTreeContext(aiCallTree);
-						console.timeEnd('StandaloneCallTreeContext');
 
 						// console.log('ITS ALIVE!', callTreeContext.getItem().serialize());
-						console.time('onAIContextChange');
 						onAIContextChange?.(callTreeContext);
-						console.timeEnd('onAIContextChange');
 					});
 				});
 			} catch (e) {
