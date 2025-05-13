@@ -159,10 +159,6 @@ export function FileContextSection({
 				// 		)
 				// 		.sort((a, b) => (b.dur ?? 0) - (a.dur ?? 0))[0];
 
-				const _update = debounce((processedTrace: ProcessedTrace) => {
-					setProcessedTrace(processedTrace);
-				}, 300);
-
 				// Process the trace events for the AI call tree
 				requestAnimationFrame(() => {
 					const timerangeCallTree = AICallTree.fromTimeOnThread({
