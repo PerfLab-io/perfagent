@@ -58,7 +58,7 @@ export type InsightsReport = {
 	metricScore?: MetricScoreClassification;
 	infoContent?: string;
 	recommendations?: string[];
-	extras?: INPExtras;
+	extras?: INPExtras | LCPExtras;
 };
 
 export type INPExtras = {
@@ -72,6 +72,48 @@ export type INPExtras = {
 		animationFrameEventMeta: any;
 		eventDurationStr: string;
 	}[][];
+};
+
+export type LCPExtras = {
+	networkStackInfo: string;
+};
+
+type ExpectedMimeTypes =
+	| 'text/css'
+	| 'application/json'
+	| 'application/javascript'
+	| 'application/ecmascript'
+	| 'application/x-javascript'
+	| 'image';
+type RequestMap = {
+	origin: string;
+	isSameOrigin: boolean;
+	assetCount: Array<{
+		type: ExpectedMimeTypes;
+		entryCount: number;
+		lowPrioCount: number;
+		highPrioCount: number;
+		renderBlockingCount: number;
+		totalTime: Micro;
+	}>;
+	repeatedAssets?: { [key: string]: number };
+	failedRequests?: { [key: string]: number };
+	totalTime: Micro;
+};
+
+// Utility function to determine asset type from mime type for the RequestMap
+const getAssetType = (mimeType: ExpectedMimeTypes): ExpectedMimeTypes => {
+	if (mimeType === 'text/css') return 'text/css';
+	if (mimeType === 'application/json' || mimeType.includes('+json'))
+		return 'application/json';
+	if (
+		mimeType === 'application/javascript' ||
+		mimeType === 'application/ecmascript' ||
+		mimeType === 'application/x-javascript'
+	)
+		return 'application/javascript';
+	if (mimeType.startsWith('image/')) return 'image';
+	return mimeType;
 };
 
 export function analyseInsightsForCWV(
@@ -141,6 +183,21 @@ export function analyseInsightsForCWV(
 				LCPEvent.args.data.navigationId,
 			);
 
+			const navigationBounds = insights?.bounds;
+			const networkRequestsTillLCP = trace.NetworkRequests.byTime.filter(
+				(nE) => {
+					const nETotal = nE.ts + nE.dur;
+					// ensure that the events are from the starting point of the selected navigation
+					return nE.ts >= (navigationBounds?.min || 0) && nETotal < LCPEvent.ts;
+				},
+			);
+
+			console.log(networkRequestsTillLCP);
+
+			const mainFrameOrigin = new URL(
+				networkRequestsTillLCP.at(-1)?.args.data.requestingFrameUrl || '',
+			);
+
 			if (navigationTimings) {
 				for (const [key, value] of navigationTimings.entries()) {
 					const normalizedTiming = microSecondsToMilliSeconds(value.timing);
@@ -196,6 +253,162 @@ export function analyseInsightsForCWV(
 							: '',
 					].filter(Boolean);
 				}
+
+				const mappedURLs = networkRequestsTillLCP
+					.reduce<Map<string, RequestMap>>((reqMap, entry) => {
+						const frameURL = mainFrameOrigin;
+						const entryURL = new URL(entry.args.data.url);
+						const isSameOrigin = frameURL.origin === entryURL.origin;
+						const _rM: RequestMap = reqMap.get(entryURL.origin) || {
+							origin: entryURL.origin,
+							isSameOrigin,
+							assetCount: [],
+							repeatedAssets: undefined,
+							failedRequests: undefined,
+							totalTime: 0 as Micro,
+						};
+						const assetType = getAssetType(
+							entry.args.data.mimeType as ExpectedMimeTypes,
+						);
+						const assetTypeObj = _rM.assetCount.find(
+							({ type }) => type === assetType,
+						);
+						const isLowPriority =
+							entry.args.data.priority === 'Low' ||
+							entry.args.data.priority === 'VeryLow';
+						const isHighPriority =
+							entry.args.data.priority === 'High' ||
+							entry.args.data.priority === 'VeryHigh';
+						const isRenderBlocking =
+							entry.args.data.renderBlocking === 'blocking' ||
+							entry.args.data.renderBlocking === 'in_body_parser_blocking' ||
+							entry.args.data.renderBlocking === 'potentially_blocking';
+						const repeatCount =
+							(_rM.repeatedAssets?.[entryURL.origin] || -1) + 1;
+						const failedCount =
+							(_rM.failedRequests?.[entryURL.origin] || -1) + 1;
+
+						_rM.assetCount = assetTypeObj
+							? _rM.assetCount.map((_asset) => {
+									if (_asset.type === assetType) {
+										return {
+											type: assetType,
+											entryCount: _asset.entryCount + 1,
+											lowPrioCount: isLowPriority
+												? _asset.lowPrioCount + 1
+												: _asset.lowPrioCount,
+											highPrioCount: isHighPriority
+												? _asset.highPrioCount + 1
+												: _asset.highPrioCount,
+											renderBlockingCount: isRenderBlocking
+												? _asset.renderBlockingCount + 1
+												: _asset.renderBlockingCount,
+											totalTime: (_asset.totalTime + entry.dur) as Micro,
+										};
+									}
+
+									return _asset;
+								})
+							: [
+									..._rM.assetCount,
+									{
+										type: assetType,
+										entryCount: 1,
+										lowPrioCount: isLowPriority ? 1 : 0,
+										highPrioCount: isHighPriority ? 1 : 0,
+										renderBlockingCount: isRenderBlocking ? 1 : 0,
+										totalTime: entry.dur,
+									},
+								];
+						_rM.repeatedAssets = repeatCount
+							? {
+									...(_rM.repeatedAssets || {}),
+									[entryURL.origin]: repeatCount,
+								}
+							: _rM.repeatedAssets;
+						_rM.failedRequests = failedCount
+							? {
+									...(_rM.failedRequests || {}),
+									[entryURL.origin]: failedCount,
+								}
+							: _rM.failedRequests;
+						_rM.totalTime = (_rM.totalTime + entry.dur) as Micro;
+
+						return reqMap.set(entryURL.origin, _rM);
+					}, new Map<string, RequestMap>())
+					.values()
+					.reduce(
+						(str, entry) => {
+							return dedent`
+						${str}
+
+						Origin: ${entry.origin}
+						SameOrigin: ${entry.isSameOrigin}
+						AssetCount:
+						${entry.assetCount.reduce(
+							(_str, acc) => dedent`
+							${_str}
+							- AssetType: ${acc.type}
+							* Count: ${acc.entryCount}
+							* LowPriorityCount: ${acc.lowPrioCount}
+							* HighPriorityCount: ${acc.highPrioCount}
+							* RenderBlockingCount: ${acc.renderBlockingCount}
+							* TotalTimeSpentForAssetType: ${microSecondsToMilliSeconds(acc.totalTime)}ms\n
+							`,
+							'',
+						)}
+						RepeatedAssets: ${
+							entry.repeatedAssets
+								? Object.keys(entry.repeatedAssets).reduce(
+										(_str, acc) => dedent`${_str}\n
+										* ${acc}: ${entry.repeatedAssets?.[acc]}`,
+										'',
+									)
+								: '0'
+						}
+						FailedAssets: ${
+							entry.failedRequests
+								? Object.keys(entry.failedRequests).reduce(
+										(_str, acc) => dedent`${_str}\n
+										* ${acc}: ${entry.failedRequests?.[acc]}`,
+										'',
+									)
+								: '0'
+						}
+						TotalTime: ${microSecondsToMilliSeconds(entry.totalTime)}ms
+						\n
+						`;
+						},
+						dedent`
+					Trace URL: ${mainFrameOrigin.href}
+					Trace Origin: ${mainFrameOrigin.origin}
+					LCP candidate timming: ${_lcp.metricValue}ms
+					LCP candidate type: ${LCPEvent.args.data.type}
+					LCP candidate phase timings:
+					${_lcp.metricBreakdown.reduce(
+						(_acc, _phase) => dedent`
+					${_acc}
+					* ${_phase.label}: ${_phase.value}ms
+					`,
+						'',
+					)}
+					`,
+					);
+
+				_lcp.extras = {
+					networkStackInfo: dedent`
+					${mappedURLs}
+					
+					- Recommendations based on insights:
+					${_lcp.recommendations?.reduce(
+						(_acc, rec) => dedent`
+						${_acc}
+						* ${rec}
+						`,
+						'',
+					)}
+					`,
+				};
 
 				LCP = _lcp;
 			}
