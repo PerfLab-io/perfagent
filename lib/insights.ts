@@ -96,6 +96,9 @@ type RequestMap = {
 		highPrioCount: number;
 		renderBlockingCount: number;
 		totalTime: Micro;
+		encodedData: number;
+		decodedBody: number;
+		uncompressedCount: number;
 	}>;
 	repeatedAssets?: { [key: string]: number };
 	failedRequests?: { [key: string]: number };
@@ -253,6 +256,8 @@ export function analyseInsightsForCWV(
 					].filter(Boolean);
 				}
 
+				console.log(networkRequestsTillLCP);
+
 				const mappedURLs = networkRequestsTillLCP
 					.reduce<Map<string, RequestMap>>((reqMap, entry) => {
 						const frameURL = mainFrameOrigin;
@@ -303,6 +308,20 @@ export function analyseInsightsForCWV(
 												? _asset.renderBlockingCount + 1
 												: _asset.renderBlockingCount,
 											totalTime: (_asset.totalTime + entry.dur) as Micro,
+											encodedData:
+												_asset.encodedData + entry.args.data.encodedDataLength,
+											decodedBody:
+												_asset.decodedBody + entry.args.data.decodedBodyLength,
+											uncompressedCount:
+												_asset.uncompressedCount +
+													entry.args.data.responseHeaders.filter(
+														(header) =>
+															header.name === 'content-encoding' &&
+															header.value === 'gzip',
+													).length ===
+												0
+													? 1
+													: 0,
 										};
 									}
 
@@ -317,6 +336,16 @@ export function analyseInsightsForCWV(
 										highPrioCount: isHighPriority ? 1 : 0,
 										renderBlockingCount: isRenderBlocking ? 1 : 0,
 										totalTime: entry.dur,
+										encodedData: entry.args.data.encodedDataLength,
+										decodedBody: entry.args.data.decodedBodyLength,
+										uncompressedCount:
+											entry.args.data.responseHeaders.filter(
+												(header) =>
+													header.name === 'content-encoding' &&
+													header.value === 'gzip',
+											).length === 0
+												? 1
+												: 0,
 									},
 								];
 						_rM.repeatedAssets = repeatCount
@@ -352,7 +381,10 @@ export function analyseInsightsForCWV(
 							* LowPriorityCount: ${acc.lowPrioCount}
 							* HighPriorityCount: ${acc.highPrioCount}
 							* RenderBlockingCount: ${acc.renderBlockingCount}
-							* TotalTimeSpentForAssetType: ${microSecondsToMilliSeconds(acc.totalTime)}ms\n
+							* TotalTimeSpentForAssetType: ${microSecondsToMilliSeconds(acc.totalTime)}ms
+							* TotalEncodedDataLength: ${acc.encodedData / 1000}kB
+							* TotalDecodedBodyLength: ${acc.decodedBody / 1000}kB
+							* UncompressedCount: ${acc.uncompressedCount}\n
 							`,
 							'',
 						)}
@@ -410,6 +442,8 @@ export function analyseInsightsForCWV(
 					}
 					`,
 					);
+
+				console.log(mappedURLs);
 
 				_lcp.extras = {
 					networkStackInfo: dedent`

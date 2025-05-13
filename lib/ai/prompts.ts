@@ -378,6 +378,9 @@ The format of the representation is as follows:
     * HighPriorityCount: $networkGroupingEntryAssetCountEntryHighPrioCount
     * RenderBlockingCount: $networkGroupingEntryAssetCountEntryRenderBlockingCount
     * TotalTimeSpentForAssetType: $networkGroupingEntryAssetCountEntryTotalTime
+    * TotalEncodedDataLength: $networkGroupingEntryAssetCountEntryTotalEncodedDataLength
+    * TotalDecodedBodyLength: $networkGroupingEntryAssetCountEntryTotalDecodedBodyLength
+    * UncompressedCount: $networkGroupingEntryAssetCountEntryUncompressedCount
     // $networkGroupingEntryAssetCountEntry end
     
     RepeatedAssets: $networkGroupingEntryRepeatedAssets
@@ -410,6 +413,9 @@ The fields are:
     * networkGroupingEntryAssetCountEntryHighPrioCount: Count of high priority requests for the given asset type entry. This is the final priority and not the 'initial priority' or the 'priority hint'.
     * networkGroupingEntryAssetCountEntryRenderBlockingCount: Count of render blocking requests for the given asset type.
     * networkGroupingEntryAssetCountEntryTotalTime: Total time in milliseconds spent for the given asset type
+    * networkGroupingEntryAssetCountEntryTotalEncodedDataLength: Total encoded size for given asset type (in kB)
+    * networkGroupingEntryAssetCountEntryTotalDecodedBodyLength: Total decoded size for given asset type (in kB)
+    * networkGroupingEntryAssetCountEntryUncompressedCount: Total # of uncompressed request for given asset type
   * networkGroupingEntryRepeatedAssets: A list of repeated entries, with a count, for a given individual asset entry for the given grouping. Defaults to 0 if there's no repeated record
   * networkGroupingEntryFailedAssets: A list of failed requests, with a count, for the given grouping. Defaults to 0 if there's no repeated record
   * networkGroupingEntryTotalTime: Total cumulative time spent for a given origin grouping. Does not represent the total ellapsed time for the requests as they are processed in parallel.
@@ -417,6 +423,8 @@ The fields are:
 
 Your task is to analyze this network activity and learn insights and emerging patterns from the data within it and give recommendation on possible improvements to improve LCP timing. Your analysis may include:
 * Insights of total time spent on first party vs third party assets with insights around asset entries
+  * Include statistics from the asset entries to help scope the analysis
+  * Look out for common problems and inballances that increases the timming of the LCP candidate such as total size and excessive request # of first or third party source
 * Find correlation between any possible render blocking asset(s) type(s) that might collaborate to the LCP element timming
 * Offer insights specific to the LCP candidate type. Is it an image or Text? Where is the most significant time spent waiting for the candidate? What possible optimizations can be made to reduce them?
 * Analyse content headers for possible clues
@@ -432,12 +440,17 @@ Your task is to analyze this network activity and learn insights and emerging pa
     * Are we fetching too many scripts?
     * Could we defer scripts that are render blocking?
 * Based on your analysis, provide specific and actionable suggestions for improving the LCP candidate timming
-  * Are there any overuse by first or third party assets? 
+  * Are there any overuse by first or third party assets?
+  * Are we loading too much (kB size wise)?
   * Could there be any improvements to the critical rendering path?
   * Do we have any low hanging fruits? Such as repeated request, redirects, requests throwing errors?
 * Include a 'quote' section at the beginning, right after the opening subheading, of the report with some metadata for the LCP request such as candidate timming and candidate type
 
 # Considerations
+* When providing recommendations for LCP, it is all about using what you have learned from the network activity and recommendations given to give insights based on a few questions:
+  * How soon can we display this candidate?
+  * What are the main causes preventing it from being loaded/displayed earlyer?
+* Keep in mind that any networkGroupingEntryAssetCountEntryType that refers to JSON is most likely an API call to either fetch data for the page or submitting tracking events to third parties.
 * Do not wrap the whole response in a markdown fenced codeblock, only create the individual markdown sections as described
 * Do not mention any URLs on your report, refer simply to main domains for third party or simply as 'First party' for the first party requests.
 * Keep your analysis concise and focused, highlighting only the most critical aspects for a software engineer.
