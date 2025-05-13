@@ -5,6 +5,7 @@ import * as Trace from '@perflab/trace_engine/models/trace/trace.js';
 import { InteractionEvent } from '@/components/flamegraph/types';
 import { Micro } from '@perflab/trace_engine/models/trace/types/Timing';
 import dedent from 'dedent';
+import { SyntheticNetworkRequest } from '@perflab/trace_engine/models/trace/types/TraceEvents';
 
 export enum MetricType {
 	TIME = 'time',
@@ -390,6 +391,23 @@ export function analyseInsightsForCWV(
 					`,
 						'',
 					)}
+					LCP candidate request headers:
+					${
+						(
+							insights?.model.LCPDiscovery.relatedEvents
+								?.values()
+								// @ts-ignore The type is a mess on this one
+								.find((_e) => _e.name === 'SyntheticNetworkRequest') as
+								| SyntheticNetworkRequest
+								| undefined
+						)?.args.data.responseHeaders.reduce(
+							(_str, _ev) => dedent`
+							${_str}
+							* ${_ev.name}: ${_ev.value}
+							`,
+							'',
+						) || 'NOOP'
+					}
 					`,
 					);
 

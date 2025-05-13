@@ -362,6 +362,10 @@ The format of the representation is as follows:
     // $LCPCandidatePhaseTiming start
     * $LCPCandidatePhaseTimingEntryName: $LCPCandidatePhaseTimingValue
     // $LCPCandidatePhaseTiming end
+    LCP candidate request headers:
+    // $LCPCandidateRequestHeaders start
+    * $LCPCandidateRequestHeaderEntry
+    // $LCPCandidateRequestHeaders end
 
     // $networkGroupingEntry start
     Origin: $networkGroupingEntryOrigin
@@ -395,6 +399,7 @@ The fields are:
 * LCPCandidatePhaseTiming: The list of phases for the LCP candidate timings in milliseconds
   * LCPCandidatePhaseTimingEntryName: One of TTFB, Load Delay, Load Time and Render Delay according to what phase the entry refers to
   * LCPCandidatePhaseTimingValue: The value in milliseconds
+* LCPCandidateRequestHeaders: A list of the request headers for the LCP candidate. Defaults to NOOP if a related request could not be found (for example, the candidate is an HTML element and not an asset such as image)
 * networkGroupingEntry: Each grouping of unique origins from the network activity for the interval from request start to LCP timming
   * networkGroupingEntryOrigin: The origin for the given grouping
   * networkGroupingEntryIsSameOrigin: Boolean if grouping is from same origin or not
@@ -411,19 +416,30 @@ The fields are:
 * recommendations: A list of recommendations based on insights taken from the different data points for the LCP entry
 
 Your task is to analyze this network activity and learn insights and emerging patterns from the data within it and give recommendation on possible improvements to improve LCP timing. Your analysis may include:
-* Insights of total time spent on first party vs third party assets
+* Insights of total time spent on first party vs third party assets with insights around asset entries
 * Find correlation between any possible render blocking asset(s) type(s) that might collaborate to the LCP element timming
 * Offer insights specific to the LCP candidate type. Is it an image or Text? Where is the most significant time spent waiting for the candidate? What possible optimizations can be made to reduce them?
+* Analyse content headers for possible clues
+  * Is the LCP asset being delivered via a CDN?
+  * Is the LCP asset being compressed?
+  * Is the LCP asset request using a good caching policy?
+  * Do not expose any sensitive request header, you analysis should be surrounding optimizations only
+* Give insights and use any recommendations based on what you've learned from the data on a dedicated section
 * Suggest possible action points based on where the most time is spent per origin grouping per asset type:
     * Is it mostly render blocking issues?
     * Is it mostly third party issues?
     * Are we making too many API requests (normally with the application/json type) that are blocking the network resources?
     * Are we fetching too many scripts?
     * Could we defer scripts that are render blocking?
-* Give insights and use any recommendations present
-* Based on your analysis, provide specific and actionable suggestions for improving the LCP candidate timming. Are there any overuse by first or third party assets? Do we have any low hanging fruits?
+* Based on your analysis, provide specific and actionable suggestions for improving the LCP candidate timming
+  * Are there any overuse by first or third party assets? 
+  * Could there be any improvements to the critical rendering path?
+  * Do we have any low hanging fruits? Such as repeated request, redirects, requests throwing errors?
+* Include a 'quote' section at the beginning, right after the opening subheading, of the report with some metadata for the LCP request such as candidate timming and candidate type
 
 # Considerations
+* Do not wrap the whole response in a markdown fenced codeblock, only create the individual markdown sections as described
+* Do not mention any URLs on your report, refer simply to main domains for third party or simply as 'First party' for the first party requests.
 * Keep your analysis concise and focused, highlighting only the most critical aspects for a software engineer.
 * Build a report with structured sections, making it easier to read
 * Respond only with the report content, no opening remarks.
