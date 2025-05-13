@@ -192,8 +192,6 @@ export function analyseInsightsForCWV(
 				},
 			);
 
-			console.log(networkRequestsTillLCP);
-
 			const mainFrameOrigin = new URL(
 				networkRequestsTillLCP.at(-1)?.args.data.requestingFrameUrl || '',
 			);
