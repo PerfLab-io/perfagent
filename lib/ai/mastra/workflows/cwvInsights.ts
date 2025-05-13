@@ -128,6 +128,11 @@ const insightReportSchema = z.object({
 				}),
 			),
 		})
+		.or(
+			z.object({
+				networkStackInfo: z.string(),
+			}),
+		)
 		.optional(),
 });
 
@@ -347,6 +352,8 @@ const analyzeTrace = new Step({
 				};
 			}
 
+			const LCPExtras = topic === 'LCP' ? insightsForTopic.extras : undefined;
+
 			if (insightsForTopic.extras) {
 				// we don't want the extras being handled by the agent directly
 				insightsForTopic.extras = undefined;
@@ -420,6 +427,55 @@ const analyzeTrace = new Step({
 						data: chunk,
 					},
 				});
+			}
+
+			if (topic === 'LCP') {
+				dataStreamWriter.writeData({
+					type: 'text',
+					runId,
+					status: 'in-progress',
+					content: {
+						type: 'text-delta',
+						data: `\n\n`,
+					},
+				});
+
+				dataStreamWriter.writeData({
+					type: 'text',
+					runId,
+					status: 'in-progress',
+					content: {
+						type: 'trace-insight',
+						data: {
+							id: 'trace-insight',
+							type: 'trace-insight',
+							timestamp: Date.now(),
+							title: 'Trace Analysis',
+							message: `Analyzing relevant trace events ...`,
+						},
+					},
+				});
+
+				const networkAssistant = mastra.getAgent('networkAssistant');
+				const networkAssistantStream = await networkAssistant.stream([
+					{
+						role: 'user',
+						// @ts-ignore
+						content: LCPExtras?.networkStackInfo as string,
+					},
+				]);
+
+				for await (const chunk of networkAssistantStream.textStream) {
+					dataStreamWriter.writeData({
+						type: 'text',
+						runId,
+						status: 'in-progress',
+						content: {
+							type: 'text-delta',
+							data: chunk,
+						},
+					});
+				}
 			}
 
 			if (triggerData.aiContext && topic === 'INP') {
