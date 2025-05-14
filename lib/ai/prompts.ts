@@ -358,6 +358,7 @@ The format of the representation is as follows:
     Trace Origin: $traceOrigin
     LCP candidate timming: $LCPCandidateTiming
     LCP candidate type: $LCPCandidateType
+    LCP candidate initiator type: $LCPCandidateInitiatorType
     LCP candidate phase timings:
     // $LCPCandidatePhaseTiming start
     * $LCPCandidatePhaseTimingEntryName: $LCPCandidatePhaseTimingValue
@@ -402,6 +403,7 @@ The fields are:
 * LCPCandidatePhaseTiming: The list of phases for the LCP candidate timings in milliseconds
   * LCPCandidatePhaseTimingEntryName: One of TTFB, Load Delay, Load Time and Render Delay according to what phase the entry refers to
   * LCPCandidatePhaseTimingValue: The value in milliseconds
+* LCPCandidateInitiatorType: The type of the LCP candidate initiator (one of: parser, script, preload, SignedExchange, preflight, other). Defaults to 'NOOP' if the related request could not be found. Other means that it is none of the other options but in the main HTML response.
 * LCPCandidateRequestHeaders: A list of the request headers for the LCP candidate. Defaults to NOOP if a related request could not be found (for example, the candidate is an HTML element and not an asset such as image)
 * networkGroupingEntry: Each grouping of unique origins from the network activity for the interval from request start to LCP timming
   * networkGroupingEntryOrigin: The origin for the given grouping
@@ -427,6 +429,7 @@ Your task is to analyze this network activity and learn insights and emerging pa
   * Look out for common problems and inballances that increases the timming of the LCP candidate such as total size and excessive request # of first or third party source
 * Find correlation between any possible render blocking asset(s) type(s) that might collaborate to the LCP element timming
 * Offer insights specific to the LCP candidate type. Is it an image or Text? Where is the most significant time spent waiting for the candidate? What possible optimizations can be made to reduce them?
+* Is the LCPCandidateInitiatorType a script? If so, this can mean that the LCP candidate is loaded dynamically via JS. This can be a main bottleneck since it would depend on the JS download, parsing and execution times according to its placement on the critical path. LCP candidates should be served preloaded with the HTML response to maximize the chances of being displayed early.
 * Analyse content headers for possible clues
   * Is the LCP asset being delivered via a CDN?
   * Is the LCP asset being compressed?
@@ -450,6 +453,7 @@ Your task is to analyze this network activity and learn insights and emerging pa
 * When providing recommendations for LCP, it is all about using what you have learned from the network activity and recommendations given to give insights based on a few questions:
   * How soon can we display this candidate?
   * What are the main causes preventing it from being loaded/displayed earlyer?
+* When it comes to CSS and Fonts, it is better to preload and combine them into as few requests as possible than async loaded for better layout stability and render performance. However, css can be optimized by using the media attribute to only load certain styles for certain screen sizes.
 * Keep in mind that any networkGroupingEntryAssetCountEntryType that refers to JSON is most likely an API call to either fetch data for the page or submitting tracking events to third parties.
 * Do not wrap the whole response in a markdown fenced codeblock, only create the individual markdown sections as described
 * Do not mention any URLs on your report, refer simply to main domains for third party or simply as 'First party' for the first party requests.

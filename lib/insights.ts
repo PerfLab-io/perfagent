@@ -257,6 +257,12 @@ export function analyseInsightsForCWV(
 				}
 
 				console.log(networkRequestsTillLCP);
+				const lcpNetworkRequest = insights?.model.LCPDiscovery.relatedEvents
+					?.values()
+					// @ts-ignore The type is a mess on this one
+					.find((_e) => _e.name === 'SyntheticNetworkRequest') as
+					| SyntheticNetworkRequest
+					| undefined;
 
 				const mappedURLs = networkRequestsTillLCP
 					.reduce<Map<string, RequestMap>>((reqMap, entry) => {
@@ -415,6 +421,7 @@ export function analyseInsightsForCWV(
 					Trace Origin: ${mainFrameOrigin.origin}
 					LCP candidate timming: ${_lcp.metricValue}ms
 					LCP candidate type: ${LCPEvent.args.data.type}
+					LCP candidate initiator type: ${lcpNetworkRequest?.args.data.initiator?.type || 'NOOP'}
 					LCP candidate phase timings:
 					${_lcp.metricBreakdown.reduce(
 						(_acc, _phase) => dedent`
@@ -425,14 +432,7 @@ export function analyseInsightsForCWV(
 					)}
 					LCP candidate request headers:
 					${
-						(
-							insights?.model.LCPDiscovery.relatedEvents
-								?.values()
-								// @ts-ignore The type is a mess on this one
-								.find((_e) => _e.name === 'SyntheticNetworkRequest') as
-								| SyntheticNetworkRequest
-								| undefined
-						)?.args.data.responseHeaders.reduce(
+						lcpNetworkRequest?.args.data.responseHeaders.reduce(
 							(_str, _ev) => dedent`
 							${_str}
 							* ${_ev.name}: ${_ev.value}
