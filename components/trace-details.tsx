@@ -15,7 +15,7 @@ import {
 	MousePointer,
 	Pointer,
 } from 'lucide-react';
-import { cn, debounce } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { FileInsightCard } from './trace-details/trace-insight-card';
 import { FrameHistogram } from './trace-details/trace-histogram';
 import {
@@ -33,24 +33,26 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from './ui/select';
-import {
-	Event,
+import type {
+	PageLoadEvent,
 	SyntheticExtendedAnimationFramePair,
+	SyntheticNetworkRequest,
 	TraceEventAnimationFrameScriptGroupingEvent,
-	type SyntheticAnimationFramePair,
+	SyntheticAnimationFramePair,
 } from '@perflab/trace_engine/models/trace/types/TraceEvents';
-import { type Micro } from '@perflab/trace_engine/models/trace/types/Timing';
+import type {
+	TraceWindowMicro,
+	Micro,
+} from '@perflab/trace_engine/models/trace/types/Timing';
 import { MetricGauge } from './trace-details/metric-gauge';
 import { LinePattern } from './line-pattern';
 import { useFFmpeg } from '@/lib/hooks/use-ffmpeg';
 import { AttachedFile } from '@/app/chat/page';
 import { AICallTree } from '@perflab/trace_engine/panels/timeline/utils/AICallTree';
 import { StandaloneCallTreeContext } from '@perflab/trace_engine/panels/ai_assistance/standalone';
-import { walkTreeFromEntry } from '@perflab/trace_engine/models/trace/helpers/TreeHelpers';
-import { FrameNode, ProcessedTrace } from './flamegraph/types';
-import { generateRandomColor } from './flamegraph/trace-processor';
-import { microToMilli } from '@perflab/trace_engine/models/trace/helpers/Timing';
-import { FlameGraphCanvas, FlameGraphCanvasProps } from './flamegraph/canvas';
+import { ProcessedTrace } from './flamegraph/types';
+import { FlameGraphCanvasProps } from './flamegraph/canvas';
+import { NetworkActivityCompactCanvas } from './network-activity/compact-canvas';
 
 enum WebVitalsMetric {
 	INP = 'Interaction to Next Paint',
@@ -62,6 +64,57 @@ const WebVitalsMetricIcons = {
 	INP: <MousePointer className="h-3.5 w-3.5" />,
 	CLS: <Clock className="h-3.5 w-3.5" />,
 	LCP: <Activity className="h-3.5 w-3.5" />,
+};
+
+const getNetworkActivityUpToLCPEvent = (
+	traceAnalysis: TraceAnalysis,
+	selectedNavigation: string,
+):
+	| {
+			networkRequests: SyntheticNetworkRequest[];
+			lcpNetworkRequest?: SyntheticNetworkRequest;
+			mainFrameOrigin: string;
+			navigationBounds: TraceWindowMicro;
+			loadTimeMetrics: PageLoadEvent[];
+	  }
+	| undefined => {
+	const {
+		PageLoadMetrics: { allMarkerEvents: loadTimeMetrics },
+	} = traceAnalysis.parsedTrace;
+
+	const insights = traceAnalysis.insights.get(selectedNavigation);
+	const LCPEvent = loadTimeMetrics.find(
+		(metric) => metric.name === 'largestContentfulPaint::Candidate',
+	);
+
+	if (!insights || !LCPEvent) return undefined;
+
+	const navigationBounds = insights.bounds;
+	const networkRequestsTillLCP =
+		traceAnalysis.parsedTrace.NetworkRequests.byTime.filter((nE) => {
+			const nETotal = nE.ts + nE.dur;
+			// ensure that the events are from the starting point of the selected navigation
+			return nE.ts >= (navigationBounds.min || 0) && nETotal < LCPEvent.ts;
+		});
+
+	const mainFrameOrigin = new URL(
+		networkRequestsTillLCP.at(-1)?.args.data.requestingFrameUrl || '',
+	);
+
+	const lcpNetworkRequest = insights.model.LCPDiscovery.relatedEvents
+		?.values()
+		// @ts-ignore The type is a mess on this one
+		.find((_e) => _e.name === 'SyntheticNetworkRequest') as
+		| SyntheticNetworkRequest
+		| undefined;
+
+	return {
+		networkRequests: networkRequestsTillLCP,
+		lcpNetworkRequest,
+		mainFrameOrigin: mainFrameOrigin.origin,
+		navigationBounds,
+		loadTimeMetrics,
+	};
 };
 
 export interface FileContextSectionProps {
@@ -137,6 +190,15 @@ export function FileContextSection({
 
 		return { __insights };
 	}, [traceAnalysis, selectedNavigation]);
+
+	const networkActivityUpToLCPEvent = useMemo(() => {
+		if (!traceAnalysis || !__insights) return undefined;
+
+		return getNetworkActivityUpToLCPEvent(
+			traceAnalysis,
+			selectedNavigation || __insights[0][0],
+		);
+	}, [traceAnalysis, selectedNavigation, __insights]);
 
 	useEffect(() => {
 		if (!traceAnalysis || !__insights) return;

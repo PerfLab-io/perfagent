@@ -256,7 +256,6 @@ export function analyseInsightsForCWV(
 					].filter(Boolean);
 				}
 
-				console.log(networkRequestsTillLCP);
 				const lcpNetworkRequest = insights?.model.LCPDiscovery.relatedEvents
 					?.values()
 					// @ts-ignore The type is a mess on this one
@@ -442,8 +441,6 @@ export function analyseInsightsForCWV(
 					}
 					`,
 					);
-
-				console.log(mappedURLs);
 
 				_lcp.extras = {
 					networkStackInfo: dedent`
