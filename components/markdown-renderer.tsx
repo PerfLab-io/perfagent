@@ -17,7 +17,6 @@ import {
 	FlameGraphCanvas,
 	FlameGraphCanvasProps,
 } from '@/components/flamegraph/canvas';
-import { useScrollToBottom } from '@/lib/hooks/use-scroll-to-bottom';
 
 /**
  * Types and Interfaces
@@ -288,9 +287,6 @@ export function MarkdownRenderer({
 		);
 	}, [content]);
 
-	const [messagesContainerRef, messagesEndRef] =
-		useScrollToBottom<HTMLDivElement>();
-
 	// Fetch metadata with caching
 	const fetchMetadataWithCache = useCallback(
 		async (url: string) => {
@@ -554,15 +550,8 @@ export function MarkdownRenderer({
 				'markdown-body prose prose-neutral dark:prose-invert max-w-none font-sans dark:text-neutral-200',
 				className,
 			)}
-			ref={messagesContainerRef}
 		>
 			<Marked renderer={renderer}>{content}</Marked>
-			{autoScroll && (
-				<div
-					ref={messagesEndRef}
-					className="min-h-[24px] min-w-[24px] shrink-0"
-				/>
-			)}
 		</div>
 	);
 }
