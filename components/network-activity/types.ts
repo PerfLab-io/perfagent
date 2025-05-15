@@ -1,4 +1,7 @@
-import { SyntheticNetworkRequest } from '@perflab/trace_engine/models/trace/types/TraceEvents';
+import {
+	PageLoadEvent,
+	SyntheticNetworkRequest,
+} from '@perflab/trace_engine/models/trace/types/TraceEvents';
 
 // Resource types for color coding
 export const enum ResourceType {
@@ -33,6 +36,8 @@ export interface NetworkViewState {
 	showThirdParty: boolean; // Whether to show third-party requests in compact mode
 	showMilestones: boolean; // Whether to show page load milestones
 	showByAssetType: boolean; // Whether to show by asset type in compact mode
+	firstPartyOrigin: string; // First party origin
+	loadTimeMetrics?: PageLoadEvent[];
 }
 
 // Processed network data

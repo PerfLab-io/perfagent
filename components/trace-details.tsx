@@ -34,25 +34,18 @@ import {
 	SelectValue,
 } from './ui/select';
 import type {
-	PageLoadEvent,
 	SyntheticExtendedAnimationFramePair,
-	SyntheticNetworkRequest,
 	TraceEventAnimationFrameScriptGroupingEvent,
 	SyntheticAnimationFramePair,
 } from '@perflab/trace_engine/models/trace/types/TraceEvents';
-import type {
-	TraceWindowMicro,
-	Micro,
-} from '@perflab/trace_engine/models/trace/types/Timing';
+import type { Micro } from '@perflab/trace_engine/models/trace/types/Timing';
 import { MetricGauge } from './trace-details/metric-gauge';
 import { LinePattern } from './line-pattern';
 import { useFFmpeg } from '@/lib/hooks/use-ffmpeg';
 import { AttachedFile } from '@/app/chat/page';
 import { AICallTree } from '@perflab/trace_engine/panels/timeline/utils/AICallTree';
 import { StandaloneCallTreeContext } from '@perflab/trace_engine/panels/ai_assistance/standalone';
-import { ProcessedTrace } from './flamegraph/types';
-import { FlameGraphCanvasProps } from './flamegraph/canvas';
-import { NetworkActivityCompactCanvas } from './network-activity/compact-canvas';
+import useSWR from 'swr';
 
 enum WebVitalsMetric {
 	INP = 'Interaction to Next Paint',
@@ -64,57 +57,6 @@ const WebVitalsMetricIcons = {
 	INP: <MousePointer className="h-3.5 w-3.5" />,
 	CLS: <Clock className="h-3.5 w-3.5" />,
 	LCP: <Activity className="h-3.5 w-3.5" />,
-};
-
-const getNetworkActivityUpToLCPEvent = (
-	traceAnalysis: TraceAnalysis,
-	selectedNavigation: string,
-):
-	| {
-			networkRequests: SyntheticNetworkRequest[];
-			lcpNetworkRequest?: SyntheticNetworkRequest;
-			mainFrameOrigin: string;
-			navigationBounds: TraceWindowMicro;
-			loadTimeMetrics: PageLoadEvent[];
-	  }
-	| undefined => {
-	const {
-		PageLoadMetrics: { allMarkerEvents: loadTimeMetrics },
-	} = traceAnalysis.parsedTrace;
-
-	const insights = traceAnalysis.insights.get(selectedNavigation);
-	const LCPEvent = loadTimeMetrics.find(
-		(metric) => metric.name === 'largestContentfulPaint::Candidate',
-	);
-
-	if (!insights || !LCPEvent) return undefined;
-
-	const navigationBounds = insights.bounds;
-	const networkRequestsTillLCP =
-		traceAnalysis.parsedTrace.NetworkRequests.byTime.filter((nE) => {
-			const nETotal = nE.ts + nE.dur;
-			// ensure that the events are from the starting point of the selected navigation
-			return nE.ts >= (navigationBounds.min || 0) && nETotal < LCPEvent.ts;
-		});
-
-	const mainFrameOrigin = new URL(
-		networkRequestsTillLCP.at(-1)?.args.data.requestingFrameUrl || '',
-	);
-
-	const lcpNetworkRequest = insights.model.LCPDiscovery.relatedEvents
-		?.values()
-		// @ts-ignore The type is a mess on this one
-		.find((_e) => _e.name === 'SyntheticNetworkRequest') as
-		| SyntheticNetworkRequest
-		| undefined;
-
-	return {
-		networkRequests: networkRequestsTillLCP,
-		lcpNetworkRequest,
-		mainFrameOrigin: mainFrameOrigin.origin,
-		navigationBounds,
-		loadTimeMetrics,
-	};
 };
 
 export interface FileContextSectionProps {
@@ -146,9 +88,11 @@ export function FileContextSection({
 	const [isInitialRender, setIsInitialRender] = useState(true);
 	const [isExpanded, setIsExpanded] = useState(true);
 	const [isAnimating, setIsAnimating] = useState(false);
-	const [selectedNavigation, setSelectedNavigation] = useState<string | null>(
-		null,
-	);
+	const { data: selectedNavigation, mutate: setSelectedNavigation } = useSWR<
+		string | null
+	>('navigation-id', null, {
+		fallbackData: null,
+	});
 
 	const { convertToFormat, isLoading, progress, error } = useFFmpeg();
 	const [inpAnimationFrames, setInpAnimationFrames] = useState<
@@ -157,13 +101,6 @@ export function FileContextSection({
 	const [inpInteractionAnimation, setInpInteractionAnimation] = useState<
 		string | null
 	>(null);
-
-	const [_processedTrace, setProcessedTrace] = useState<
-		ProcessedTrace | undefined
-	>(undefined);
-	const [flamegraphProps, setFlameGraphProps] = useState<FlameGraphCanvasProps>(
-		{} as FlameGraphCanvasProps,
-	);
 
 	useEffect(() => {
 		onINPInteractionAnimationChange?.({
@@ -190,15 +127,6 @@ export function FileContextSection({
 
 		return { __insights };
 	}, [traceAnalysis, selectedNavigation]);
-
-	const networkActivityUpToLCPEvent = useMemo(() => {
-		if (!traceAnalysis || !__insights) return undefined;
-
-		return getNetworkActivityUpToLCPEvent(
-			traceAnalysis,
-			selectedNavigation || __insights[0][0],
-		);
-	}, [traceAnalysis, selectedNavigation, __insights]);
 
 	useEffect(() => {
 		if (!traceAnalysis || !__insights) return;
@@ -251,142 +179,8 @@ export function FileContextSection({
 						throw new Error('Failed to create AI call tree');
 					}
 
-					// const processedTrace: ProcessedTrace = {
-					// 	startTime: microToMilli(
-					// 		(timerangeCallTree.rootNode.event.ts || 0) as Micro,
-					// 	),
-					// 	endTime: microToMilli(
-					// 		((timerangeCallTree.rootNode.event.ts || 0) +
-					// 			(timerangeCallTree.rootNode.event.dur || 0)) as Micro,
-					// 	),
-					// 	rootIds: [timerangeCallTree.rootNode.event.ts.toString() || ''],
-					// 	frames: [],
-					// 	maxDepth: 0,
-					// 	totalTime: 0,
-					// 	frameMap: new Map(),
-					// 	sourceScriptColors: new Map(),
-					// };
-
-					// setFlameGraphProps({
-					// 	timeline: {
-					// 		min: processedTrace.startTime - 3_000,
-					// 		max: processedTrace.endTime + 3_000,
-					// 		range: processedTrace.endTime + 3_000,
-					// 	},
-					// 	startTime: processedTrace.startTime,
-					// 	endTime: processedTrace.endTime,
-					// });
-
-					// let depth = -1;
-					// let nodeId = 0;
-					// const sourceScriptColors = new Map<string, string>();
-					// let parentIds: string[] = [];
-
-					// const onFrameStart = (entry: Event) => {
-					// 	if (
-					// 		!entry.name.includes('ProfileCall') &&
-					// 		!entry.name.includes('FunctionCall') &&
-					// 		!entry.name.includes('RunMicrotasks') &&
-					// 		!entry.name.includes('RequestAnimationFrame')
-					// 	) {
-					// 		return;
-					// 	}
-					// 	depth += 1;
-					// 	const _parent = processedTrace.frames.at(-1);
-					// 	let parent = undefined;
-
-					// 	if (depth !== 0 && _parent) {
-					// 		parentIds.push(_parent.id);
-					// 		parent = processedTrace.frames.find(
-					// 			({ id }) => id === _parent.id,
-					// 		);
-					// 	}
-
-					// 	let color = '#f5d76e';
-					// 	nodeId += 1;
-					// 	let id = nodeId.toString();
-					// 	let name = entry.name;
-					// 	let sourceScript = undefined;
-					// 	let cat = entry.cat;
-
-					// 	if (entry.name === 'ProfileCall') {
-					// 		// @ts-ignore
-					// 		sourceScript = entry.callFrame?.url;
-					// 		// @ts-ignore
-					// 		cat = entry.callFrame?.codeType?.toLowerCase();
-					// 		// @ts-ignore
-					// 		const _name: string | undefined = entry.callFrame?.functionName;
-					// 		name = _name ? _name : '(anonymous)';
-
-					// 		if (sourceScript) {
-					// 			// Check if we already have a color for this source script
-					// 			if (!sourceScriptColors.has(sourceScript)) {
-					// 				// Generate a new random color for this source script
-					// 				sourceScriptColors.set(sourceScript, generateRandomColor());
-					// 			}
-					// 			// Use the assigned color for this source script
-					// 			color = sourceScriptColors.get(sourceScript) || color;
-					// 		}
-					// 	}
-
-					// 	const frame: FrameNode = {
-					// 		color,
-					// 		id,
-					// 		value: microToMilli((entry.ts + (entry.dur || 0)) as Micro),
-					// 		start: microToMilli(entry.ts) / 1000,
-					// 		end: microToMilli((entry.ts + (entry.dur || 0)) as Micro) / 1000,
-					// 		depth,
-					// 		name,
-					// 		parent: parentIds.at(-1),
-					// 		children: [],
-					// 		sourceScript,
-					// 		cat,
-					// 		args: entry.args,
-					// 		included:
-					// 			entry.name.includes('ProfileCall') ||
-					// 			entry.name.includes('FunctionCall') ||
-					// 			entry.name.includes('RunMicrotasks') ||
-					// 			entry.name.includes('RequestAnimationFrame'),
-					// 	};
-
-					// 	parent?.children.push(frame.id.toString());
-
-					// 	processedTrace.frames.push(frame);
-					// 	processedTrace.maxDepth =
-					// 		depth > processedTrace.maxDepth ? depth : processedTrace.maxDepth;
-					// 	processedTrace.sourceScriptColors = sourceScriptColors;
-					// };
-
-					// const onFrameEnd = (entry: Event) => {
-					// 	if (
-					// 		!entry.name.includes('ProfileCall') &&
-					// 		!entry.name.includes('FunctionCall') &&
-					// 		!entry.name.includes('RunMicrotasks') &&
-					// 		!entry.name.includes('RequestAnimationFrame')
-					// 	) {
-					// 		return;
-					// 	}
-					// 	depth -= 1;
-					// 	parentIds.pop();
-
-					// 	_update(processedTrace);
-					// };
-
-					// console.time('walkTreeFromEntry');
-					// walkTreeFromEntry(
-					// 	traceAnalysis.parsedTrace.Renderer.entryToNode,
-					// 	timerangeCallTree.rootNode.event,
-					// 	onFrameStart,
-					// 	onFrameEnd,
-					// );
-					// console.timeEnd('walkTreeFromEntry');
-
-					// console.log(processedTrace);
-
 					requestAnimationFrame(() => {
 						const callTreeContext = new StandaloneCallTreeContext(aiCallTree);
-
-						// console.log('ITS ALIVE!', callTreeContext.getItem().serialize());
 						onAIContextChange?.(callTreeContext);
 					});
 				});
@@ -614,12 +408,6 @@ export function FileContextSection({
 			{/* Content */}
 			{isExpanded && (
 				<div className="border-peppermint-200 dark:border-peppermint-900/50 border-t p-3">
-					{/* {_processedTrace && (
-						<FlameGraphCanvas
-							processedTrace={_processedTrace}
-							{...flamegraphProps}
-						/>
-					)} */}
 					<div className="flex justify-between">
 						<div className="flex items-center">
 							<div className="border-peppermint-200 dark:border-peppermint-800 dark:bg-peppermint-900/30 shrink-0 rounded border bg-white p-2">

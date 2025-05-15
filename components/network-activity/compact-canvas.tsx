@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useEffect, memo } from 'react';
+import { useRef, useState, useEffect, memo, useCallback } from 'react';
 
 import {
 	type NetworkViewState,
@@ -17,19 +17,70 @@ import {
 	PageLoadEvent,
 	SyntheticNetworkRequest,
 } from '@perflab/trace_engine/models/trace/types/TraceEvents';
+import type { TraceWindowMicro } from '@perflab/trace_engine/models/trace/types/Timing';
+import { TraceAnalysis } from '@/lib/trace';
+import useSWR from 'swr';
 
-export interface NetworkActivityCanvasProps {
-	networkData: SyntheticNetworkRequest[];
-	firstPartyOrigin: string;
+const getNetworkActivityUpToLCPEvent = (
+	traceAnalysis: TraceAnalysis,
+	selectedNavigation: string,
+):
+	| {
+			networkRequests: SyntheticNetworkRequest[];
+			lcpNetworkRequest?: SyntheticNetworkRequest;
+			mainFrameOrigin: string;
+			navigationBounds: TraceWindowMicro;
+			loadTimeMetrics: PageLoadEvent[];
+	  }
+	| undefined => {
+	const {
+		PageLoadMetrics: { allMarkerEvents: loadTimeMetrics },
+	} = traceAnalysis.parsedTrace;
+
+	const insights = traceAnalysis.insights.get(selectedNavigation);
+	const LCPEvent = loadTimeMetrics.find(
+		(metric) => metric.name === 'largestContentfulPaint::Candidate',
+	);
+
+	if (!insights || !LCPEvent) return undefined;
+
+	const navigationBounds = insights.bounds;
+	const networkRequestsTillLCP =
+		traceAnalysis.parsedTrace.NetworkRequests.byTime.filter((nE) => {
+			const nETotal = nE.ts + nE.dur;
+			// ensure that the events are from the starting point of the selected navigation
+			return nE.ts >= (navigationBounds.min || 0) && nETotal < LCPEvent.ts;
+		});
+
+	const mainFrameOrigin = new URL(
+		networkRequestsTillLCP.at(-1)?.args.data.requestingFrameUrl || '',
+	);
+
+	const lcpNetworkRequest = insights.model.LCPDiscovery.relatedEvents
+		?.values()
+		// @ts-ignore The type is a mess on this one
+		.find((_e) => _e.name === 'SyntheticNetworkRequest') as
+		| SyntheticNetworkRequest
+		| undefined;
+
+	return {
+		networkRequests: networkRequestsTillLCP,
+		lcpNetworkRequest,
+		mainFrameOrigin: mainFrameOrigin.origin,
+		navigationBounds,
+		loadTimeMetrics,
+	};
+};
+
+export interface NetworkActivityCompactCanvasProps {
+	networkData?: SyntheticNetworkRequest[];
+	firstPartyOrigin?: string;
 	width?: number;
 	height?: number;
 	className?: string;
 	initialViewState?: Partial<NetworkViewState>;
 	loadTimeMetrics?: PageLoadEvent[];
 }
-
-// Increase the expanded mode minimum height
-// const EXPANDED_MODE_MIN_HEIGHT = 400; // Changed from 150 to 400
 
 export const NetworkActivityCompactCanvas = memo(
 	function CompactCanvasComponent({
@@ -39,7 +90,21 @@ export const NetworkActivityCompactCanvas = memo(
 		initialViewState,
 		firstPartyOrigin,
 		loadTimeMetrics,
-	}: NetworkActivityCanvasProps) {
+	}: NetworkActivityCompactCanvasProps) {
+		const { data: traceAnalysis } = useSWR<TraceAnalysis | null>(
+			'trace-analysis',
+			null,
+			{
+				fallbackData: null,
+			},
+		);
+		const { data: selectedNavigation } = useSWR<string | null>(
+			'navigation-id',
+			null,
+			{
+				fallbackData: null,
+			},
+		);
 		const canvasRef = useRef<HTMLCanvasElement>(null);
 		const [processedData, setProcessedData] =
 			useState<ProcessedNetworkData | null>(null);
@@ -55,6 +120,8 @@ export const NetworkActivityCompactCanvas = memo(
 			showThirdParty: true,
 			showMilestones: true, // Show milestones by default
 			showByAssetType: false,
+			firstPartyOrigin: firstPartyOrigin || '',
+			loadTimeMetrics,
 		});
 
 		// Calculate actual canvas height based on mode and whether milestones are shown
@@ -62,57 +129,104 @@ export const NetworkActivityCompactCanvas = memo(
 			COMPACT_MODE_HEIGHT +
 			(viewState.showMilestones ? MILESTONE_TRACK_HEIGHT : 0);
 
-		// Process network data
+		const _processNetworkData = useCallback(
+			(
+				_networkData: SyntheticNetworkRequest[],
+				_viewState?: Partial<NetworkViewState>,
+			) => {
+				const processed = processNetworkData(_networkData);
+				setProcessedData(processed);
+				console.log('_viewState', _viewState);
+
+				// Calculate visible depth count based on available height
+				const availableHeight =
+					height - TIMESCALE_HEIGHT - LEGEND_HEIGHT - MILESTONE_TRACK_HEIGHT;
+				const visibleDepths = Math.floor(
+					availableHeight / NETWORK_ENTRY_HEIGHT,
+				);
+
+				// Initialize view state to show the entire timeline
+				setViewState((prev) => ({
+					...prev,
+					startTime:
+						_viewState?.startTime !== undefined
+							? _viewState.startTime
+							: viewState.startTime,
+					endTime:
+						_viewState?.endTime !== undefined
+							? _viewState.endTime
+							: viewState.endTime,
+					isCompact: true,
+					topDepth:
+						_viewState?.topDepth !== undefined ? _viewState.topDepth : 0,
+					visibleDepthCount:
+						_viewState?.visibleDepthCount !== undefined
+							? _viewState.visibleDepthCount
+							: Math.max(10, visibleDepths),
+					showFirstParty:
+						_viewState?.showFirstParty !== undefined
+							? _viewState.showFirstParty
+							: true,
+					showThirdParty:
+						_viewState?.showThirdParty !== undefined
+							? _viewState.showThirdParty
+							: true,
+					showMilestones:
+						_viewState?.showMilestones !== undefined
+							? _viewState.showMilestones
+							: true,
+					showByAssetType:
+						_viewState?.showByAssetType !== undefined
+							? _viewState.showByAssetType
+							: false,
+					firstPartyOrigin:
+						_viewState?.firstPartyOrigin !== undefined
+							? _viewState.firstPartyOrigin
+							: firstPartyOrigin || '',
+					loadTimeMetrics:
+						_viewState?.loadTimeMetrics !== undefined
+							? _viewState.loadTimeMetrics
+							: loadTimeMetrics,
+				}));
+			},
+			[networkData, height],
+		);
+
+		// Process network data props
 		useEffect(() => {
-			const processed = processNetworkData(networkData);
-			setProcessedData(processed);
+			if (!networkData) return;
 
-			// Calculate visible depth count based on available height
-			const availableHeight =
-				height -
-				TIMESCALE_HEIGHT -
-				LEGEND_HEIGHT -
-				(viewState.showMilestones ? MILESTONE_TRACK_HEIGHT : 0);
-			const visibleDepths = Math.floor(availableHeight / NETWORK_ENTRY_HEIGHT);
+			_processNetworkData(networkData, initialViewState);
+		}, [networkData, initialViewState, _processNetworkData]);
 
-			// Initialize view state to show the entire timeline
-			setViewState((prev) => ({
-				...prev,
-				startTime:
-					initialViewState?.startTime !== undefined
-						? initialViewState.startTime
-						: viewState.startTime,
-				endTime:
-					initialViewState?.endTime !== undefined
-						? initialViewState.endTime
-						: viewState.endTime,
-				isCompact: true,
-				topDepth:
-					initialViewState?.topDepth !== undefined
-						? initialViewState.topDepth
-						: 0,
-				visibleDepthCount:
-					initialViewState?.visibleDepthCount !== undefined
-						? initialViewState.visibleDepthCount
-						: Math.max(10, visibleDepths),
-				showFirstParty:
-					initialViewState?.showFirstParty !== undefined
-						? initialViewState.showFirstParty
-						: true,
-				showThirdParty:
-					initialViewState?.showThirdParty !== undefined
-						? initialViewState.showThirdParty
-						: true,
-				showMilestones:
-					initialViewState?.showMilestones !== undefined
-						? initialViewState.showMilestones
-						: true,
-				showByAssetType:
-					initialViewState?.showByAssetType !== undefined
-						? initialViewState.showByAssetType
-						: false,
-			}));
-		}, [networkData, initialViewState, height, viewState.showMilestones]);
+		// Process network data from trace analysis, only if networkData is not provided
+		useEffect(() => {
+			if (networkData || !traceAnalysis || !selectedNavigation) return;
+
+			const networkActivityUpToLCPEvent = getNetworkActivityUpToLCPEvent(
+				traceAnalysis,
+				selectedNavigation,
+			);
+
+			if (!networkActivityUpToLCPEvent) return;
+
+			_processNetworkData(networkActivityUpToLCPEvent.networkRequests, {
+				...initialViewState,
+				startTime: networkActivityUpToLCPEvent.navigationBounds.min,
+				endTime: networkActivityUpToLCPEvent.lcpNetworkRequest
+					? ((networkActivityUpToLCPEvent.lcpNetworkRequest.ts +
+							networkActivityUpToLCPEvent.lcpNetworkRequest.dur +
+							800000) as number)
+					: networkActivityUpToLCPEvent.navigationBounds.max,
+				firstPartyOrigin: networkActivityUpToLCPEvent.mainFrameOrigin,
+				loadTimeMetrics: networkActivityUpToLCPEvent.loadTimeMetrics,
+			});
+		}, [
+			traceAnalysis,
+			selectedNavigation,
+			_processNetworkData,
+			initialViewState,
+		]);
 
 		// Render the network activity canvas
 		useEffect(() => {
@@ -130,8 +244,8 @@ export const NetworkActivityCompactCanvas = memo(
 				viewState,
 				width,
 				canvasHeight,
-				firstPartyOrigin,
-				loadTimeMetrics,
+				viewState.firstPartyOrigin,
+				viewState.loadTimeMetrics,
 			);
 
 			const base64IMG = canvasRef.current.toDataURL('image/png');

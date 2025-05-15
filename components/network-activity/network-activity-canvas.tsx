@@ -87,6 +87,8 @@ export function NetworkActivityCanvas({
 		showFirstParty: true,
 		showThirdParty: true,
 		showMilestones: true, // Show milestones by default
+		showByAssetType: false,
+		firstPartyOrigin,
 	});
 
 	// Calculate actual canvas height based on mode and whether milestones are shown

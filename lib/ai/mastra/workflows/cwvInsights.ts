@@ -429,7 +429,7 @@ const analyzeTrace = new Step({
 				});
 			}
 
-			if (topic === 'LCP') {
+			if (topic === 'LCP' && LCPExtras) {
 				dataStreamWriter.writeData({
 					type: 'text',
 					runId,
@@ -461,7 +461,38 @@ const analyzeTrace = new Step({
 					{
 						role: 'user',
 						// @ts-ignore
-						content: LCPExtras?.networkStackInfo as string,
+						content: LCPExtras.networkStackInfo as string,
+					},
+					{
+						role: 'user',
+						content: dedent`
+						Make sure to include at the opening of your network activity insights section the following fenced codeblock:
+
+						\`\`\`network-activity
+						{
+							"topic": "LCP",
+							"initialViewState": {
+								"showFirstParty": true,
+								"showThirdParty": true,
+								"showByAssetType": false
+							},
+							"label": "First party vs Third party activity map"
+						}
+						\`\`\`
+
+						And at the end of the same section include the following fenced codeblock:
+						\`\`\`network-activity
+						{
+							"topic": "LCP",
+							"initialViewState": {
+								"showFirstParty": false,
+								"showThirdParty": false,
+								"showByAssetType": true
+							},
+							"label": "Network activity visualized by asset type"
+						}
+						\`\`\`
+						`,
 					},
 				]);
 
