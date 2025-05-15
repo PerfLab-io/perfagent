@@ -17,6 +17,10 @@ import {
 	FlameGraphCanvas,
 	FlameGraphCanvasProps,
 } from '@/components/flamegraph/canvas';
+import {
+	NetworkActivityCompactCanvas,
+	NetworkActivityCompactCanvasProps,
+} from './network-activity/compact-canvas';
 
 /**
  * Types and Interfaces
@@ -386,6 +390,31 @@ export function MarkdownRenderer({
 						props.endTime = endTime;
 					}
 					return <FlameGraphCanvas {...props} />;
+				}
+				if (language === 'network-activity') {
+					let data = null as NetworkActivityCompactCanvasProps | null;
+					try {
+						data = JSON.parse(children);
+					} catch (error) {
+						console.error('Error parsing network activity data:', error);
+					}
+					if (!data)
+						return <CodeBlock language={language}>{children}</CodeBlock>;
+
+					const props = data;
+					return (
+						<>
+							<NetworkActivityCompactCanvas width={900} {...props} />
+							<blockquote className="mt-2 border-l-4 border-neutral-300 pl-2 text-sm text-neutral-500 italic">
+								<p dir="auto">
+									{
+										// @ts-ignore
+										props.label
+									}
+								</p>
+							</blockquote>
+						</>
+					);
 				}
 				return <CodeBlock language={language}>{children}</CodeBlock>;
 			},
