@@ -74,26 +74,6 @@ Stores are organized by domain:
    - Manages UI artifacts and metadata
    - Replaces the previous useArtifact hook
 
-### Usage Example
-
-```tsx
-import { useUIStore } from '@/lib/stores';
-
-function MyComponent() {
-  // Only subscribe to what you need
-  const { pageTitle, setPageTitle } = useUIStore();
-  
-  return (
-    <div>
-      <h1>{pageTitle}</h1>
-      <button onClick={() => setPageTitle('New Title')}>
-        Change Title
-      </button>
-    </div>
-  );
-}
-```
-
 ## AI Capabilities
 
 The project includes several AI components:
