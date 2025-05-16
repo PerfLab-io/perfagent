@@ -63,53 +63,71 @@ export default function AiChatPage() {
 	});
 
 	// Use the chat store for state management
-	const {
-		// Chat UI state
-		chatStarted,
-		setChatStarted,
-		messagesVisible,
-		setMessagesVisible,
-		showFileSection,
-		setShowFileSection,
+	// Chat UI state
+	const chatStarted = useChatStore((state) => state.chatStarted);
+	const setChatStarted = useChatStore((state) => state.setChatStarted);
+	const messagesVisible = useChatStore((state) => state.messagesVisible);
+	const setMessagesVisible = useChatStore((state) => state.setMessagesVisible);
+	const showFileSection = useChatStore((state) => state.showFileSection);
+	const setShowFileSection = useChatStore((state) => state.setShowFileSection);
 
-		// Side panel state
-		showSidePanel,
-		setShowSidePanel,
-		panelAnimationComplete,
-		setPanelAnimationComplete,
-		panelExiting,
-		setPanelExiting,
-		panelContentType,
-		setPanelContentType,
+	// Side panel state
+	const showSidePanel = useChatStore((state) => state.showSidePanel);
+	const setShowSidePanel = useChatStore((state) => state.setShowSidePanel);
+	const panelAnimationComplete = useChatStore(
+		(state) => state.panelAnimationComplete,
+	);
+	const setPanelAnimationComplete = useChatStore(
+		(state) => state.setPanelAnimationComplete,
+	);
+	const panelExiting = useChatStore((state) => state.panelExiting);
+	const setPanelExiting = useChatStore((state) => state.setPanelExiting);
+	const panelContentType = useChatStore((state) => state.panelContentType);
+	const setPanelContentType = useChatStore(
+		(state) => state.setPanelContentType,
+	);
 
-		// File and trace state
-		traceContents,
-		setTraceContents,
-		attachedFiles,
-		setAttachedFiles,
-		suggestions,
-		setSuggestions,
+	// File and trace state
+	const traceContents = useChatStore((state) => state.traceContents);
+	const setTraceContents = useChatStore((state) => state.setTraceContents);
+	const attachedFiles = useChatStore((state) => state.attachedFiles);
+	const setAttachedFiles = useChatStore((state) => state.setAttachedFiles);
+	const suggestions = useChatStore((state) => state.suggestions);
+	const setSuggestions = useChatStore((state) => state.setSuggestions);
 
-		// Context file state
-		currentContextFile,
-		setCurrentContextFile,
-		contextFileInsights,
-		setContextFileInsights,
-		contextFileINPInteractionAnimation,
-		setContextFileINPInteractionAnimation,
+	// Context file state
+	const currentContextFile = useChatStore((state) => state.currentContextFile);
+	const setCurrentContextFile = useChatStore(
+		(state) => state.setCurrentContextFile,
+	);
+	const contextFileInsights = useChatStore(
+		(state) => state.contextFileInsights,
+	);
+	const setContextFileInsights = useChatStore(
+		(state) => state.setContextFileInsights,
+	);
+	const contextFileINPInteractionAnimation = useChatStore(
+		(state) => state.contextFileINPInteractionAnimation,
+	);
+	const setContextFileINPInteractionAnimation = useChatStore(
+		(state) => state.setContextFileINPInteractionAnimation,
+	);
 
-		// Report state
-		isGeneratingReport,
-		setIsGeneratingReport,
-		reportData,
-		setReportData,
-		activeReportId,
-		setActiveReportId,
+	// Report state
+	const isGeneratingReport = useChatStore((state) => state.isGeneratingReport);
+	const setIsGeneratingReport = useChatStore(
+		(state) => state.setIsGeneratingReport,
+	);
+	const reportData = useChatStore((state) => state.reportData);
+	const setReportData = useChatStore((state) => state.setReportData);
+	const activeReportId = useChatStore((state) => state.activeReportId);
+	const setActiveReportId = useChatStore((state) => state.setActiveReportId);
 
-		// Serialized context
-		serializedContext,
-		setSerializedContext,
-	} = useChatStore();
+	// Serialized context
+	const serializedContext = useChatStore((state) => state.serializedContext);
+	const setSerializedContext = useChatStore(
+		(state) => state.setSerializedContext,
+	);
 
 	// Refs
 	const fileInputRef = useRef<HTMLInputElement>(null);
