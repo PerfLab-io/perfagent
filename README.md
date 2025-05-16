@@ -130,10 +130,10 @@ The project includes several AI components:
 
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
 # Run the development server
-npm run dev
+pnpm dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the application.
