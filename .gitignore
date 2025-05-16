@@ -28,3 +28,4 @@ next-env.d.ts
 CLAUDE.md
 .mastra/
 _example/
+.DS_Store
