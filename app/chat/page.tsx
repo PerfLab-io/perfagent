@@ -79,8 +79,12 @@ export default function AiChatPage() {
 	const [isGeneratingReport, setIsGeneratingReport] = useState(false);
 	const [reportData, setReportData] = useState<string | null>(null);
 	const [activeReportId, setActiveReportId] = useState<string | null>(null);
-	const [currentNavigation, setCurrentNavigation] = useState<string | null>(
+	const { data: currentNavigation } = useSWR<string | null>(
+		'navigation-id',
 		null,
+		{
+			fallbackData: null,
+		},
 	);
 	const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
 	const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -245,8 +249,6 @@ export default function AiChatPage() {
 
 	const handleTraceNavigationChange = useCallback(
 		(navigationId: string) => {
-			setCurrentNavigation(navigationId);
-
 			if (!traceAnalysis) return;
 
 			const insights = analyseInsightsForCWV(
@@ -257,7 +259,7 @@ export default function AiChatPage() {
 
 			requestAnimationFrame(() => setContextFileInsights(insights));
 		},
-		[setCurrentNavigation, traceAnalysis],
+		[traceAnalysis],
 	);
 
 	const handleAIContextChange = useCallback(
