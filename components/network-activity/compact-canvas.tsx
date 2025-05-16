@@ -136,7 +136,6 @@ export const NetworkActivityCompactCanvas = memo(
 			) => {
 				const processed = processNetworkData(_networkData);
 				setProcessedData(processed);
-				console.log('_viewState', _viewState);
 
 				// Calculate visible depth count based on available height
 				const availableHeight =
