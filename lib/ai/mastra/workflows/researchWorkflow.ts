@@ -102,6 +102,11 @@ const generateStepIds = (plan: z.infer<typeof researchPlanSchema>) => {
 	};
 };
 
+type TriggerSchema = {
+	messages: CoreMessage[];
+	dataStream: DataStreamWriter;
+};
+
 const researchPlanning = new Step({
 	id: 'research-planning',
 	description: "Builds a research plan based on user's input",
@@ -110,10 +115,7 @@ const researchPlanning = new Step({
 	}),
 	outputSchema: researchPlanSchema,
 	execute: async ({ context, runId, mastra }) => {
-		const triggerData = context?.getStepResult<{
-			dataStream: DataStreamWriter;
-			messages: CoreMessage[];
-		}>('trigger');
+		const triggerData = context?.getStepResult<TriggerSchema>('trigger');
 
 		if (!triggerData) {
 			throw new Error('Trigger data not found');
@@ -225,9 +227,7 @@ const researchSteps = new Step({
 	description: 'Assembles the research plan into a list of steps',
 	outputSchema: researchStepsSchema,
 	execute: async ({ context, runId }) => {
-		const triggerData = context?.getStepResult<{
-			dataStream: DataStreamWriter;
-		}>('trigger');
+		const triggerData = context?.getStepResult<TriggerSchema>('trigger');
 		const researchPlan =
 			context?.getStepResult<z.infer<typeof researchPlanSchema>>(
 				'research-planning',
@@ -291,9 +291,7 @@ const searchWeb = new Step({
 	description:
 		'Searches the web based on the data from the research steps plan',
 	execute: async ({ context, runId, mastra }) => {
-		const triggerData = context?.getStepResult<{
-			dataStream: DataStreamWriter;
-		}>('trigger');
+		const triggerData = context?.getStepResult<TriggerSchema>('trigger');
 		const researchStepsStepResult =
 			context?.getStepResult<z.infer<typeof researchStepsSchema>>(
 				'research-steps',
@@ -441,9 +439,7 @@ const analyzeResults = new Step({
 		completedSteps: z.number(),
 	}),
 	execute: async ({ context, runId, mastra }) => {
-		const triggerData = context?.getStepResult<{
-			dataStream: DataStreamWriter;
-		}>('trigger');
+		const triggerData = context?.getStepResult<TriggerSchema>('trigger');
 		const researchStepsStepResult =
 			context?.getStepResult<z.infer<typeof researchStepsSchema>>(
 				'research-steps',
@@ -561,10 +557,7 @@ const researchReport = new Step({
 	id: 'research-report',
 	description: 'Generates a research report based on the results and analysis',
 	execute: async ({ context, runId, mastra }) => {
-		const triggerData = context?.getStepResult<{
-			dataStream: DataStreamWriter;
-			messages: CoreMessage[];
-		}>('trigger');
+		const triggerData = context?.getStepResult<TriggerSchema>('trigger');
 		const researchPlan =
 			context?.getStepResult<z.infer<typeof researchPlanSchema>>(
 				'research-planning',

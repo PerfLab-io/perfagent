@@ -1,4 +1,4 @@
-import { coreMessageSchema, DataStreamWriter } from 'ai';
+import { type CoreMessage, type DataStreamWriter, coreMessageSchema } from 'ai';
 
 import { Step, Workflow } from '@mastra/core/workflows';
 import { z } from 'zod';
@@ -6,12 +6,25 @@ import dedent from 'dedent';
 import { renderFlameGraphCanvas } from '@/components/flamegraph/canvas';
 
 import { createRequire } from 'module';
-import { microSecondsToMilliSeconds } from '@perflab/trace_engine/core/platform/Timing';
-import { msOrSDisplay } from '@/lib/trace';
-import { Micro } from '@perflab/trace_engine/models/trace/types/Timing';
 const require = createRequire(import.meta.url);
 
 const messageSchema = coreMessageSchema;
+
+const topicSchemaOutput = z.object({
+	topic: z
+		.enum(['LCP', 'CLS', 'INP'])
+		.describe(
+			'Insight topic to analyze based on the user prompt. The list reffers to CLS, INP and LCP related queries',
+		),
+});
+
+type TriggerSchema = {
+	messages: CoreMessage[];
+	insights: z.infer<typeof insightsSchema>;
+	inpInteractionAnimation: string | null;
+	aiContext: string | null;
+	dataStream: DataStreamWriter;
+};
 
 const topicStep = new Step({
 	id: 'analysis-topic',
@@ -19,18 +32,10 @@ const topicStep = new Step({
 	inputSchema: z.object({
 		messages: z.array(messageSchema),
 	}),
-	outputSchema: z.object({
-		topic: z
-			.enum(['LCP', 'CLS', 'INP'])
-			.describe(
-				'Insight topic to analyze based on the user prompt. The list reffers to CLS, INP and LCP related queries',
-			),
-	}),
+	outputSchema: topicSchemaOutput,
 	execute: async ({ context, mastra, runId }) => {
-		const { messages, dataStream } = context.getStepResult<{
-			messages: z.infer<typeof messageSchema>[];
-			dataStream: DataStreamWriter;
-		}>('trigger');
+		const { messages, dataStream } =
+			context.getStepResult<TriggerSchema>('trigger');
 
 		if (!mastra) {
 			throw new Error('Mastra not found');
@@ -53,13 +58,7 @@ const topicStep = new Step({
 		});
 
 		const response = await mastra.getAgent('topicsAgent').generate(messages, {
-			output: z.object({
-				topic: z
-					.enum(['LCP', 'CLS', 'INP'])
-					.describe(
-						'Insight topic to analyze based on the user prompt. The list reffers to CLS, INP and LCP related queries',
-					),
-			}),
+			output: topicSchemaOutput,
 		});
 
 		dataStream.writeData({
@@ -146,10 +145,7 @@ const extractInsightData = new Step({
 	id: 'extract-insight-data',
 	description: 'Extracts the insight data from the insights',
 	execute: async ({ context, mastra, runId }) => {
-		const triggerData = context?.getStepResult<{
-			insights: z.infer<typeof insightsSchema>;
-			dataStream: DataStreamWriter;
-		}>('trigger');
+		const triggerData = context?.getStepResult<TriggerSchema>('trigger');
 		const topicStepResult = context?.getStepResult<{
 			topic: string;
 		}>('analysis-topic');
@@ -191,8 +187,6 @@ const extractInsightData = new Step({
 				return triggerData.insights.INP;
 			}
 		})(topicStepResult.topic);
-
-		console.log('insightsForTopic: ', insightsForTopic);
 
 		return {
 			insightsForTopic,
@@ -313,11 +307,7 @@ const analyzeTrace = new Step({
 	id: 'analyze-trace',
 	description: 'Analyzes a trace insights',
 	execute: async ({ context, mastra, runId }) => {
-		const triggerData = context?.getStepResult<{
-			dataStream: DataStreamWriter;
-			inpInteractionAnimation: string | null;
-			aiContext: string | null;
-		}>('trigger');
+		const triggerData = context?.getStepResult<TriggerSchema>('trigger');
 
 		const { insightsForTopic, topic } = context?.getStepResult<{
 			insightsForTopic: z.infer<
@@ -332,8 +322,6 @@ const analyzeTrace = new Step({
 				reportMarkdown?: string;
 			};
 		}>('generate-extra-report-data');
-
-		console.log('reportDetails: ', reportDetails);
 
 		if (!triggerData) {
 			throw new Error('Trigger data not found');
@@ -374,16 +362,6 @@ const analyzeTrace = new Step({
 					},
 				},
 			});
-
-			console.log('insightsForTopic complete: ', insightsForTopic.metric);
-			console.log(
-				'insightsForTopic: ',
-				JSON.stringify(insightsForTopic, null, 2),
-			);
-			console.log(
-				'inpInteractionAnimation: ',
-				triggerData.inpInteractionAnimation,
-			);
 
 			// Generate the analysis content
 			const reportStream = await mastra.getAgent('reportAssistant').stream([
