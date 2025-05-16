@@ -4,12 +4,12 @@ import { Separator } from '@/components/ui/separator';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { FilePenIcon, Paperclip, PencilIcon, PenIcon } from 'lucide-react';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef } from 'react';
 import { Input } from './ui/input';
+import { useUIStore } from '@/lib/stores';
 
 export function SiteHeader() {
-	const [pageTitle, setPageTitle] = useState('Agent Insight #20');
-	const [isEditing, setIsEditing] = useState(false);
+	const { pageTitle, setPageTitle, isEditing, setIsEditing } = useUIStore();
 	const inputRef = useRef<HTMLInputElement>(null);
 
 	const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -22,42 +22,56 @@ export function SiteHeader() {
 				setIsEditing(false);
 			}
 		},
-		[],
+		[setIsEditing],
 	);
 
+	const startEditing = useCallback(() => {
+		setIsEditing(true);
+		setTimeout(() => {
+			inputRef.current?.focus();
+		}, 0);
+	}, [setIsEditing]);
+
+	// Either display the title as text or as an input field when editing
 	return (
-		<header className="group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 flex h-12 shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear">
-			<div className="flex w-full items-center gap-1 px-4 lg:gap-2 lg:px-6">
-				<SidebarTrigger className="-ml-1" />
-				<Separator
-					orientation="vertical"
-					className="mx-2 data-[orientation=vertical]:h-4"
-				/>
-				{isEditing ? (
-					<Input
-						type="text"
-						className="h-6 w-56 rounded-sm border-dashed border-primary text-primary-foreground ring-primary-foreground/20 placeholder:text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary"
-						ref={inputRef}
-						autoFocus
-						value={pageTitle}
-						onChange={handleTitleChange}
-						onKeyUp={handleKeyUp}
-					/>
-				) : (
-					<Button
-						variant="ghost"
-						size="sm"
-						className="group gap-2"
-						onClick={() => {
-							setIsEditing(true);
-							inputRef.current?.focus();
-						}}
-					>
-						<h1 className="font-medium">{pageTitle}</h1>
-						<FilePenIcon className="h-4 w-4 origin-left scale-0 transition-all group-hover:block group-hover:scale-100" />
-					</Button>
-				)}
+		<div className="bg-background sticky top-0 z-10 flex h-16 w-full items-center border-b px-4">
+			<SidebarTrigger />
+
+			<div className="flex h-full w-full items-center justify-between">
+				<div className="flex h-full w-full items-center justify-between px-4 md:px-6">
+					<div className="flex items-center gap-2">
+						{isEditing ? (
+							<Input
+								ref={inputRef}
+								value={pageTitle}
+								onChange={handleTitleChange}
+								onKeyUp={handleKeyUp}
+								onBlur={() => setIsEditing(false)}
+								className="max-w-[240px] focus-visible:ring-0"
+							/>
+						) : (
+							<div
+								className="text-xl font-semibold tracking-tight hover:cursor-pointer"
+								onClick={startEditing}
+							>
+								{pageTitle}
+							</div>
+						)}
+					</div>
+
+					<div className="flex items-center gap-2">
+						<Button
+							variant="outline"
+							size="icon"
+							className="rounded-full"
+							onClick={startEditing}
+						>
+							<PencilIcon className="h-4 w-4" />
+							<span className="sr-only">Edit title</span>
+						</Button>
+					</div>
+				</div>
 			</div>
-		</header>
+		</div>
 	);
 }

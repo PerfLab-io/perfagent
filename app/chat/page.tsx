@@ -1,7 +1,7 @@
 'use client';
 
 import type React from 'react';
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useRef, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Paperclip, Send, X } from 'lucide-react';
 import { ChatMessage } from '@/components/chat-message';
@@ -20,6 +20,7 @@ import type { StandaloneCallTreeContext } from '@perflab/trace_engine/panels/ai_
 import { useSerializationWorker } from '../hooks/useSerializationWorker';
 import useSWR from 'swr';
 import { useScrollToBottom } from '@/lib/hooks/use-scroll-to-bottom';
+import { useChatStore } from '@/lib/stores';
 
 export interface AttachedFile {
 	id: string;
@@ -61,60 +62,57 @@ export default function AiChatPage() {
 		id: 'current-chat',
 	});
 
-	// UI state management
-	const [chatStarted, setChatStarted] = useState(false);
-	const [messagesVisible, setMessagesVisible] = useState(false);
-	const [showFileSection, setShowFileSection] = useState(false);
+	// Use the chat store for state management
+	const {
+		// Chat UI state
+		chatStarted,
+		setChatStarted,
+		messagesVisible,
+		setMessagesVisible,
+		showFileSection,
+		setShowFileSection,
 
-	// Side panel state management
-	const [showSidePanel, setShowSidePanel] = useState<boolean | null>(null);
-	const [panelAnimationComplete, setPanelAnimationComplete] = useState(false);
-	const [panelExiting, setPanelExiting] = useState(false);
-	const [panelContentType, setPanelContentType] = useState<'data' | 'report'>(
-		'data',
-	);
-	const [traceContents, setTraceContents] = useState<string | null>(null);
+		// Side panel state
+		showSidePanel,
+		setShowSidePanel,
+		panelAnimationComplete,
+		setPanelAnimationComplete,
+		panelExiting,
+		setPanelExiting,
+		panelContentType,
+		setPanelContentType,
 
-	// Report state management
-	const [isGeneratingReport, setIsGeneratingReport] = useState(false);
-	const [reportData, setReportData] = useState<string | null>(null);
-	const [activeReportId, setActiveReportId] = useState<string | null>(null);
-	const { data: currentNavigation } = useSWR<string | null>(
-		'navigation-id',
-		null,
-		{
-			fallbackData: null,
-		},
-	);
-	const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
-	const [suggestions, setSuggestions] = useState<string[]>([]);
-	const { data: traceAnalysis, mutate: setTraceAnalysis } =
-		useSWR<TraceAnalysis | null>('trace-analysis', null, {
-			fallbackData: null,
-		});
+		// File and trace state
+		traceContents,
+		setTraceContents,
+		attachedFiles,
+		setAttachedFiles,
+		suggestions,
+		setSuggestions,
 
-	// AI context state
-	const [currentContextFile, setCurrentContextFile] =
-		useState<AttachedFile | null>(null);
-	const [contextFileInsights, setContextFileInsights] = useState<ReturnType<
-		typeof analyseInsightsForCWV
-	> | null>(null);
-	const [
+		// Context file state
+		currentContextFile,
+		setCurrentContextFile,
+		contextFileInsights,
+		setContextFileInsights,
 		contextFileINPInteractionAnimation,
 		setContextFileINPInteractionAnimation,
-	] = useState<{
-		animationFrameInteractionImageUrl: string | null;
-		isLoading: boolean;
-		progress: number;
-		error: string | null;
-	} | null>(null);
-	const [serializedContext, setSerializedContext] = useState<string | null>(
-		null,
-	);
+
+		// Report state
+		isGeneratingReport,
+		setIsGeneratingReport,
+		reportData,
+		setReportData,
+		activeReportId,
+		setActiveReportId,
+
+		// Serialized context
+		serializedContext,
+		setSerializedContext,
+	} = useChatStore();
 
 	// Refs
 	const fileInputRef = useRef<HTMLInputElement>(null);
-
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const formRef = useRef<HTMLFormElement>(null);
 
@@ -126,6 +124,21 @@ export default function AiChatPage() {
 	)();
 
 	const { serializeInWorker } = useSerializationWorker();
+
+	// Keep the traceAnalysis from SWR for compatibility
+	const { data: traceAnalysis, mutate: setTraceAnalysis } =
+		useSWR<TraceAnalysis | null>('trace-analysis', null, {
+			fallbackData: null,
+		});
+
+	// SWR for navigation ID
+	const { data: currentNavigation } = useSWR<string | null>(
+		'navigation-id',
+		null,
+		{
+			fallbackData: null,
+		},
+	);
 
 	const processFiles = useCallback(
 		(
@@ -233,16 +246,8 @@ export default function AiChatPage() {
 		(id: string) => {
 			setTraceAnalysis(null);
 			setCurrentContextFile(null);
-			setAttachedFiles((prev) => {
-				const updated = prev.filter((file) => file.id !== id);
-
-				// If all files are removed, reset suggestions
-				if (updated.length === 0) {
-					setSuggestions([]);
-				}
-
-				return updated;
-			});
+			setAttachedFiles([]);
+			setSuggestions([]);
 		},
 		[setAttachedFiles, setSuggestions],
 	);

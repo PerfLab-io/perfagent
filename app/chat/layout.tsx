@@ -6,6 +6,7 @@ import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/app-sidebar';
 import { SiteHeader } from '@/components/site-header';
 import { Metadata } from 'next';
+import { cookies } from 'next/headers';
 
 export const metadata: Metadata = {
 	title: 'PerfAgent - Agent insights for web performance',
@@ -13,14 +14,19 @@ export const metadata: Metadata = {
 		"PerfAgent is an AI-powered web performance insights tool that helps you understand your website's performance and identify opportunities for improvement.",
 };
 
-export default function AiChatLayout({
+export default async function AiChatLayout({
 	children,
 }: {
 	children: React.ReactNode;
 }) {
+	// Read the sidebar cookie from the server
+	const cookieStore = await cookies();
+	const sidebarCookie = cookieStore.get('sidebar:state');
+	const sidebarOpen = sidebarCookie?.value === 'false' ? false : true;
+
 	return (
 		<>
-			<SidebarProvider>
+			<SidebarProvider open={sidebarOpen}>
 				<AppSidebar variant="inset" />
 				<SidebarInset>
 					<SiteHeader />
