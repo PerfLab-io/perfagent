@@ -405,13 +405,11 @@ export function MarkdownRenderer({
 					return (
 						<>
 							<NetworkActivityCompactCanvas width={900} {...props} />
-							<blockquote className="mt-2 border-l-4 border-neutral-300 pl-2 text-sm text-neutral-500 italic">
-								<p dir="auto">
-									{
-										// @ts-ignore
-										props.label
-									}
-								</p>
+							<blockquote className="border-primary bg-muted my-2 rounded-r-md border-l-4 py-1 pl-4 text-sm text-neutral-700 italic dark:bg-neutral-900/50 dark:text-neutral-300">
+								{
+									// @ts-ignore
+									props.label
+								}
 							</blockquote>
 						</>
 					);
@@ -472,7 +470,7 @@ export function MarkdownRenderer({
 			// Blockquote rendering
 			blockquote(children: React.ReactNode) {
 				return (
-					<blockquote className="border-primary/30 dark:border-primary/20 my-6 rounded-r-md border-l-4 bg-neutral-50 py-1 pl-4 text-neutral-700 italic dark:bg-neutral-900/50 dark:text-neutral-300">
+					<blockquote className="border-primary bg-muted my-6 rounded-r-md border-l-4 py-1 pl-4 text-neutral-700 italic dark:bg-neutral-900/50 dark:text-neutral-300">
 						{children}
 					</blockquote>
 				);

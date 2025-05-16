@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import {
 	XCircle,
 	FileText,
@@ -34,7 +34,7 @@ interface MarkdownReportProps {
  * MarkdownReport Component
  * Displays a report with markdown content in a sliding panel
  */
-export function MarkdownReport({
+export const MarkdownReport = memo(function MarkdownReport({
 	visible,
 	onClose,
 	exiting = false,
@@ -228,4 +228,4 @@ export function MarkdownReport({
 			</div>
 		</div>
 	);
-}
+});

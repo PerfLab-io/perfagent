@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect, useCallback, memo } from 'react';
 import type {
 	ProcessedTrace,
 	ViewState,
@@ -126,7 +126,7 @@ export const renderFlameGraphCanvas = (options: {
 // Add constants for vertical navigation
 const ROW_HEIGHT = 24; // Height of each row in pixels
 
-export function FlameGraphCanvas({
+export const FlameGraphCanvas = memo(function FlameGraphCanvas({
 	searchEvent,
 	width = 1200,
 	height = 400,
@@ -444,4 +444,4 @@ export function FlameGraphCanvas({
 			<img src={base64IMG} alt="Flamegraph" />
 		</div>
 	);
-}
+});

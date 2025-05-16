@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, memo } from 'react';
 import {
 	ChevronDown,
 	ChevronRight,
@@ -74,7 +74,7 @@ export interface FileContextSectionProps {
 	onAIContextChange?: (callTreeContext: StandaloneCallTreeContext) => void;
 }
 
-export function FileContextSection({
+export const FileContextSection = memo(function FileContextSection({
 	currentFile,
 	isVisible,
 	traceAnalysis,
@@ -799,4 +799,4 @@ export function FileContextSection({
 			)}
 		</div>
 	);
-}
+});
