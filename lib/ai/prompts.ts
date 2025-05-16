@@ -285,7 +285,6 @@ Your task is to analyze this callframe and its surrounding context within the pe
 
 # Considerations
 * Keep your analysis concise and focused, highlighting only the most critical aspects for a software engineer.
-* Do not mention id of the callframe or the URL number in your response.
 * Whenever analyzing the callframes, pay attention to the URLs of each callframe and the calltree as a whole, but do not mention any chunk URL directly in your analysis. There may be some patterns and potential leads on where the biggest performance bottlenecks are by analyzing common URL sources for some common libraries recommations.
 * Whenever identifying a potential source of performance issues coming from a common URL source or pattern, provide recommendations that are specific to the identified source or pattern. Thought you can provide general recommendations, those recommendations might not have the same value as specific recommendations for specific sources or patterns.
   * For instance, when certain patterns come from a specific library (either identified from the URL, identified from the callframe name or context, or directly provided by the user), provide recommendations that are tailored to help mitigate the identified issue or suggest research points for the user to further investigate if you lack enough confidence on the identified issue.
@@ -296,8 +295,12 @@ Urls that contain certain patterns are known to come from some common libraries 
 
 - *_next/static/chunks/* - NextJS known build assets. some emerging patterns might give hints on react specific optimizations.
 
-**Important:** Do not use Top level headings (#) in your response. But create a well formatted markdown response based on your instructions and the data provided. Open up with a ## Trace events analysis
-**Important:** When mentioning duration times, be specific when refering to individual callframes duration or a total duration of a certain repeating function / callframe.
+**IMPORTANT:**
+* Do not use Top level headings (#) in your response. But create a well formatted markdown response based on your instructions and the data provided. Open up with a ## Trace events analysis
+* When mentioning duration times, be specific when refering to individual callframes duration or a total duration of a certain repeating function / callframe.
+* DO NOT mention id of the callframe or the url_number in your response directly, as that information is not relevant to the user. You can use the callframe name or the URL address referred from the list of all URLs when it makes sense to do so.
+  * Example of a wrong excerpt: "... pushing data to to a third party (URLs 2-5) ..."
+  * Example of a correct excerpt: "... pushing data to to a third party (a.thirdparty.com, b.thirdparty.com, c.thirdparty.com)..."
 
 ## Example session (simplified scenario, no library specific patterns)
 
@@ -456,13 +459,14 @@ Your task is to analyze this network activity and learn insights and emerging pa
 * When it comes to CSS and Fonts, it is better to preload and combine them into as few requests as possible than async loaded for better layout stability and render performance. However, css can be optimized by using the media attribute to only load certain styles for certain screen sizes.
 * Keep in mind that any networkGroupingEntryAssetCountEntryType that refers to JSON is most likely an API call to either fetch data for the page or submitting tracking events to third parties.
 * Do not wrap the whole response in a markdown fenced codeblock, only create the individual markdown sections as described
-* Do not mention any URLs on your report, refer simply to main domains for third party or simply as 'First party' for the first party requests.
+* Do not mention any full URLs on your report, refer simply to main domains for third party or simply as 'First party' for the first party requests.
 * Keep your analysis concise and focused, highlighting only the most critical aspects for a software engineer.
 * Build a report with structured sections, making it easier to read
 * Respond only with the report content, no opening remarks.
 * End the report with a brief summary and some suggested follow up questions or research topics for the user in a separate section. Suggested title: "Next steps"
 * As opening section for the report use the 'Largest Contentful Paint (LCP) network analysis' as a secondary heading
 * Don't use primary headings (#), only secondary and bellow.
+* **Important:** Don't use the character '~' to represent aproximation. Use 'aprox.' instead.
 
 ${grounding}
 `;
