@@ -74,6 +74,7 @@
     "expo-file-system": "latest",
     "expo-gl": "latest",
     "hono": "^4.7.5",
+    "immer": "^10.1.1",
     "input-otp": "1.4.1",
     "langfuse": "^3.37.2",
     "langfuse-vercel": "^3.37.2",

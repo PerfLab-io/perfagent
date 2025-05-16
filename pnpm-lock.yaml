@@ -136,10 +136,10 @@ importers:
         version: 1.0.4(react@19.0.0)
       '@react-three/drei':
         specifier: latest
-        version: 10.0.4(@react-three/fiber@9.1.0(a32e9438eb3cf2df5939f3a40fb68865))(@types/react@19.0.12)(@types/three@0.174.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)(three@0.174.0)
+        version: 10.0.4(@react-three/fiber@9.1.0(214e4cb6dc436bfae99314b245c451ab))(@types/react@19.0.12)(@types/three@0.174.0)(immer@10.1.1)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)(three@0.174.0)
       '@react-three/fiber':
         specifier: latest
-        version: 9.1.0(a32e9438eb3cf2df5939f3a40fb68865)
+        version: 9.1.0(214e4cb6dc436bfae99314b245c451ab)
       '@t3-oss/env-nextjs':
         specifier: ^0.12.0
         version: 0.12.0(typescript@5.8.2)(zod@3.24.2)
@@ -200,6 +200,9 @@ importers:
       hono:
         specifier: ^4.7.5
         version: 4.7.5
+      immer:
+        specifier: ^10.1.1
+        version: 10.1.1
       input-otp:
         specifier: 1.4.1
         version: 1.4.1(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
@@ -268,7 +271,7 @@ importers:
         version: 3.24.2
       zustand:
         specifier: ^5.0.4
-        version: 5.0.4(@types/react@19.0.12)(react@19.0.0)(use-sync-external-store@1.4.0(react@19.0.0))
+        version: 5.0.4(@types/react@19.0.12)(immer@10.1.1)(react@19.0.0)(use-sync-external-store@1.4.0(react@19.0.0))
     devDependencies:
       '@next/eslint-plugin-next':
         specifier: ^15.2.4
@@ -6386,6 +6389,9 @@ packages:
 
   immediate@3.0.6:
     resolution: {integrity: sha512-XXOFtyqDjNDAQxVfYxuF7g9Il/IbWmmlQg2MYKOH8ExIT1qg6xc4zyS3HaEEATgs1btfzxq15ciUiY7gjSXRGQ==}
+
+  immer@10.1.1:
+    resolution: {integrity: sha512-s2MPrmjovJcoMaHtx6K11Ra7oD05NT97w1IC5zpMkT6Atjr7H8LjaDd81iIxUYpMKSRRNMJE703M1Fhr/TctHw==}
 
   import-fresh@2.0.0:
     resolution: {integrity: sha512-eZ5H8rcgYazHbKC3PG4ClHNykCSxtAhxSSEM+2mb+7evD2CKF5V7c0dNum7AdpDh0ZdICwZY9sRSn8f+KH96sg==}
@@ -13496,12 +13502,12 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.0.12
 
-  '@react-three/drei@10.0.4(@react-three/fiber@9.1.0(a32e9438eb3cf2df5939f3a40fb68865))(@types/react@19.0.12)(@types/three@0.174.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)(three@0.174.0)':
+  '@react-three/drei@10.0.4(@react-three/fiber@9.1.0(214e4cb6dc436bfae99314b245c451ab))(@types/react@19.0.12)(@types/three@0.174.0)(immer@10.1.1)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)(three@0.174.0)':
     dependencies:
       '@babel/runtime': 7.26.10
       '@mediapipe/tasks-vision': 0.10.17
       '@monogrid/gainmap-js': 3.1.0(three@0.174.0)
-      '@react-three/fiber': 9.1.0(a32e9438eb3cf2df5939f3a40fb68865)
+      '@react-three/fiber': 9.1.0(214e4cb6dc436bfae99314b245c451ab)
       '@use-gesture/react': 10.3.1(react@19.0.0)
       camera-controls: 2.10.0(three@0.174.0)
       cross-env: 7.0.3
@@ -13518,10 +13524,10 @@ snapshots:
       three-mesh-bvh: 0.8.3(three@0.174.0)
       three-stdlib: 2.35.14(three@0.174.0)
       troika-three-text: 0.52.3(three@0.174.0)
-      tunnel-rat: 0.1.2(@types/react@19.0.12)(react@19.0.0)
+      tunnel-rat: 0.1.2(@types/react@19.0.12)(immer@10.1.1)(react@19.0.0)
       use-sync-external-store: 1.4.0(react@19.0.0)
       utility-types: 3.11.0
-      zustand: 5.0.4(@types/react@19.0.12)(react@19.0.0)(use-sync-external-store@1.4.0(react@19.0.0))
+      zustand: 5.0.4(@types/react@19.0.12)(immer@10.1.1)(react@19.0.0)(use-sync-external-store@1.4.0(react@19.0.0))
     optionalDependencies:
       react-dom: 19.0.0(react@19.0.0)
     transitivePeerDependencies:
@@ -13529,7 +13535,7 @@ snapshots:
       - '@types/three'
       - immer
 
-  '@react-three/fiber@9.1.0(a32e9438eb3cf2df5939f3a40fb68865)':
+  '@react-three/fiber@9.1.0(214e4cb6dc436bfae99314b245c451ab)':
     dependencies:
       '@babel/runtime': 7.26.10
       '@types/react-reconciler': 0.28.9(@types/react@19.0.12)
@@ -13544,7 +13550,7 @@ snapshots:
       suspend-react: 0.1.3(react@19.0.0)
       three: 0.174.0
       use-sync-external-store: 1.4.0(react@19.0.0)
-      zustand: 5.0.4(@types/react@19.0.12)(react@19.0.0)(use-sync-external-store@1.4.0(react@19.0.0))
+      zustand: 5.0.4(@types/react@19.0.12)(immer@10.1.1)(react@19.0.0)(use-sync-external-store@1.4.0(react@19.0.0))
     optionalDependencies:
       expo: 52.0.40(@babel/core@7.26.10)(@babel/preset-env@7.26.9(@babel/core@7.26.10))(react-native@0.78.1(@babel/core@7.26.10)(@babel/preset-env@7.26.9(@babel/core@7.26.10))(@types/react@19.0.12)(react@19.0.0))(react@19.0.0)
       expo-asset: 11.0.5(expo@52.0.40(@babel/core@7.26.10)(@babel/preset-env@7.26.9(@babel/core@7.26.10))(react-native@0.78.1(@babel/core@7.26.10)(@babel/preset-env@7.26.9(@babel/core@7.26.10))(@types/react@19.0.12)(react@19.0.0))(react@19.0.0))(react-native@0.78.1(@babel/core@7.26.10)(@babel/preset-env@7.26.9(@babel/core@7.26.10))(@types/react@19.0.12)(react@19.0.0))(react@19.0.0)
@@ -16593,6 +16599,8 @@ snapshots:
 
   immediate@3.0.6: {}
 
+  immer@10.1.1: {}
+
   import-fresh@2.0.0:
     dependencies:
       caller-path: 2.0.0
@@ -19273,9 +19281,9 @@ snapshots:
     dependencies:
       safe-buffer: 5.2.1
 
-  tunnel-rat@0.1.2(@types/react@19.0.12)(react@19.0.0):
+  tunnel-rat@0.1.2(@types/react@19.0.12)(immer@10.1.1)(react@19.0.0):
     dependencies:
-      zustand: 4.5.6(@types/react@19.0.12)(react@19.0.0)
+      zustand: 4.5.6(@types/react@19.0.12)(immer@10.1.1)(react@19.0.0)
     transitivePeerDependencies:
       - '@types/react'
       - immer
@@ -19702,16 +19710,18 @@ snapshots:
 
   zod@3.24.2: {}
 
-  zustand@4.5.6(@types/react@19.0.12)(react@19.0.0):
+  zustand@4.5.6(@types/react@19.0.12)(immer@10.1.1)(react@19.0.0):
     dependencies:
       use-sync-external-store: 1.4.0(react@19.0.0)
     optionalDependencies:
       '@types/react': 19.0.12
+      immer: 10.1.1
       react: 19.0.0
 
-  zustand@5.0.4(@types/react@19.0.12)(react@19.0.0)(use-sync-external-store@1.4.0(react@19.0.0)):
+  zustand@5.0.4(@types/react@19.0.12)(immer@10.1.1)(react@19.0.0)(use-sync-external-store@1.4.0(react@19.0.0)):
     optionalDependencies:
       '@types/react': 19.0.12
+      immer: 10.1.1
       react: 19.0.0
       use-sync-external-store: 1.4.0(react@19.0.0)
 
