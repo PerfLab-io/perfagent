@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowRight, Eye, EyeOff, Lock, User } from 'lucide-react';
 import type React from 'react';
 import { useState } from 'react';
+import { login } from '@/app/actions/login';
 
 export default function LoginPage() {
 	const [email, setEmail] = useState('');
@@ -21,22 +22,18 @@ export default function LoginPage() {
 		setLoginStep('authenticating');
 		setErrorMessage('');
 
-		// Simulate authentication
-		setTimeout(() => {
-			if (email === 'admin@perfagent.dev' && password === 'password123') {
-				setLoginStep('success');
-				setTimeout(() => {
-					// Redirect to dashboard or home
-					window.location.href = '/';
-				}, 2000);
-			} else {
-				setLoginStep('error');
-				setErrorMessage(
-					'Invalid credentials. Try admin@perfagent.dev / password123',
-				);
-			}
+		const user = await login(email, password);
+
+		if (!user) {
+			setLoginStep('error');
+			setErrorMessage('Invalid credentials');
 			setIsLoading(false);
-		}, 2000);
+			return;
+		}
+
+		setLoginStep('success');
+		setIsLoading(false);
+		return;
 	};
 
 	return (
