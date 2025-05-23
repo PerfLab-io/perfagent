@@ -3,7 +3,7 @@
 import { Separator } from '@/components/ui/separator';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { FilePenIcon, Paperclip, PencilIcon, PenIcon } from 'lucide-react';
+import { FilePenIcon } from 'lucide-react';
 import { useCallback, useRef } from 'react';
 import { Input } from './ui/input';
 import { useUIStore } from '@/lib/stores';
@@ -24,13 +24,6 @@ export function SiteHeader() {
 		},
 		[setIsEditing],
 	);
-
-	const startEditing = useCallback(() => {
-		setIsEditing(true);
-		setTimeout(() => {
-			inputRef.current?.focus();
-		}, 0);
-	}, [setIsEditing]);
 
 	// Either display the title as text or as an input field when editing
 	return (
