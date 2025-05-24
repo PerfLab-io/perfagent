@@ -17,7 +17,7 @@ import { FileContextSection } from '@/components/trace-details';
 import { analyseInsightsForCWV } from '@/lib/insights';
 import { DataStreamHandler } from '@/components/data-stream-handler';
 import type { StandaloneCallTreeContext } from '@perflab/trace_engine/panels/ai_assistance/standalone';
-import { useSerializationWorker } from '@/app/hooks/useSerializationWorker';
+import { useSerializationWorker } from '@/lib/hooks/useSerializationWorker';
 import useSWR from 'swr';
 import { useScrollToBottom } from '@/lib/hooks/use-scroll-to-bottom';
 import { useChatStore } from '@/lib/stores';
