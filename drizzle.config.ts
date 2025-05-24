@@ -9,6 +9,9 @@ export default defineConfig({
 	dbCredentials: {
 		url: serverEnv.DB_URL,
 	},
+	migrations: {
+		schema: 'public', // used in PostgreSQL only, `drizzle` by default
+	},
 	// Print all statements
 	verbose: true,
 	// Always ask for confirmation
