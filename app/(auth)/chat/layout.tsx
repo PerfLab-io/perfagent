@@ -1,5 +1,5 @@
 import type React from 'react';
-import '../globals.css';
+import '@/app/globals.css';
 import './chat.css';
 import { SidebarInset } from '@/components/ui/sidebar';
 import { SidebarProvider } from '@/components/ui/sidebar';
