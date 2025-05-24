@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowRight, Eye, EyeOff, Lock, User } from 'lucide-react';
 import type React from 'react';
 import { useState } from 'react';
-import { login } from '@/app/actions/login';
+import { checkAgentAccess, login } from '@/app/actions/login';
 
 export default function LoginPage() {
 	const [email, setEmail] = useState('');
@@ -27,6 +27,17 @@ export default function LoginPage() {
 		if (!user) {
 			setLoginStep('error');
 			setErrorMessage('Invalid credentials');
+			setIsLoading(false);
+			return;
+		}
+
+		const hasAccess = await checkAgentAccess(user.id);
+
+		if (!hasAccess) {
+			setLoginStep('error');
+			setErrorMessage(
+				'You do not yet have access to the system. Please ensure to signup to the waitlist and wait for an invite.',
+			);
 			setIsLoading(false);
 			return;
 		}
