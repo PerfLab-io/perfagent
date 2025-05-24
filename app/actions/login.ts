@@ -1,17 +1,18 @@
 'use server';
 
 import { db } from '@/drizzle/db';
-import { user, password as passwordTable } from '@/drizzle/schema';
-import bcrypt from 'bcryptjs';
-import { eq, and, or, SQL } from 'drizzle-orm';
-import { parsePermissionString, PermissionString } from '@/lib/user';
-
 import {
-	permission,
+	user,
+	password as passwordTable,
 	role,
 	roleToUser,
 	permissionToRole,
+	permission,
 } from '@/drizzle/schema';
+import bcrypt from 'bcryptjs';
+import { eq, and, or, SQL } from 'drizzle-orm';
+import { parsePermissionString, type PermissionString } from '@/lib/user';
+import { createSession } from '@/lib/session';
 
 export async function login(email: string, password: string) {
 	try {
@@ -40,6 +41,9 @@ export async function login(email: string, password: string) {
 		if (!isValid) {
 			return null;
 		}
+
+		// Create session for authenticated user
+		await createSession(userWithPassword.user.id);
 
 		return userWithPassword.user;
 	} catch (error) {
