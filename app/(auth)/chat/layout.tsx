@@ -7,6 +7,8 @@ import { AppSidebar } from '@/components/app-sidebar';
 import { SiteHeader } from '@/components/site-header';
 import { Metadata } from 'next';
 import { cookies } from 'next/headers';
+import { requireUserWithRole, SessionData } from '@/lib/session';
+import { redirect } from 'next/navigation';
 
 export const metadata: Metadata = {
 	title: 'PerfAgent - Agent insights for web performance',
@@ -19,6 +21,13 @@ export default async function AiChatLayout({
 }: {
 	children: React.ReactNode;
 }) {
+	let user: SessionData | null = null;
+	try {
+		user = await requireUserWithRole('agent-user');
+	} catch (error) {
+		console.error(error);
+		return redirect('/login');
+	}
 	// Read the sidebar cookie from the server
 	const cookieStore = await cookies();
 	const sidebarCookie = cookieStore.get('sidebar:state');
@@ -26,7 +35,7 @@ export default async function AiChatLayout({
 
 	return (
 		<>
-			<SidebarProvider open={sidebarOpen}>
+			<SidebarProvider open={sidebarOpen} user={user}>
 				<AppSidebar variant="inset" />
 				<SidebarInset>
 					<SiteHeader />
