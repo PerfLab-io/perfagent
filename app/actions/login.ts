@@ -19,8 +19,6 @@ export async function login(email: string, password: string) {
 			.where(eq(user.email, email))
 			.limit(1);
 
-		console.log(result);
-
 		const userWithPassword = result[0];
 		if (!userWithPassword?.user) {
 			return null;
