@@ -13,6 +13,7 @@ import bcrypt from 'bcryptjs';
 import { eq, and, or, SQL } from 'drizzle-orm';
 import { parsePermissionString, type PermissionString } from '@/lib/user';
 import { createSession } from '@/lib/session';
+import { deleteSession } from '@/lib/session';
 
 export async function login(email: string, password: string) {
 	try {
@@ -166,4 +167,19 @@ export async function grantRole(
  */
 export async function checkAgentAccess(userId: string) {
 	return canReadOwnAgents(userId);
+}
+
+/**
+ * Log out the current user by deleting their session
+ * @returns Promise<boolean> True if logout was successful
+ */
+export async function logout(): Promise<boolean> {
+	try {
+		await deleteSession();
+		console.log('User logged out successfully');
+		return true;
+	} catch (error) {
+		console.error('Error during logout:', error);
+		return false;
+	}
 }
