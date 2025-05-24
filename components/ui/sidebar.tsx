@@ -18,6 +18,7 @@ import {
 	TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useUIStore } from '@/lib/stores';
+import { SessionData } from '@/lib/session';
 
 const SIDEBAR_WIDTH = '16rem';
 const SIDEBAR_WIDTH_MOBILE = '18rem';
@@ -32,6 +33,7 @@ type SidebarContext = {
 	setOpenMobile: (open: boolean) => void;
 	isMobile: boolean;
 	toggleSidebar: () => void;
+	user?: SessionData;
 };
 
 const SidebarContext = React.createContext<SidebarContext | null>(null);
@@ -50,6 +52,7 @@ const SidebarProvider = React.forwardRef<
 	React.ComponentProps<'div'> & {
 		open?: boolean;
 		onOpenChange?: (open: boolean) => void;
+		user?: SessionData;
 	}
 >(
 	(
@@ -59,6 +62,7 @@ const SidebarProvider = React.forwardRef<
 			className,
 			style,
 			children,
+			user,
 			...props
 		},
 		ref,
@@ -117,6 +121,7 @@ const SidebarProvider = React.forwardRef<
 				openMobile: sidebarOpenMobile,
 				setOpenMobile: setSidebarOpenMobile,
 				toggleSidebar,
+				user,
 			}),
 			[
 				state,
@@ -126,6 +131,7 @@ const SidebarProvider = React.forwardRef<
 				sidebarOpenMobile,
 				setSidebarOpenMobile,
 				toggleSidebar,
+				user,
 			],
 		);
 

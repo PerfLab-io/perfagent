@@ -24,16 +24,9 @@ import {
 	SidebarMenuItem,
 	useSidebar,
 } from '@/components/ui/sidebar';
+import { SessionData } from '@/lib/session';
 
-export function NavUser({
-	user,
-}: {
-	user: {
-		name: string;
-		email: string;
-		avatar: string;
-	};
-}) {
+export function NavUser({ user }: { user: SessionData }) {
 	const { isMobile } = useSidebar();
 
 	return (
@@ -43,18 +36,21 @@ export function NavUser({
 					<DropdownMenuTrigger asChild>
 						<SidebarMenuButton
 							size="lg"
-							className="border-sidebar-accent-foreground text-sidebar-accent-foreground border border-dashed bg-peppermint-100 data-[state=open]:border-solid"
+							className="border-sidebar-accent-foreground text-sidebar-accent-foreground bg-peppermint-100 border border-dashed data-[state=open]:border-solid"
 						>
 							<Avatar className="h-8 w-8 rounded-lg grayscale">
-								<AvatarImage src={user.avatar} alt={user.name} />
-								<AvatarFallback className="rounded-lg bg-primary-foreground text-primary">
+								<AvatarImage
+									src="https://github.com/perflab-io.png"
+									alt={user.user?.name ?? ''}
+								/>
+								<AvatarFallback className="bg-primary-foreground text-primary rounded-lg">
 									VD
 								</AvatarFallback>
 							</Avatar>
 							<div className="grid flex-1 text-left text-sm leading-tight">
-								<span className="truncate font-medium">{user.name}</span>
-								<span className="truncate text-xs text-muted-foreground">
-									{user.email}
+								<span className="truncate font-medium">{user.user?.name}</span>
+								<span className="text-muted-foreground truncate text-xs">
+									{user.user?.email}
 								</span>
 							</div>
 							<MoreVerticalIcon className="ml-auto size-4" />
@@ -69,13 +65,18 @@ export function NavUser({
 						<DropdownMenuLabel className="p-0 font-normal">
 							<div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
 								<Avatar className="h-8 w-8 rounded-lg">
-									<AvatarImage src={user.avatar} alt={user.name} />
+									<AvatarImage
+										src="https://github.com/perflab-io.png"
+										alt={user.user?.name ?? ''}
+									/>
 									<AvatarFallback className="rounded-lg">VD</AvatarFallback>
 								</Avatar>
 								<div className="grid flex-1 text-left text-sm leading-tight">
-									<span className="truncate font-medium">{user.name}</span>
-									<span className="truncate text-xs text-muted-foreground">
-										{user.email}
+									<span className="truncate font-medium">
+										{user.user?.name}
+									</span>
+									<span className="text-muted-foreground truncate text-xs">
+										{user.user?.email}
 									</span>
 								</div>
 							</div>
