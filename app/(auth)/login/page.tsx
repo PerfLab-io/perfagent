@@ -5,6 +5,7 @@ import { ArrowRight, Eye, EyeOff, Lock, User } from 'lucide-react';
 import type React from 'react';
 import { useState } from 'react';
 import { checkAgentAccess, login } from '@/app/actions/login';
+import { redirect } from 'next/navigation';
 
 export default function LoginPage() {
 	const [email, setEmail] = useState('');
@@ -44,7 +45,12 @@ export default function LoginPage() {
 
 		setLoginStep('success');
 		setIsLoading(false);
-		return;
+
+		requestAnimationFrame(() => {
+			setTimeout(() => {
+				redirect('/chat');
+			}, 300);
+		});
 	};
 
 	return (
