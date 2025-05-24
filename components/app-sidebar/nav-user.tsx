@@ -7,6 +7,7 @@ import {
 	MoreVerticalIcon,
 	UserCircleIcon,
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -25,9 +26,27 @@ import {
 	useSidebar,
 } from '@/components/ui/sidebar';
 import { SessionData } from '@/lib/session';
+import { logout } from '@/app/actions/login';
 
 export function NavUser({ user }: { user: SessionData }) {
 	const { isMobile } = useSidebar();
+	const router = useRouter();
+
+	const handleLogout = async () => {
+		try {
+			const success = await logout();
+			if (success) {
+				router.push('/');
+				router.refresh(); // Refresh to update UI state
+			} else {
+				console.error('Logout failed');
+				// Optionally show a toast notification here
+			}
+		} catch (error) {
+			console.error('Error during logout:', error);
+			// Optionally show an error message to the user
+		}
+	};
 
 	return (
 		<SidebarMenu>
@@ -97,7 +116,7 @@ export function NavUser({ user }: { user: SessionData }) {
 							</DropdownMenuItem>
 						</DropdownMenuGroup>
 						<DropdownMenuSeparator />
-						<DropdownMenuItem>
+						<DropdownMenuItem onClick={handleLogout}>
 							<LogOutIcon />
 							Log out
 						</DropdownMenuItem>
