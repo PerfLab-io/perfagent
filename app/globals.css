@@ -1,139 +1,363 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+@source '../*.{ts,tsx}';
+@source '../*.{js,ts,jsx,tsx,mdx}';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --color-merino-50: hsl(var(--merino-50));
+  --color-merino-100: hsl(var(--merino-100));
+  --color-merino-200: hsl(var(--merino-200));
+  --color-merino-300: hsl(var(--merino-300));
+  --color-merino-400: hsl(var(--merino-400));
+  --color-merino-500: hsl(var(--merino-500));
+  --color-merino-600: hsl(var(--merino-600));
+  --color-merino-700: hsl(var(--merino-700));
+  --color-merino-800: hsl(var(--merino-800));
+  --color-merino-900: hsl(var(--merino-900));
+  --color-merino-950: hsl(var(--merino-950));
+
+  --color-peppermint-25: hsl(var(--peppermint-25));
+  --color-peppermint-50: hsl(var(--peppermint-50));
+  --color-peppermint-100: hsl(var(--peppermint-100));
+  --color-peppermint-200: hsl(var(--peppermint-200));
+  --color-peppermint-300: hsl(var(--peppermint-300));
+  --color-peppermint-400: hsl(var(--peppermint-400));
+  --color-peppermint-500: hsl(var(--peppermint-500));
+  --color-peppermint-600: hsl(var(--peppermint-600));
+  --color-peppermint-700: hsl(var(--peppermint-700));
+  --color-peppermint-800: hsl(var(--peppermint-800));
+  --color-peppermint-900: hsl(var(--peppermint-900));
+  --color-peppermint-950: hsl(var(--peppermint-950));
+
+  --color-midnight-50: hsl(var(--midnight-50));
+  --color-midnight-100: hsl(var(--midnight-100));
+  --color-midnight-200: hsl(var(--midnight-200));
+  --color-midnight-300: hsl(var(--midnight-300));
+  --color-midnight-400: hsl(var(--midnight-400));
+  --color-midnight-500: hsl(var(--midnight-500));
+  --color-midnight-600: hsl(var(--midnight-600));
+  --color-midnight-700: hsl(var(--midnight-700));
+  --color-midnight-800: hsl(var(--midnight-800));
+  --color-midnight-900: hsl(var(--midnight-900));
+  --color-midnight-950: hsl(var(--midnight-950));
+
+  --color-sidebar: hsl(var(--peppermint-200));
+  --color-sidebar-foreground: hsl(var(--peppermint-950));
+  --color-sidebar-primary: hsl(var(--peppermint-500));
+  --color-sidebar-primary-foreground: hsl(var(--peppermint-50));
+  --color-sidebar-accent: hsl(var(--peppermint-100));
+  --color-sidebar-accent-foreground: hsl(var(--peppermint-700));
+  --color-sidebar-border: hsl(var(--peppermint-500));
+  --color-sidebar-ring: hsl(var(--peppermint-50));
+
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-background: hsl(var(--bg-color));
+  --color-foreground: hsl(var(--text-color));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-accent: hsl(var(--accent-color));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+
+  --color-card: hsl(var(--card-bg));
+  --color-card-foreground: hsl(var(--text-color));
+
+  --color-base: hsl(var(--text-color));
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+}
+
+@utility container {
+  margin-inline: auto;
+  padding-inline: 2rem;
+  @media (width >= --theme(--breakpoint-sm)) {
+    max-width: none;
+  }
+  @media (width >= 1400px) {
+    max-width: 1400px;
+  }
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
 
 @layer base {
-  :root {
-    /* Peppermint palette */
-    --peppermint-50: 120 65% 97%;
-    --peppermint-100: 123 71% 95%;
-    --peppermint-200: 122 66% 85%;
-    --peppermint-300: 124 65% 73%;
-    --peppermint-400: 124 59% 58%;
-    --peppermint-500: 124 60% 45%;
-    --peppermint-600: 125 64% 36%;
-    --peppermint-700: 125 61% 29%;
-    --peppermint-800: 124 54% 24%;
-    --peppermint-900: 126 51% 20%;
-    --peppermint-950: 129 69% 10%;
+	:root {
+		/* Peppermint palette */
+		--peppermint-50: 120 65% 97%;
+		--peppermint-100: 123 71% 95%;
+		--peppermint-200: 122 66% 85%;
+		--peppermint-300: 124 65% 73%;
+		--peppermint-400: 124 59% 58%;
+		--peppermint-500: 124 60% 45%;
+		--peppermint-600: 125 64% 36%;
+		--peppermint-700: 125 61% 29%;
+		--peppermint-800: 124 54% 24%;
+		--peppermint-900: 126 51% 20%;
+		--peppermint-950: 129 69% 10%;
 
-    /* Merino palette */
-    --merino-50: 37 45% 94%;
-    --merino-100: 37 43% 92%;
-    --merino-200: 35 44% 83%;
-    --merino-300: 34 43% 72%;
-    --merino-400: 30 43% 61%;
-    --merino-500: 28 42% 53%;
-    --merino-600: 24 41% 48%;
-    --merino-700: 21 40% 40%;
-    --merino-800: 19 35% 34%;
-    --merino-900: 19 34% 28%;
-    --merino-950: 16 35% 15%;
+		/* Merino palette */
+		--merino-50: 37 45% 94%;
+		--merino-100: 37 43% 92%;
+		--merino-200: 35 44% 83%;
+		--merino-300: 34 43% 72%;
+		--merino-400: 30 43% 61%;
+		--merino-500: 28 42% 53%;
+		--merino-600: 24 41% 48%;
+		--merino-700: 21 40% 40%;
+		--merino-800: 19 35% 34%;
+		--merino-900: 19 34% 28%;
+		--merino-950: 16 35% 15%;
 
-    /* Midnight palette */
+		/* Midnight palette */
+		--midnight-50: 212 100% 97%;
+		--midnight-100: 210 100% 94%;
+		--midnight-200: 213 100% 89%;
+		--midnight-300: 214 98% 82%;
+		--midnight-400: 219 94% 74%;
+		--midnight-500: 223 87% 67%;
+		--midnight-600: 228 79% 59%;
+		--midnight-700: 229 60% 51%;
+		--midnight-800: 229 57% 41%;
+		--midnight-900: 227 50% 34%;
+		--midnight-950: 228 49% 12%;
 
-    /* Midnight palette */
-    --midnight-50: 212 100% 97%;
-    --midnight-100: 210 100% 94%;
-    --midnight-200: 213 100% 89%;
-    --midnight-300: 214 98% 82%;
-    --midnight-400: 219 94% 74%;
-    --midnight-500: 223 87% 67%;
-    --midnight-600: 228 79% 59%;
-    --midnight-700: 229 60% 51%;
-    --midnight-800: 229 57% 41%;
-    --midnight-900: 227 50% 34%;
-    --midnight-950: 228 49% 12%;
+		--card: var(--midnight-50);
+		--card-foreground: var(--midnight-900);
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+		--popover: 0 0% 100%; /* white */
+		--popover-foreground: var(--merino-900);
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+		--primary: var(--peppermint-200);
+		--primary-foreground: var(--peppermint-900);
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+		--secondary: var(--midnight-200);
+		--secondary-foreground: var(--midnight-900);
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+		--muted: 0 0% 96.1%; /* gray */
+		--muted-foreground: 0 0% 45.1%; /* gray */
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+		--accent: var(--merino-200);
+		--accent-foreground: var(--merino-900);
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+		--destructive: 0 84.2% 60.2%;
+		--destructive-foreground: 210 40% 98%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+		--border: var(--peppermint-950);
+		--input: 214.3 31.8% 91.4%;
+		--ring: 222.2 84% 4.9%;
 
-    --border: var(--midnight-950);
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+		--radius: 0.5rem;
 
-    --radius: 0.5rem;
-  }
+		/* Use peppermint-25 for background */
+		--bg-color: var(--peppermint-50);
+		/* Use peppermint-950 for text */
+		--text-color: var(--peppermint-950);
+		/* Use merino-200 for accent */
+		--accent-color: var(--merino-200);
+		/* Use white for card background */
+		--card-bg: 0 0% 100%;
+		/* Use peppermint-400 for border */
+		--border-color: var(--peppermint-950);
+	}
 
-  .dark {
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+	.dark {
+		--card: 222.2 84% 4.9%;
+		--card-foreground: 210 40% 98%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+		--popover: 222.2 84% 4.9%;
+		--popover-foreground: 210 40% 98%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+		--primary: 210 40% 98%;
+		--primary-foreground: var(--merino-900);
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+		--secondary: 217.2 32.6% 17.5%;
+		--secondary-foreground: 210 40% 98%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+		--muted: 217.2 32.6% 17.5%;
+		--muted-foreground: 215 20.2% 65.1%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+		--accent: 217.2 32.6% 17.5%;
+		--accent-foreground: 210 40% 98%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+		--destructive: 0 62.8% 30.6%;
+		--destructive-foreground: 210 40% 98%;
 
-    --border: var(--merino-200);
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-  }
+		--border: var(--merino-200);
+		--input: 217.2 32.6% 17.5%;
+		--ring: 212.7 26.8% 83.9%;
+
+		/* Use peppermint-950 for background (dark green) */
+		--bg-color: var(--peppermint-950);
+		/* Use merino-50 for text (light cream) */
+		--text-color: var(--merino-50);
+		/* Use merino-600 for accent (darker tan) */
+		--accent-color: var(--merino-600);
+		/* Use peppermint-50 for card background (light green) instead of midnight */
+		--card-bg: var(--peppermint-50);
+		/* Use merino-200 for border (light tan) */
+		--border-color: var(--merino-200);
+	}
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
+	* {
+		@apply border-border;
+	}
+	body {
+		@apply bg-background text-foreground;
+	}
 }
 
-/* Light mode */
-:root {
-  /* Use peppermint-25 for background */
-  --bg-color: var(--peppermint-25);
-  /* Use midnight-950 for text */
-  --text-color: var(--midnight-950);
-  /* Use merino-200 for accent */
-  --accent-color: var(--merino-200);
-  /* Use white for card background */
-  --card-bg: 0 0% 100%;
-  /* Use midnight-950 for border */
-  --border-color: var(--midnight-950);
+/* Add these keyframe animations to the existing globals.css file */
+
+@keyframes bounce {
+	0%,
+	100% {
+		transform: translateY(0);
+	}
+	50% {
+		transform: translateY(-10px);
+	}
 }
 
-/* Dark mode */
-.dark {
-  /* Use peppermint-950 for background (dark green) */
-  --bg-color: var(--peppermint-950);
-  /* Use merino-50 for text (light cream) */
-  --text-color: var(--merino-50);
-  /* Use merino-600 for accent (darker tan) */
-  --accent-color: var(--merino-600);
-  /* Use peppermint-50 for card background (light green) instead of midnight */
-  --card-bg: var(--peppermint-50);
-  /* Use merino-200 for border (light tan) */
-  --border-color: var(--merino-200);
+@keyframes pulse-border {
+	0%,
+	100% {
+		border-color: hsl(var(--peppermint-300));
+	}
+	50% {
+		border-color: hsl(var(--peppermint-500));
+	}
+}
+
+@keyframes zoom-in-out {
+	0%,
+	100% {
+		transform: scale(1);
+	}
+	50% {
+		transform: scale(1.1);
+	}
+}
+
+@keyframes spin-slow {
+	0% {
+		transform: rotate(0deg);
+	}
+	25% {
+		transform: rotate(-15deg);
+	}
+	75% {
+		transform: rotate(15deg);
+	}
+	100% {
+		transform: rotate(0deg);
+	}
+}
+
+/* Add these to the existing animations in the file */
+.animate-bounce {
+	animation: bounce 1s infinite ease-in-out;
+}
+
+.animate-pulse-border {
+	animation: pulse-border 2s infinite ease-in-out;
+}
+
+.animate-zoom-in-out {
+	animation: zoom-in-out 2s infinite ease-in-out;
+}
+
+.animate-spin-slow {
+	animation: spin-slow 1.5s infinite ease-in-out;
+}
+
+/* Remove the container query section and replace with this */
+@media (max-width: 640px) {
+	.report-button-text {
+		display: none;
+	}
+
+	.report-button-icon-only {
+		padding: 0.5rem;
+		height: 2rem;
+	}
+}
+
+/* Report button responsive behavior */
+.report-button {
+	transition: all 0.3s ease;
+}
+
+.report-button-text {
+	transition: all 0.3s ease;
+	flex-shrink: 1;
+}
+
+/* When the panel is active (showing the report), hide the button text */
+.panel-active .report-button-text {
+	max-width: 0;
+	opacity: 0;
+	margin: 0;
+	padding: 0;
+}
+
+/* When the panel is active, adjust the button to be more compact */
+.panel-active .report-button {
+	padding-left: 0.5rem;
+	padding-right: 0.5rem;
+	min-width: 32px;
+	gap: 0.25rem;
+}
+
+/* Media query for small screens */
+@media (max-width: 768px) {
+	.report-button-text {
+		max-width: 0;
+		opacity: 0;
+		margin: 0;
+		padding: 0;
+	}
+
+	.report-button {
+		padding-left: 0.5rem;
+		padding-right: 0.5rem;
+		min-width: 32px;
+		gap: 0.25rem;
+	}
 }

@@ -1,21 +1,21 @@
 {
-  "name": "PerfAgent - AI-Powered Web Performance Analysis",
-  "short_name": "PerfAgent",
-  "description": "Get expert insights on Core Web Vitals and performance optimization from an AI specialized in web performance analysis.",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#1a2b34",
-  "theme_color": "#4ade80",
-  "icons": [
-    {
-      "src": "/favicons/android-chrome-192x192.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "/favicons/android-chrome-512x512.png",
-      "sizes": "512x512",
-      "type": "image/png"
-    }
-  ]
+	"name": "PerfAgent - AI-Powered Web Performance Analysis",
+	"short_name": "PerfAgent",
+	"description": "Get expert insights on Core Web Vitals and performance optimization from an AI specialized in web performance analysis.",
+	"start_url": "/",
+	"display": "standalone",
+	"background_color": "#1a2b34",
+	"theme_color": "#4ade80",
+	"icons": [
+		{
+			"src": "/favicons/android-chrome-192x192.png",
+			"sizes": "192x192",
+			"type": "image/png"
+		},
+		{
+			"src": "/favicons/android-chrome-512x512.png",
+			"sizes": "512x512",
+			"type": "image/png"
+		}
+	]
 }
