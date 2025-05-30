@@ -14,11 +14,10 @@ import { eq, and, or, SQL } from 'drizzle-orm';
 import { parsePermissionString, type PermissionString } from '@/lib/user';
 import { createSession } from '@/lib/session';
 import { deleteSession } from '@/lib/session';
+import crypto from 'crypto';
 
 export async function login(email: string, password: string) {
 	try {
-		console.log('login', email, password);
-
 		const result = await db
 			.select({
 				user: user,
@@ -31,7 +30,10 @@ export async function login(email: string, password: string) {
 
 		const userWithPassword = result[0];
 		if (!userWithPassword?.user) {
-			return null;
+			return {
+				user: null,
+				hasAccess: false,
+			};
 		}
 
 		const isValid = await bcrypt.compare(
@@ -40,16 +42,34 @@ export async function login(email: string, password: string) {
 		);
 
 		if (!isValid) {
-			return null;
+			return {
+				user: null,
+				hasAccess: false,
+			};
+		}
+
+		const hasAccess = await checkAgentAccess(userWithPassword.user.id);
+
+		if (!hasAccess) {
+			return {
+				user: userWithPassword.user,
+				hasAccess: false,
+			};
 		}
 
 		// Create session for authenticated user
 		await createSession(userWithPassword.user.id);
 
-		return userWithPassword.user;
+		return {
+			user: userWithPassword.user,
+			hasAccess: true,
+		};
 	} catch (error) {
 		console.log('error', error);
-		return null;
+		return {
+			user: null,
+			hasAccess: false,
+		};
 	}
 }
 
@@ -180,6 +200,194 @@ export async function logout(): Promise<boolean> {
 		return true;
 	} catch (error) {
 		console.error('Error during logout:', error);
+		return false;
+	}
+}
+
+/**
+ * Create a new role with specified permissions
+ * @param roleName The name of the role to create (e.g., 'content-manager')
+ * @param permissionStrings Array of permission strings to assign to the role (e.g., ['read:agent:own', 'write:agent:own'])
+ * @returns Promise<boolean> True if role and permissions were created successfully
+ */
+export async function createRoleWithPermissions(
+	roleName: string,
+	permissionStrings: PermissionString[],
+): Promise<boolean> {
+	try {
+		// Check if role already exists
+		const existingRole = await db
+			.select({
+				id: role.id,
+				name: role.name,
+			})
+			.from(role)
+			.where(eq(role.name, roleName))
+			.limit(1);
+
+		let roleId: string;
+
+		if (existingRole.length === 0) {
+			// Create new role with required fields
+			const newRole = await db
+				.insert(role)
+				.values({
+					id: crypto.randomUUID(),
+					name: roleName,
+					description: `Auto-generated role: ${roleName}`,
+					createdAt: new Date().toISOString(),
+					updatedAt: new Date().toISOString(),
+				})
+				.returning({ id: role.id });
+
+			roleId = newRole[0].id;
+			console.log(`Role created: ${roleName} with id ${roleId}`);
+		} else {
+			roleId = existingRole[0].id;
+			console.log(`Role already exists: ${roleName} with id ${roleId}`);
+		}
+
+		// Process each permission string
+		for (const permissionString of permissionStrings) {
+			const { action, entity, access } =
+				parsePermissionString(permissionString);
+
+			// Handle access conditions for permission creation
+			if (access && access.length > 0) {
+				// Create separate permissions for each access level
+				for (const accessLevel of access) {
+					const accessConditions = [
+						eq(permission.action, action),
+						eq(permission.entity, entity),
+						eq(permission.access, accessLevel),
+					];
+
+					const existingPermission = await db
+						.select({
+							id: permission.id,
+						})
+						.from(permission)
+						.where(and(...accessConditions))
+						.limit(1);
+
+					let permissionId: string;
+
+					if (existingPermission.length === 0) {
+						// Create new permission with all required fields
+						const newPermission = await db
+							.insert(permission)
+							.values({
+								id: crypto.randomUUID(),
+								action,
+								entity,
+								access: accessLevel,
+								description: `Auto-generated permission: ${action}:${entity}:${accessLevel}`,
+								createdAt: new Date().toISOString(),
+								updatedAt: new Date().toISOString(),
+							})
+							.returning({ id: permission.id });
+
+						permissionId = newPermission[0].id;
+						console.log(
+							`Permission created: ${action}:${entity}:${accessLevel} with id ${permissionId}`,
+						);
+					} else {
+						permissionId = existingPermission[0].id;
+					}
+
+					// Link permission to role if not already linked
+					const existingLink = await db
+						.select()
+						.from(permissionToRole)
+						.where(
+							and(
+								eq(permissionToRole.a, permissionId),
+								eq(permissionToRole.b, roleId),
+							),
+						)
+						.limit(1);
+
+					if (existingLink.length === 0) {
+						await db.insert(permissionToRole).values({
+							a: permissionId,
+							b: roleId,
+						});
+						console.log(
+							`Permission ${action}:${entity}:${accessLevel} linked to role ${roleName}`,
+						);
+					}
+				}
+			} else {
+				// Handle permission without access (default to empty string for access)
+				const whereConditions = [
+					eq(permission.action, action),
+					eq(permission.entity, entity),
+					eq(permission.access, ''), // Default to empty string for access
+				];
+
+				const existingPermission = await db
+					.select({
+						id: permission.id,
+					})
+					.from(permission)
+					.where(and(...whereConditions))
+					.limit(1);
+
+				let permissionId: string;
+
+				if (existingPermission.length === 0) {
+					// Create new permission with all required fields
+					const newPermission = await db
+						.insert(permission)
+						.values({
+							id: crypto.randomUUID(),
+							action,
+							entity,
+							access: '', // Default to empty string for access
+							description: `Auto-generated permission: ${action}:${entity}`,
+							createdAt: new Date().toISOString(),
+							updatedAt: new Date().toISOString(),
+						})
+						.returning({ id: permission.id });
+
+					permissionId = newPermission[0].id;
+					console.log(
+						`Permission created: ${action}:${entity} with id ${permissionId}`,
+					);
+				} else {
+					permissionId = existingPermission[0].id;
+				}
+
+				// Link permission to role if not already linked
+				const existingLink = await db
+					.select()
+					.from(permissionToRole)
+					.where(
+						and(
+							eq(permissionToRole.a, permissionId),
+							eq(permissionToRole.b, roleId),
+						),
+					)
+					.limit(1);
+
+				if (existingLink.length === 0) {
+					await db.insert(permissionToRole).values({
+						a: permissionId,
+						b: roleId,
+					});
+					console.log(
+						`Permission ${action}:${entity} linked to role ${roleName}`,
+					);
+				}
+			}
+		}
+
+		console.log(
+			`Role ${roleName} created/updated with ${permissionStrings.length} permissions`,
+		);
+		return true;
+	} catch (error) {
+		console.error('Error creating role with permissions:', error);
 		return false;
 	}
 }
