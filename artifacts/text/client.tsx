@@ -51,7 +51,6 @@ export const textArtifact = new Artifact<
 		}
 	},
 	content: ({ metadata }) => {
-		console.log('metadata', metadata);
 		if (!metadata) {
 			return null;
 		}

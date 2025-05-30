@@ -10,6 +10,7 @@ export const serverEnv = createEnv({
 		LANGFUSE_SECRET_KEY: z.string().min(1),
 		LANGFUSE_PUBLIC_KEY: z.string().min(1),
 		LANGFUSE_BASEURL: z.string().min(1),
+		DB_URL: z.string().min(1),
 	},
 	experimental__runtimeEnv: process.env,
 });

@@ -134,7 +134,7 @@ function renderHighlightAnnotation(
 
 	// Set styles for the annotation overlay
 	ctx.fillStyle = annotation.color || '#e6d7c3'; // Default to light merino if no color specified
-	ctx.globalAlpha = 0.15;
+	ctx.globalAlpha = 0.4;
 
 	// Draw the annotation overlay - full height of the canvas, starting below the timescale and interactions track
 	const startY = 30 + yOffset; // Start below the timescale and interactions track

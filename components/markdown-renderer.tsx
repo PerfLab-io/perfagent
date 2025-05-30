@@ -17,6 +17,10 @@ import {
 	FlameGraphCanvas,
 	FlameGraphCanvasProps,
 } from '@/components/flamegraph/canvas';
+import {
+	NetworkActivityCompactCanvas,
+	NetworkActivityCompactCanvasProps,
+} from './network-activity/compact-canvas';
 
 /**
  * Types and Interfaces
@@ -24,6 +28,7 @@ import {
 interface MarkdownRendererProps {
 	content: string;
 	className?: string;
+	autoScroll?: boolean;
 }
 
 interface CitationLink {
@@ -274,6 +279,7 @@ const LinkPreview: React.FC<{ href: string }> = ({ href }) => {
 export function MarkdownRenderer({
 	content,
 	className,
+	autoScroll = false,
 }: MarkdownRendererProps) {
 	const [metadataCache, setMetadataCache] = useState<
 		Record<string, LinkMetadata>
@@ -385,6 +391,29 @@ export function MarkdownRenderer({
 					}
 					return <FlameGraphCanvas {...props} />;
 				}
+				if (language === 'network-activity') {
+					let data = null as NetworkActivityCompactCanvasProps | null;
+					try {
+						data = JSON.parse(children);
+					} catch (error) {
+						console.error('Error parsing network activity data:', error);
+					}
+					if (!data)
+						return <CodeBlock language={language}>{children}</CodeBlock>;
+
+					const props = data;
+					return (
+						<>
+							<NetworkActivityCompactCanvas width={900} {...props} />
+							<blockquote className="border-primary bg-muted my-2 rounded-r-md border-l-4 py-1 pl-4 text-sm text-neutral-700 italic dark:bg-neutral-900/50 dark:text-neutral-300">
+								{
+									// @ts-ignore
+									props.label
+								}
+							</blockquote>
+						</>
+					);
+				}
 				return <CodeBlock language={language}>{children}</CodeBlock>;
 			},
 
@@ -441,7 +470,7 @@ export function MarkdownRenderer({
 			// Blockquote rendering
 			blockquote(children: React.ReactNode) {
 				return (
-					<blockquote className="border-primary/30 dark:border-primary/20 my-6 rounded-r-md border-l-4 bg-neutral-50 py-1 pl-4 text-neutral-700 italic dark:bg-neutral-900/50 dark:text-neutral-300">
+					<blockquote className="border-primary bg-muted my-6 rounded-r-md border-l-4 py-1 pl-4 text-neutral-700 italic dark:bg-neutral-900/50 dark:text-neutral-300">
 						{children}
 					</blockquote>
 				);

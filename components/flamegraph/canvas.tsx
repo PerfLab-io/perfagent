@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect, useCallback, memo } from 'react';
 import type {
 	ProcessedTrace,
 	ViewState,
@@ -89,7 +89,6 @@ export const renderFlameGraphCanvas = (options: {
 
 	// Render the flamegraph with current view state
 	if (processedData) {
-		console.log('have trace data!', processedData);
 		renderFlameGraph(ctx, processedData, {
 			width,
 			height,
@@ -119,7 +118,7 @@ export const renderFlameGraphCanvas = (options: {
 			processedData.frameMap,
 			selectedAnnotation?.id,
 			// Add offset for interactions track
-			INTERACTIONS_TRACK_HEIGHT,
+			interactions ? INTERACTIONS_TRACK_HEIGHT : 0,
 		);
 	}
 };
@@ -127,7 +126,7 @@ export const renderFlameGraphCanvas = (options: {
 // Add constants for vertical navigation
 const ROW_HEIGHT = 24; // Height of each row in pixels
 
-export function FlameGraphCanvas({
+export const FlameGraphCanvas = memo(function FlameGraphCanvas({
 	searchEvent,
 	width = 1200,
 	height = 400,
@@ -156,6 +155,9 @@ export function FlameGraphCanvas({
 	const [selectedAnnotation, setSelectedAnnotation] =
 		useState<Annotation | null>(null);
 	const [base64IMG, setBase64IMG] = useState<string | undefined>(undefined);
+	const [processedAnnotations, setProcessedAnnotations] = useState<
+		Annotation[]
+	>(annotations || []);
 
 	// View state represents the visible portion of the timeline
 	const [viewState, setViewState] = useState<ViewState>({
@@ -203,6 +205,26 @@ export function FlameGraphCanvas({
 				timerangeCallTree.rootNode.event,
 				traceAnalysis.parsedTrace,
 			);
+
+			// Grab the longest function call subtree to render an annotation
+			const longestCall = timerangeCallTree.rootNode.events
+				.toSorted((entry, entry2) => (entry2.dur || 0) - (entry.dur || 0))
+				.filter((entry) => entry.name === 'FunctionCall')
+				.at(0);
+
+			const annotationStart = (longestCall?.ts || 0) as Micro;
+			const annotationEnd = (longestCall?.dur || 0) + annotationStart;
+
+			const annotation = {
+				id: 'processed-1',
+				type: 'highlight',
+				startTime: microToMilli(annotationStart) / 1000,
+				endTime: microToMilli(annotationEnd as Micro) / 1000,
+				label: 'Longest subtree',
+				color: '#e8c4d4',
+			} as Annotation;
+
+			setProcessedAnnotations([...(annotations || []), annotation]);
 
 			if (!aiCallTree) {
 				throw new Error('Failed to create AI call tree');
@@ -388,7 +410,7 @@ export function FlameGraphCanvas({
 			showInteractions,
 			showAnnotations,
 			interactions,
-			annotations,
+			annotations: processedAnnotations,
 			selectedAnnotation,
 		});
 
@@ -402,7 +424,7 @@ export function FlameGraphCanvas({
 		viewState,
 		showAnnotations,
 		showInteractions,
-		annotations,
+		processedAnnotations,
 		interactions,
 		selectedAnnotation,
 	]);
@@ -422,4 +444,4 @@ export function FlameGraphCanvas({
 			<img src={base64IMG} alt="Flamegraph" />
 		</div>
 	);
-}
+});

@@ -23,15 +23,12 @@ import {
 	SidebarHeader,
 	SidebarMenu,
 	SidebarMenuItem,
+	useSidebar,
 } from '@/components/ui/sidebar';
 import { SimpleThemeToggle } from '../simple-theme-toggle';
+import { SessionData } from '@/lib/session';
 
 const data = {
-	user: {
-		name: 'vinicius',
-		email: 'vinicius@example.com',
-		avatar: 'https://github.com/perflab-io.png',
-	},
 	navMain: [
 		{
 			title: 'Agent insights',
@@ -114,6 +111,8 @@ const data = {
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+	const { user } = useSidebar();
+
 	return (
 		<Sidebar collapsible="offcanvas" {...props}>
 			<SidebarHeader>
@@ -137,7 +136,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 				<NavSecondary items={data.navSecondary} className="mt-auto" />
 			</SidebarContent>
 			<SidebarFooter>
-				<NavUser user={data.user} />
+				<NavUser user={user ?? ({} as SessionData)} />
 			</SidebarFooter>
 		</Sidebar>
 	);

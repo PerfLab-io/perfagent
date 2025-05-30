@@ -4,6 +4,8 @@ import { Handlers } from '@perflab/trace_engine';
 import * as Trace from '@perflab/trace_engine/models/trace/trace.js';
 import { InteractionEvent } from '@/components/flamegraph/types';
 import { Micro } from '@perflab/trace_engine/models/trace/types/Timing';
+import dedent from 'dedent';
+import { SyntheticNetworkRequest } from '@perflab/trace_engine/models/trace/types/TraceEvents';
 
 export enum MetricType {
 	TIME = 'time',
@@ -57,7 +59,7 @@ export type InsightsReport = {
 	metricScore?: MetricScoreClassification;
 	infoContent?: string;
 	recommendations?: string[];
-	extras?: INPExtras;
+	extras?: INPExtras | LCPExtras;
 };
 
 export type INPExtras = {
@@ -71,6 +73,51 @@ export type INPExtras = {
 		animationFrameEventMeta: any;
 		eventDurationStr: string;
 	}[][];
+};
+
+export type LCPExtras = {
+	networkStackInfo: string;
+};
+
+type ExpectedMimeTypes =
+	| 'text/css'
+	| 'application/json'
+	| 'application/javascript'
+	| 'application/ecmascript'
+	| 'application/x-javascript'
+	| 'image';
+type RequestMap = {
+	origin: string;
+	isSameOrigin: boolean;
+	assetCount: Array<{
+		type: ExpectedMimeTypes;
+		entryCount: number;
+		lowPrioCount: number;
+		highPrioCount: number;
+		renderBlockingCount: number;
+		totalTime: Micro;
+		encodedData: number;
+		decodedBody: number;
+		uncompressedCount: number;
+	}>;
+	repeatedAssets?: { [key: string]: number };
+	failedRequests?: { [key: string]: number };
+	totalTime: Micro;
+};
+
+// Utility function to determine asset type from mime type for the RequestMap
+const getAssetType = (mimeType: ExpectedMimeTypes): ExpectedMimeTypes => {
+	if (mimeType === 'text/css') return 'text/css';
+	if (mimeType === 'application/json' || mimeType.includes('+json'))
+		return 'application/json';
+	if (
+		mimeType === 'application/javascript' ||
+		mimeType === 'application/ecmascript' ||
+		mimeType === 'application/x-javascript'
+	)
+		return 'application/javascript';
+	if (mimeType.startsWith('image/')) return 'image';
+	return mimeType;
 };
 
 export function analyseInsightsForCWV(
@@ -88,8 +135,6 @@ export function analyseInsightsForCWV(
 
 	const mainFrameMetrics = PageLoadMetrics.allMarkerEvents;
 
-	// INFO: TODO: The main frame may have multiple navigations, depending on the trace
-	// we must account for that in the future.
 	const insights = traceInsights.get(selectedNavigation);
 
 	const LCPEvent = mainFrameMetrics.find(
@@ -142,6 +187,19 @@ export function analyseInsightsForCWV(
 				LCPEvent.args.data.navigationId,
 			);
 
+			const navigationBounds = insights?.bounds;
+			const networkRequestsTillLCP = trace.NetworkRequests.byTime.filter(
+				(nE) => {
+					const nETotal = nE.ts + nE.dur;
+					// ensure that the events are from the starting point of the selected navigation
+					return nE.ts >= (navigationBounds?.min || 0) && nETotal < LCPEvent.ts;
+				},
+			);
+
+			const mainFrameOrigin = new URL(
+				networkRequestsTillLCP.at(-1)?.args.data.requestingFrameUrl || '',
+			);
+
 			if (navigationTimings) {
 				for (const [key, value] of navigationTimings.entries()) {
 					const normalizedTiming = microSecondsToMilliSeconds(value.timing);
@@ -153,8 +211,7 @@ export function analyseInsightsForCWV(
 				}
 
 				_lcp.infoContent = `The LCP event happened at ${msOrSDisplay(
-					// @ts-expect-error
-					microSecondsToMilliSeconds(LCPEvent.ts - (traceWindow.min || 0)),
+					microSecondsToMilliSeconds(_lcp.metricValue as Micro),
 				)}.`;
 
 				if (
@@ -173,45 +230,232 @@ export function analyseInsightsForCWV(
 
 						_lcp.metricBreakdown.push({
 							label: LCPMetricPhases[key as keyof typeof LCPMetricPhases],
-							value: value,
+							value: Math.ceil(Math.round(value * 100) / 100),
 						});
 					});
+
 					_lcp.recommendations = [
 						insights?.model.LCPDiscovery.strings.description,
-					];
-
-					if (
-						insights.model.LCPDiscovery.checklist &&
-						!insights.model.LCPDiscovery.checklist.priorityHinted
-					) {
-						_lcp.recommendations.push(
-							`Increase priority hint for the LCP resource.
-                    This resource is critical for the user experience and should use fetchpriorit=high.`,
-						);
-					}
-					if (
-						insights.model.LCPDiscovery.checklist &&
-						!insights.model.LCPDiscovery.checklist.requestDiscoverable
-					) {
-						_lcp.recommendations.push(
-							`Consider preload the LCP image, or have it being discovered on the initial document load.
-                    This LCP image has a total load delay of ${msOrSDisplay(
-											insights.model.LCPPhases.phases?.loadDelay || 0,
-										)}.
-                    Sometimes your LCP image may be correctly placed in the document but other resources from
-                    part of the [critical rendering path](https://web.dev/learn/performance/understanding-the-critical-path) are blocking its discovery till a later time.`,
-						);
-					}
-					if (
-						insights.model.LCPDiscovery.checklist &&
-						!insights.model.LCPDiscovery.checklist.eagerlyLoaded
-					) {
-						_lcp.recommendations.push(
-							`Remove lazy loading from the LCP image.
-                    The LCP image should be loaded as soon as possible to avoid a delay in rendering.`,
-						);
-					}
+						!insights.model.LCPDiscovery.checklist?.priorityHinted.value
+							? dedent`
+							Increase priority hint for the LCP resource.
+							This resource is critical for the user experience and should use fetchpriorit=high.`
+							: '',
+						!insights.model.LCPDiscovery.checklist?.requestDiscoverable.value
+							? dedent`
+							Consider preload the LCP image, or have it being discovered on the initial document load.
+							This LCP image has a total load delay of ${msOrSDisplay(insights.model.LCPPhases.phases?.loadDelay || 0)}.
+							Sometimes your LCP image may be correctly placed in the document but other resources from
+							part of the [critical rendering path](https://web.dev/learn/performance/understanding-the-critical-path) are blocking its discovery till a later time.`
+							: '',
+						!insights.model.LCPDiscovery.checklist?.eagerlyLoaded.value
+							? dedent`
+							Remove lazy loading from the LCP image.
+							The LCP image should be loaded as soon as possible to avoid a delay in rendering.`
+							: '',
+					].filter(Boolean);
 				}
+
+				const lcpNetworkRequest = insights?.model.LCPDiscovery.relatedEvents
+					?.values()
+					// @ts-ignore The type is a mess on this one
+					.find((_e) => _e.name === 'SyntheticNetworkRequest') as
+					| SyntheticNetworkRequest
+					| undefined;
+
+				const mappedURLs = networkRequestsTillLCP
+					.reduce<Map<string, RequestMap>>((reqMap, entry) => {
+						const frameURL = mainFrameOrigin;
+						const entryURL = new URL(entry.args.data.url);
+						const isSameOrigin = frameURL.origin === entryURL.origin;
+						const _rM: RequestMap = reqMap.get(entryURL.origin) || {
+							origin: entryURL.origin,
+							isSameOrigin,
+							assetCount: [],
+							repeatedAssets: undefined,
+							failedRequests: undefined,
+							totalTime: 0 as Micro,
+						};
+						const assetType = getAssetType(
+							entry.args.data.mimeType as ExpectedMimeTypes,
+						);
+						const assetTypeObj = _rM.assetCount.find(
+							({ type }) => type === assetType,
+						);
+						const isLowPriority =
+							entry.args.data.priority === 'Low' ||
+							entry.args.data.priority === 'VeryLow';
+						const isHighPriority =
+							entry.args.data.priority === 'High' ||
+							entry.args.data.priority === 'VeryHigh';
+						const isRenderBlocking =
+							entry.args.data.renderBlocking === 'blocking' ||
+							entry.args.data.renderBlocking === 'in_body_parser_blocking' ||
+							entry.args.data.renderBlocking === 'potentially_blocking';
+						const repeatCount =
+							(_rM.repeatedAssets?.[entryURL.origin] || -1) + 1;
+						const failedCount =
+							(_rM.failedRequests?.[entryURL.origin] || -1) + 1;
+
+						_rM.assetCount = assetTypeObj
+							? _rM.assetCount.map((_asset) => {
+									if (_asset.type === assetType) {
+										return {
+											type: assetType,
+											entryCount: _asset.entryCount + 1,
+											lowPrioCount: isLowPriority
+												? _asset.lowPrioCount + 1
+												: _asset.lowPrioCount,
+											highPrioCount: isHighPriority
+												? _asset.highPrioCount + 1
+												: _asset.highPrioCount,
+											renderBlockingCount: isRenderBlocking
+												? _asset.renderBlockingCount + 1
+												: _asset.renderBlockingCount,
+											totalTime: (_asset.totalTime + entry.dur) as Micro,
+											encodedData:
+												_asset.encodedData + entry.args.data.encodedDataLength,
+											decodedBody:
+												_asset.decodedBody + entry.args.data.decodedBodyLength,
+											uncompressedCount:
+												_asset.uncompressedCount +
+													entry.args.data.responseHeaders.filter(
+														(header) =>
+															header.name === 'content-encoding' &&
+															header.value === 'gzip',
+													).length ===
+												0
+													? 1
+													: 0,
+										};
+									}
+
+									return _asset;
+								})
+							: [
+									..._rM.assetCount,
+									{
+										type: assetType,
+										entryCount: 1,
+										lowPrioCount: isLowPriority ? 1 : 0,
+										highPrioCount: isHighPriority ? 1 : 0,
+										renderBlockingCount: isRenderBlocking ? 1 : 0,
+										totalTime: entry.dur,
+										encodedData: entry.args.data.encodedDataLength,
+										decodedBody: entry.args.data.decodedBodyLength,
+										uncompressedCount:
+											entry.args.data.responseHeaders.filter(
+												(header) =>
+													header.name === 'content-encoding' &&
+													header.value === 'gzip',
+											).length === 0
+												? 1
+												: 0,
+									},
+								];
+						_rM.repeatedAssets = repeatCount
+							? {
+									...(_rM.repeatedAssets || {}),
+									[entryURL.origin]: repeatCount,
+								}
+							: _rM.repeatedAssets;
+						_rM.failedRequests = failedCount
+							? {
+									...(_rM.failedRequests || {}),
+									[entryURL.origin]: failedCount,
+								}
+							: _rM.failedRequests;
+						_rM.totalTime = (_rM.totalTime + entry.dur) as Micro;
+
+						return reqMap.set(entryURL.origin, _rM);
+					}, new Map<string, RequestMap>())
+					.values()
+					.reduce(
+						(str, entry) => {
+							return dedent`
+						${str}
+
+						Origin: ${entry.origin}
+						SameOrigin: ${entry.isSameOrigin}
+						AssetCount:
+						${entry.assetCount.reduce(
+							(_str, acc) => dedent`
+							${_str}
+							- AssetType: ${acc.type}
+							* Count: ${acc.entryCount}
+							* LowPriorityCount: ${acc.lowPrioCount}
+							* HighPriorityCount: ${acc.highPrioCount}
+							* RenderBlockingCount: ${acc.renderBlockingCount}
+							* TotalTimeSpentForAssetType: ${microSecondsToMilliSeconds(acc.totalTime)}ms
+							* TotalEncodedDataLength: ${acc.encodedData / 1000}kB
+							* TotalDecodedBodyLength: ${acc.decodedBody / 1000}kB
+							* UncompressedCount: ${acc.uncompressedCount}\n
+							`,
+							'',
+						)}
+						RepeatedAssets: ${
+							entry.repeatedAssets
+								? Object.keys(entry.repeatedAssets).reduce(
+										(_str, acc) => dedent`${_str}\n
+										* ${acc}: ${entry.repeatedAssets?.[acc]}`,
+										'',
+									)
+								: '0'
+						}
+						FailedAssets: ${
+							entry.failedRequests
+								? Object.keys(entry.failedRequests).reduce(
+										(_str, acc) => dedent`${_str}\n
+										* ${acc}: ${entry.failedRequests?.[acc]}`,
+										'',
+									)
+								: '0'
+						}
+						TotalTime: ${microSecondsToMilliSeconds(entry.totalTime)}ms
+						\n
+						`;
+						},
+						dedent`
+					Trace URL: ${mainFrameOrigin.href}
+					Trace Origin: ${mainFrameOrigin.origin}
+					LCP candidate timming: ${_lcp.metricValue}ms
+					LCP candidate type: ${LCPEvent.args.data.type}
+					LCP candidate initiator type: ${lcpNetworkRequest?.args.data.initiator?.type || 'NOOP'}
+					LCP candidate phase timings:
+					${_lcp.metricBreakdown.reduce(
+						(_acc, _phase) => dedent`
+					${_acc}
+					* ${_phase.label}: ${_phase.value}ms
+					`,
+						'',
+					)}
+					LCP candidate request headers:
+					${
+						lcpNetworkRequest?.args.data.responseHeaders.reduce(
+							(_str, _ev) => dedent`
+							${_str}
+							* ${_ev.name}: ${_ev.value}
+							`,
+							'',
+						) || 'NOOP'
+					}
+					`,
+					);
+
+				_lcp.extras = {
+					networkStackInfo: dedent`
+					${mappedURLs}
+					
+					- Recommendations based on insights:
+					${_lcp.recommendations?.reduce(
+						(_acc, rec) => dedent`
+						${_acc}
+						* ${rec}
+						`,
+						'',
+					)}
+					`,
+				};
 
 				LCP = _lcp;
 			}

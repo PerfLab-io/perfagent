@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import {
 	XCircle,
 	FileText,
@@ -34,7 +34,7 @@ interface MarkdownReportProps {
  * MarkdownReport Component
  * Displays a report with markdown content in a sliding panel
  */
-export function MarkdownReport({
+export const MarkdownReport = memo(function MarkdownReport({
 	visible,
 	onClose,
 	exiting = false,
@@ -45,7 +45,6 @@ export function MarkdownReport({
 }: MarkdownReportProps) {
 	const [animate, setAnimate] = useState(false);
 	const [isCopied, setIsCopied] = useState(false);
-	const reportRef = useRef<HTMLDivElement>(null);
 
 	/**
 	 * Generate a unique ID for the report for feedback
@@ -127,7 +126,7 @@ export function MarkdownReport({
 	const containerClasses = useMemo(
 		() =>
 			cn(
-				'panel-right flex flex-col overflow-hidden bg-background p-6 transition-all duration-300',
+				'panel-right bg-background flex flex-col overflow-hidden p-6 transition-all duration-300',
 				animate ? 'opacity-100' : 'opacity-0',
 				exiting && 'panel-right-exit',
 			),
@@ -140,13 +139,13 @@ export function MarkdownReport({
 	return (
 		<div className={containerClasses} style={animationStyles}>
 			{/* Header area with title and actions */}
-			<div className="sticky top-0 z-10 mb-4 flex items-center justify-between border-b border-border bg-background pb-2">
+			<div className="border-border bg-background sticky top-0 z-10 mb-4 flex items-center justify-between border-b pb-2">
 				<div className="flex items-center gap-2">
 					<FileText className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-					<h2 className="text-xl font-bold text-foreground">
+					<h2 className="text-foreground text-xl font-bold">
 						Report
 						{reportId && (
-							<span className="ml-2 text-sm font-normal text-foreground/60">
+							<span className="text-foreground/60 ml-2 text-sm font-normal">
 								#{reportId}
 							</span>
 						)}
@@ -170,7 +169,7 @@ export function MarkdownReport({
 					>
 						{isCopied ? (
 							<>
-								<ClipboardCheck className="h-4 w-4 text-peppermint-600 dark:text-peppermint-400" />
+								<ClipboardCheck className="text-peppermint-600 dark:text-peppermint-400 h-4 w-4" />
 								<span className="text-peppermint-600 dark:text-peppermint-400">
 									Copied!
 								</span>
@@ -224,13 +223,9 @@ export function MarkdownReport({
 			</div>
 
 			{/* Content area with report sections */}
-			<div
-				ref={reportRef}
-				className="max-h-full grow overflow-y-auto pr-1"
-				aria-live="polite"
-			>
-				<MarkdownRenderer content={reportData || ''} />
+			<div className="max-h-full grow overflow-y-auto pr-1" aria-live="polite">
+				<MarkdownRenderer content={reportData || ''} autoScroll />
 			</div>
 		</div>
 	);
-}
+});

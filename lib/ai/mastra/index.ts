@@ -13,6 +13,7 @@ import { researchAnalyst } from './agents/researchAnalist';
 import { reportAssistant } from './agents/reportAssistant';
 import { traceAssistant } from './agents/traceAssistant';
 import { suggestionsAssistant } from './agents/suggestionsAssistant';
+import { networkAssistant } from './agents/networkAssistant';
 
 export const mastra = new Mastra({
 	workflows: { cwvInsightsWorkflow, researchWorkflow },
@@ -25,6 +26,7 @@ export const mastra = new Mastra({
 		researchAnalyst,
 		reportAssistant,
 		traceAssistant,
+		networkAssistant,
 		suggestionsAssistant,
 	},
 	logger: createLogger({

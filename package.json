@@ -60,6 +60,7 @@
     "@vercel/otel": "^1.10.4",
     "ai": "^4.2.0",
     "autoprefixer": "^10.4.21",
+    "bcryptjs": "^3.0.2",
     "canvas": "^3.1.0",
     "chrome-ai": "^1.11.1",
     "class-variance-authority": "^0.7.1",
@@ -74,6 +75,7 @@
     "expo-file-system": "latest",
     "expo-gl": "latest",
     "hono": "^4.7.5",
+    "immer": "^10.1.1",
     "input-otp": "1.4.1",
     "langfuse": "^3.37.2",
     "langfuse-vercel": "^3.37.2",
@@ -81,7 +83,7 @@
     "marked-react": "^3.0.0",
     "next": "^15.2.3",
     "next-themes": "latest",
-    "pg": "^8.14.1",
+    "postgres": "^3.4.7",
     "react": "^19.0.0",
     "react-day-picker": "8.10.1",
     "react-dom": "^19.0.0",
@@ -95,7 +97,8 @@
     "tailwindcss-animate": "^1.0.7",
     "three": "latest",
     "vaul": "^0.9.9",
-    "zod": "^3.24.2"
+    "zod": "^3.24.2",
+    "zustand": "^5.0.4"
   },
   "devDependencies": {
     "@next/eslint-plugin-next": "^15.2.4",
