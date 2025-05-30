@@ -18,8 +18,6 @@ import crypto from 'crypto';
 
 export async function login(email: string, password: string) {
 	try {
-		console.log('login', email, password);
-
 		const result = await db
 			.select({
 				user: user,
@@ -32,7 +30,10 @@ export async function login(email: string, password: string) {
 
 		const userWithPassword = result[0];
 		if (!userWithPassword?.user) {
-			return null;
+			return {
+				user: null,
+				hasAccess: false,
+			};
 		}
 
 		const isValid = await bcrypt.compare(
@@ -41,16 +42,34 @@ export async function login(email: string, password: string) {
 		);
 
 		if (!isValid) {
-			return null;
+			return {
+				user: null,
+				hasAccess: false,
+			};
+		}
+
+		const hasAccess = await checkAgentAccess(userWithPassword.user.id);
+
+		if (!hasAccess) {
+			return {
+				user: userWithPassword.user,
+				hasAccess: false,
+			};
 		}
 
 		// Create session for authenticated user
 		await createSession(userWithPassword.user.id);
 
-		return userWithPassword.user;
+		return {
+			user: userWithPassword.user,
+			hasAccess: true,
+		};
 	} catch (error) {
 		console.log('error', error);
-		return null;
+		return {
+			user: null,
+			hasAccess: false,
+		};
 	}
 }
 

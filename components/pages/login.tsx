@@ -1,6 +1,6 @@
 'use client';
 
-import { checkAgentAccess, login } from '@/app/actions/login';
+import { checkAgentAccess, grantRole, login } from '@/app/actions/login';
 import { ArrowRight, Eye, EyeOff, Lock, User } from 'lucide-react';
 import { redirect } from 'next/navigation';
 import type React from 'react';
@@ -44,7 +44,7 @@ export const LoginPageComponent = () => {
 		setLoginStep('authenticating');
 		setErrorMessage('');
 
-		const user = await login(email, password);
+		const { user, hasAccess } = await login(email, password);
 
 		if (!user) {
 			setLoginStep('error');
@@ -53,12 +53,10 @@ export const LoginPageComponent = () => {
 			return;
 		}
 
-		const hasAccess = await checkAgentAccess(user.id);
-
 		if (!hasAccess) {
 			setLoginStep('error');
 			setErrorMessage(
-				'You do not yet have access to the system. Please ensure to signup to the waitlist and wait for an invite.',
+				'You do not yet have access to the system. Please ensure to signup to the waitlist and wait for an invite',
 			);
 			setIsLoading(false);
 			return;
