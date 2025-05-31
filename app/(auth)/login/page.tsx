@@ -6,7 +6,7 @@ import { redirect } from 'next/navigation';
 export default async function LoginPage() {
 	const isAuthenticatedUser = await isAuthenticated();
 	if (isAuthenticatedUser) {
-		redirect('/chat');
+		redirect('/');
 	}
 
 	return (
