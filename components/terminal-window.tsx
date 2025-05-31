@@ -4,6 +4,7 @@ export default async function TerminalWindow({
 	children,
 	title,
 	footerLinks,
+	footerElement,
 }: {
 	children: React.ReactNode;
 	title: string;
@@ -11,6 +12,7 @@ export default async function TerminalWindow({
 		link: string;
 		label: string;
 	}[];
+	footerElement?: React.ReactNode;
 }) {
 	return (
 		<div className="w-full max-w-md">
@@ -32,6 +34,7 @@ export default async function TerminalWindow({
 
 				{/* Footer links */}
 				<div className="border-peppermint-600 mt-8 border-t border-dashed pt-6">
+					{footerElement ? footerElement : null}
 					<div className="text-peppermint-400 flex flex-col items-center justify-between gap-4 font-mono text-xs sm:flex-row">
 						{footerLinks?.map((link) => (
 							<a
