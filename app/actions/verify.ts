@@ -25,19 +25,17 @@ const VerificationTypeSchema = z.enum(types);
 export type VerificationTypes = z.infer<typeof VerificationTypeSchema>;
 
 export function getRedirectToUrl({
-	request,
 	type,
 	target,
 	redirectTo,
 }: {
-	request: Request;
 	type: VerificationTypes;
 	target: string;
 	redirectTo?: string;
 }) {
 	const baseUrl =
 		process.env.VERCEL_PROJECT_PRODUCTION_URL || 'http://localhost:3000';
-	const redirectToUrl = new URL(`${baseUrl}/verify`);
+	const redirectToUrl = new URL(`https://agent.perflab.io/verify`);
 	redirectToUrl.searchParams.set(typeQueryParam, type);
 	redirectToUrl.searchParams.set(targetQueryParam, target);
 	if (redirectTo) {
@@ -48,22 +46,20 @@ export function getRedirectToUrl({
 
 export async function prepareVerification({
 	period,
-	request,
 	type,
 	target,
 	context,
 }: {
 	period: number;
-	request: Request;
 	type: VerificationTypes;
 	target: string;
 	context?: { inviteId?: string };
 }) {
-	const verifyUrl = getRedirectToUrl({ request, type, target });
+	const verifyUrl = getRedirectToUrl({ type, target });
 	const redirectTo = new URL(verifyUrl.toString());
 
 	const { otp, ...verificationConfig } = await generateTOTP({
-		algorithm: 'SHA256',
+		algorithm: 'SHA-256',
 		// Leaving off 0, O, and I on purpose to avoid confusing users.
 		charSet: 'ABCDEFGHJKLMNPQRSTUVWXYZ123456789',
 		period,
