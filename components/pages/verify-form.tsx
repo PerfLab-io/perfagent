@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,6 +20,34 @@ export function VerifyForm() {
 
 	const type = searchParams.get('type');
 	const target = searchParams.get('target');
+	const urlCode = searchParams.get('code');
+
+	// Pre-fill code from URL parameter and auto-submit if valid
+	useEffect(() => {
+		if (urlCode && urlCode.length === 6 && !code) {
+			setCode(urlCode);
+			// Auto-submit if we have all required parameters
+			if (type && target) {
+				startTransition(async () => {
+					const result = await verifyOtpAction({
+						code: urlCode,
+						type,
+						target,
+					});
+
+					if (result.success) {
+						setSuccess(true);
+						// Redirect after a short delay
+						setTimeout(() => {
+							window.location.href = '/onboarding';
+						}, 1500);
+					} else {
+						setError(result.error || 'Invalid verification code');
+					}
+				});
+			}
+		}
+	}, [urlCode, type, target, code]);
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
