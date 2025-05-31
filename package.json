@@ -14,6 +14,7 @@
     "@ai-sdk/openai": "^1.3.0",
     "@ai-sdk/react": "^1.2.1",
     "@ai-sdk/ui-utils": "^1.2.1",
+    "@epic-web/totp": "^4.0.1",
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
     "@hono/zod-validator": "^0.4.3",
