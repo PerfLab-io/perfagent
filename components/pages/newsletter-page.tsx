@@ -2,7 +2,7 @@
 
 import type React from 'react';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { sendNewsletter } from '@/app/actions/newsletter';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';

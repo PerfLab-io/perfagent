@@ -6,7 +6,7 @@ import {
 	getUsersWithRoleInfo,
 	type UserWithRole,
 } from '@/app/actions/onboard';
-import { OnboardPageWrapper } from '@/components/onboard-wrapper';
+import { OnboardPageWrapper } from '@/components/pages/onboard-wrapper';
 
 export default async function OnboardAdmin({
 	searchParams,
