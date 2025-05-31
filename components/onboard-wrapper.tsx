@@ -132,9 +132,26 @@ function OnboardPageContent({
 				const result = await processPendingRoleUpdates(pendingUpdates);
 
 				if (result.success) {
+					const newlyGrantedCount = pendingUpdates.filter(
+						(u) => u.shouldHaveRole && !u.currentHasRole,
+					).length;
+					const revokedCount = pendingUpdates.filter(
+						(u) => !u.shouldHaveRole && u.currentHasRole,
+					).length;
+
+					let successMessage = `Successfully processed ${result.processedCount} role updates`;
+
+					if (newlyGrantedCount > 0) {
+						successMessage += `. Welcome emails sent to ${newlyGrantedCount} newly granted user${newlyGrantedCount > 1 ? 's' : ''}`;
+					}
+
+					if (revokedCount > 0) {
+						successMessage += `. Revoked access from ${revokedCount} user${revokedCount > 1 ? 's' : ''}`;
+					}
+
 					setStatus({
 						success: true,
-						message: `Successfully processed ${result.processedCount} role updates`,
+						message: successMessage,
 					});
 
 					// Update the users state to reflect the changes

@@ -5,6 +5,7 @@ import { user, role, roleToUser } from '@/drizzle/schema';
 import { eq, and, inArray } from 'drizzle-orm';
 import { resend } from '@/lib/resend';
 import { grantRole, revokeRole } from './login';
+import OnboardingEmail from '@/components/emails/onboarding';
 
 export type AudienceContact = {
 	id: string;
@@ -167,6 +168,7 @@ export async function processPendingRoleUpdates(
 ): Promise<{ success: boolean; processedCount: number; errors: string[] }> {
 	const errors: string[] = [];
 	let processedCount = 0;
+	const emailsToSend: string[] = []; // Track users who got granted access for welcome emails
 
 	try {
 		for (const update of pendingUpdates) {
@@ -194,6 +196,7 @@ export async function processPendingRoleUpdates(
 				const success = await grantRole('agent-user', userRecord);
 				if (success) {
 					processedCount++;
+					emailsToSend.push(update.email); // Add to welcome email list
 					console.log(`Granted agent-user role to ${update.email}`);
 				} else {
 					errors.push(`Failed to grant role to ${update.email}`);
@@ -206,6 +209,59 @@ export async function processPendingRoleUpdates(
 					console.log(`Revoked agent-user role from ${update.email}`);
 				} else {
 					errors.push(`Failed to revoke role from ${update.email}`);
+				}
+			}
+		}
+
+		// Send welcome emails to newly granted users
+		if (emailsToSend.length > 0) {
+			console.log(`Sending welcome emails to ${emailsToSend.length} users`);
+
+			for (const email of emailsToSend) {
+				try {
+					// Get user details for personalized email
+					const userDetails = await db
+						.select({
+							name: user.name,
+							username: user.username,
+						})
+						.from(user)
+						.where(eq(user.email, email))
+						.limit(1);
+
+					const userName =
+						userDetails[0]?.name ||
+						userDetails[0]?.username ||
+						email.split('@')[0];
+
+					const unsubscribeUrl = `https://agent.perflab.io/unsubscribe?email=${encodeURIComponent(email)}`;
+
+					await resend.emails.send({
+						from: 'PerfAgent <support@perflab.io>',
+						to: email,
+						subject: 'Welcome to PerfAgent - Your Access is Now Active! 🚀',
+						react: OnboardingEmail({
+							previewText:
+								"Welcome to PerfAgent - Let's optimize your web performance together!",
+							userName,
+							heroImageUrl:
+								'https://yn20j37lsyu3f9lc.public.blob.vercel-storage.com/newsletter/hero_images/hero16-VKXKwJJzJwMhFV0ovjFpGVljf8nxLL.jpg',
+							heroImageAlt:
+								'Welcome to PerfAgent! - AI-Powered Web Performance Analysis',
+							chatUrl: 'https://agent.perflab.io/chat',
+							unsubscribeUrl,
+							recipientEmail: email,
+						}),
+					});
+
+					console.log(`Welcome email sent to ${email}`);
+				} catch (emailError) {
+					console.error(
+						`Failed to send welcome email to ${email}:`,
+						emailError,
+					);
+					// Don't add to errors array since role was granted successfully
+					// Just log the email failure
 				}
 			}
 		}
