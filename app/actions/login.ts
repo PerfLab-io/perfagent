@@ -133,7 +133,7 @@ export async function canReadOwnAgents(userId: string): Promise<boolean> {
  */
 export async function grantRole(
 	roleName: string,
-	userRecord: typeof user.$inferSelect,
+	userRecord: Pick<typeof user.$inferSelect, 'id' | 'email'>,
 ): Promise<boolean> {
 	try {
 		// Find the role by name
@@ -177,6 +177,49 @@ export async function grantRole(
 		}
 	} catch (error) {
 		console.error('Error granting role:', error);
+		return false;
+	}
+}
+
+/**
+ * Revoke a role from a user by removing the role assignment
+ * @param roleName The name of the role to revoke (e.g., 'agent-user')
+ * @param userRecord The user record from the login function
+ * @returns Promise<boolean> True if role was revoked successfully
+ */
+export async function revokeRole(
+	roleName: string,
+	userRecord: Pick<typeof user.$inferSelect, 'id' | 'email'>,
+): Promise<boolean> {
+	try {
+		// Find the role by name
+		const roleResult = await db
+			.select({
+				id: role.id,
+				name: role.name,
+			})
+			.from(role)
+			.where(eq(role.name, roleName))
+			.limit(1);
+
+		if (roleResult.length === 0) {
+			console.error(`Role not found: ${roleName}`);
+			return false;
+		}
+
+		const targetRole = roleResult[0];
+
+		// Remove the role assignment from the user
+		const result = await db
+			.delete(roleToUser)
+			.where(
+				and(eq(roleToUser.a, targetRole.id), eq(roleToUser.b, userRecord.id)),
+			);
+
+		console.log(`Role revoked: ${roleName} from user ${userRecord.email}`);
+		return true;
+	} catch (error) {
+		console.error('Error revoking role:', error);
 		return false;
 	}
 }
