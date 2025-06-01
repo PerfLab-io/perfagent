@@ -33,7 +33,13 @@ async function sendEmail(
 	}
 }
 
-export async function signupAction({ email }: { email: string }) {
+export async function signupAction({
+	email,
+	skipRedirect = false,
+}: {
+	email: string;
+	skipRedirect?: boolean;
+}) {
 	try {
 		// Validate email with Zod
 		const validationResult = signupSchema.safeParse({ email });
@@ -84,6 +90,13 @@ export async function signupAction({ email }: { email: string }) {
 			return {
 				success: false,
 				error: 'Failed to send verification email',
+			};
+		}
+
+		// Return success without redirecting if skipRedirect is true
+		if (skipRedirect) {
+			return {
+				success: true,
 			};
 		}
 	} catch (error) {

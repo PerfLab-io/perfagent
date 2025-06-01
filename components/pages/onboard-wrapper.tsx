@@ -11,12 +11,15 @@ import {
 	SelectValue,
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import type { ListAudiencesResponseSuccess } from 'resend';
 import type { UserWithRole, PendingUpdate } from '@/app/actions/onboard';
 import {
 	processPendingRoleUpdates,
 	getAudienceContacts,
 	getUsersWithRoleInfo,
+	inviteUnregisteredUsers,
 } from '@/app/actions/onboard';
 
 export type OnboardPageWrapperProps = {
@@ -39,6 +42,8 @@ function OnboardPageContent({
 		new Map(),
 	);
 	const [pendingUpdates, setPendingUpdates] = useState<PendingUpdate[]>([]);
+	const [inviteMode, setInviteMode] = useState<boolean>(false);
+	const [pendingInvites, setPendingInvites] = useState<string[]>([]);
 	const [status, setStatus] = useState<null | {
 		success: boolean;
 		message: string;
@@ -58,24 +63,30 @@ function OnboardPageContent({
 	// Calculate pending updates when selections change
 	useEffect(() => {
 		const updates: PendingUpdate[] = [];
+		const invites: string[] = [];
+
 		users.forEach((user) => {
 			const shouldHaveRole = userSelections.get(user.email) ?? false;
-			// Only create pending updates for users who exist in database and have actual changes
-			if (
-				user.existsInDb &&
-				user.id &&
-				shouldHaveRole !== user.hasAgentUserRole
-			) {
-				updates.push({
-					userId: user.id,
-					email: user.email,
-					shouldHaveRole,
-					currentHasRole: user.hasAgentUserRole,
-				});
+
+			if (user.existsInDb) {
+				// Only create pending updates for users who exist in database and have actual changes
+				if (user.id && shouldHaveRole !== user.hasAgentUserRole) {
+					updates.push({
+						userId: user.id,
+						email: user.email,
+						shouldHaveRole,
+						currentHasRole: user.hasAgentUserRole,
+					});
+				}
+			} else if (inviteMode && shouldHaveRole) {
+				// Add to pending invites if in invite mode and user is selected
+				invites.push(user.email);
 			}
 		});
+
 		setPendingUpdates(updates);
-	}, [userSelections, users]);
+		setPendingInvites(invites);
+	}, [userSelections, users, inviteMode]);
 
 	// Handle audience selection change
 	const handleAudienceChange = async (audienceId: string) => {
@@ -117,7 +128,9 @@ function OnboardPageContent({
 
 	const handleProcessUpdates = async () => {
 		console.log('pendingUpdates', pendingUpdates);
-		if (pendingUpdates.length === 0) {
+		console.log('pendingInvites', pendingInvites);
+
+		if (pendingUpdates.length === 0 && pendingInvites.length === 0) {
 			setStatus({
 				success: false,
 				message: 'No changes to process',
@@ -129,9 +142,35 @@ function OnboardPageContent({
 			setStatus(null);
 
 			try {
-				const result = await processPendingRoleUpdates(pendingUpdates);
+				let roleUpdateResult = {
+					success: true,
+					processedCount: 0,
+					errors: [] as string[],
+				};
+				let inviteResult = {
+					success: true,
+					invitedCount: 0,
+					errors: [] as string[],
+				};
 
-				if (result.success) {
+				// Process role updates for existing users
+				if (pendingUpdates.length > 0) {
+					roleUpdateResult = await processPendingRoleUpdates(pendingUpdates);
+				}
+
+				// Process invites for unregistered users
+				if (pendingInvites.length > 0) {
+					inviteResult = await inviteUnregisteredUsers(pendingInvites);
+				}
+
+				const allErrors = [...roleUpdateResult.errors, ...inviteResult.errors];
+				const overallSuccess = roleUpdateResult.success && inviteResult.success;
+
+				if (
+					overallSuccess ||
+					roleUpdateResult.processedCount > 0 ||
+					inviteResult.invitedCount > 0
+				) {
 					const newlyGrantedCount = pendingUpdates.filter(
 						(u) => u.shouldHaveRole && !u.currentHasRole,
 					).length;
@@ -139,14 +178,23 @@ function OnboardPageContent({
 						(u) => !u.shouldHaveRole && u.currentHasRole,
 					).length;
 
-					let successMessage = `Successfully processed ${result.processedCount} role updates`;
+					let successMessage = '';
 
-					if (newlyGrantedCount > 0) {
-						successMessage += `. Welcome emails sent to ${newlyGrantedCount} newly granted user${newlyGrantedCount > 1 ? 's' : ''}`;
+					if (roleUpdateResult.processedCount > 0) {
+						successMessage += `Successfully processed ${roleUpdateResult.processedCount} role updates`;
+
+						if (newlyGrantedCount > 0) {
+							successMessage += `. Welcome emails sent to ${newlyGrantedCount} newly granted user${newlyGrantedCount > 1 ? 's' : ''}`;
+						}
+
+						if (revokedCount > 0) {
+							successMessage += `. Revoked access from ${revokedCount} user${revokedCount > 1 ? 's' : ''}`;
+						}
 					}
 
-					if (revokedCount > 0) {
-						successMessage += `. Revoked access from ${revokedCount} user${revokedCount > 1 ? 's' : ''}`;
+					if (inviteResult.invitedCount > 0) {
+						if (successMessage) successMessage += '. ';
+						successMessage += `Sent invitations to ${inviteResult.invitedCount} unregistered user${inviteResult.invitedCount > 1 ? 's' : ''}`;
 					}
 
 					setStatus({
@@ -166,13 +214,24 @@ function OnboardPageContent({
 									hasAgentUserRole: update.shouldHaveRole,
 								};
 							}
+
+							// Update verification status for invited users
+							if (pendingInvites.includes(user.email)) {
+								return {
+									...user,
+									verificationStatus: 'sent' as const,
+								};
+							}
+
 							return user;
 						}),
 					);
 				} else {
+					const totalProcessed =
+						roleUpdateResult.processedCount + inviteResult.invitedCount;
 					setStatus({
 						success: false,
-						message: `Processed ${result.processedCount} updates with ${result.errors.length} errors: ${result.errors.join(', ')}`,
+						message: `Processed ${totalProcessed} updates with ${allErrors.length} errors: ${allErrors.join(', ')}`,
 					});
 				}
 			} catch (error) {
@@ -192,11 +251,27 @@ function OnboardPageContent({
 
 	const getUserStatusBadge = (user: UserWithRole): React.ReactNode => {
 		if (!user.existsInDb) {
-			return (
-				<span className="rounded-full bg-yellow-100 px-2 py-1 text-xs font-medium text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
-					Not Registered
-				</span>
-			);
+			// Show verification status for unregistered users
+			switch (user.verificationStatus) {
+				case 'sent':
+					return (
+						<span className="rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+							Code Sent
+						</span>
+					);
+				case 'expired':
+					return (
+						<span className="rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-800 dark:bg-red-900 dark:text-red-200">
+							Code Expired
+						</span>
+					);
+				default:
+					return (
+						<span className="rounded-full bg-yellow-100 px-2 py-1 text-xs font-medium text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+							Not Registered
+						</span>
+					);
+			}
 		}
 		if (user.hasAgentUserRole) {
 			return (
@@ -269,6 +344,28 @@ function OnboardPageContent({
 						</p>
 					</div>
 				)}
+
+				{pendingInvites.length > 0 && (
+					<div className="rounded-md border border-[#67cb87] bg-[#0d3d2d] p-4">
+						<p className="font-mono text-sm text-[#c3e6d4]">
+							{pendingInvites.length} pending invitations to send
+						</p>
+					</div>
+				)}
+
+				<div className="flex items-center space-x-2">
+					<Switch
+						id="invite-mode"
+						checked={inviteMode}
+						onCheckedChange={setInviteMode}
+					/>
+					<Label
+						htmlFor="invite-mode"
+						className="cursor-pointer font-mono text-[#67cb87]"
+					>
+						Enable invite mode for unregistered users
+					</Label>
+				</div>
 			</div>
 
 			{isLoadingUsers && (
@@ -285,12 +382,15 @@ function OnboardPageContent({
 						</h2>
 						<button
 							onClick={handleProcessUpdates}
-							disabled={isPending || pendingUpdates.length === 0}
+							disabled={
+								isPending ||
+								(pendingUpdates.length === 0 && pendingInvites.length === 0)
+							}
 							className="rounded-md bg-[#67cb87] px-4 py-2 font-mono font-medium text-[#0a2824] disabled:opacity-50"
 						>
 							{isPending
 								? 'Processing...'
-								: `Grant/Revoke Role (${pendingUpdates.length})`}
+								: `Process Updates (${pendingUpdates.length + pendingInvites.length})`}
 						</button>
 					</div>
 
@@ -306,7 +406,7 @@ function OnboardPageContent({
 									onCheckedChange={(checked) =>
 										handleUserSelectionChange(user.email, checked === true)
 									}
-									disabled={!user.existsInDb}
+									disabled={!user.existsInDb && !inviteMode}
 									className="border-[#67cb87] data-[state=checked]:bg-[#67cb87] data-[state=checked]:text-[#0a2824]"
 								/>
 								<div className="flex-1 space-y-1">
@@ -322,13 +422,23 @@ function OnboardPageContent({
 												Pending Change
 											</span>
 										)}
+										{pendingInvites.includes(user.email) && (
+											<span className="rounded-full bg-purple-100 px-2 py-1 text-xs font-medium text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+												Pending Invite
+											</span>
+										)}
 									</div>
 									<p className="font-mono text-sm text-[#a3d4c4]">
 										{user.email}
 									</p>
-									{!user.existsInDb && (
+									{!user.existsInDb && !inviteMode && (
 										<p className="font-mono text-xs text-[#e0c068]">
 											User must register before role can be granted
+										</p>
+									)}
+									{!user.existsInDb && inviteMode && (
+										<p className="font-mono text-xs text-[#67cb87]">
+											Select to send signup invitation
 										</p>
 									)}
 								</div>
@@ -339,8 +449,9 @@ function OnboardPageContent({
 					{users.filter((u) => !u.existsInDb).length > 0 && (
 						<div className="mt-4 rounded-md border border-[#e0c068] bg-[#3d3520] p-4">
 							<p className="font-mono text-sm text-[#e0c068]">
-								Note: Users who haven't registered yet cannot have roles
-								assigned. They will need to sign up first.
+								{inviteMode
+									? 'Note: Enable invite mode and select unregistered users to send them signup invitations.'
+									: "Note: Users who haven't registered yet cannot have roles assigned. They will need to sign up first."}
 							</p>
 						</div>
 					)}

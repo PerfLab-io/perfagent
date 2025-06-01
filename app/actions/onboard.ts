@@ -5,6 +5,7 @@ import { user, role, roleToUser } from '@/drizzle/schema';
 import { eq, and, inArray } from 'drizzle-orm';
 import { resend } from '@/lib/resend';
 import { grantRole, revokeRole } from './login';
+import { getVerificationStatus } from './verify.server';
 import OnboardingEmail from '@/components/emails/onboarding';
 
 export type AudienceContact = {
@@ -23,6 +24,7 @@ export type UserWithRole = {
 	name?: string;
 	hasAgentUserRole: boolean;
 	existsInDb: boolean;
+	verificationStatus?: 'none' | 'sent' | 'expired';
 };
 
 export type PendingUpdate = {
@@ -124,9 +126,11 @@ export async function getUsersWithRoleInfo(
 			}
 		}
 
-		// Add contacts that don't exist in database
+		// Add contacts that don't exist in database and check their verification status
+		const unregisteredEmails: string[] = [];
 		for (const contact of audienceContacts) {
 			if (!userMap.has(contact.email)) {
+				unregisteredEmails.push(contact.email);
 				userMap.set(contact.email, {
 					id: '', // No ID for non-existing users
 					email: contact.email,
@@ -137,7 +141,23 @@ export async function getUsersWithRoleInfo(
 							: contact.first_name || contact.last_name || undefined,
 					hasAgentUserRole: false,
 					existsInDb: false,
+					verificationStatus: 'none', // Will be updated below
 				});
+			}
+		}
+
+		// Check verification status for unregistered users
+		if (unregisteredEmails.length > 0) {
+			for (const email of unregisteredEmails) {
+				const verificationStatus = await getVerificationStatus({
+					type: 'onboarding',
+					target: email,
+				});
+
+				const user = userMap.get(email);
+				if (user) {
+					user.verificationStatus = verificationStatus;
+				}
 			}
 		}
 
@@ -148,6 +168,7 @@ export async function getUsersWithRoleInfo(
 				email: u.email,
 				hasRole: u.hasAgentUserRole,
 				existsInDb: u.existsInDb,
+				verificationStatus: u.verificationStatus,
 			})),
 		);
 
@@ -276,6 +297,54 @@ export async function processPendingRoleUpdates(
 		return {
 			success: false,
 			processedCount,
+			errors: [...errors, `Unexpected error: ${error}`],
+		};
+	}
+}
+
+/**
+ * Invite unregistered users by sending them signup OTP emails
+ * @param emails Array of email addresses to invite
+ * @returns Promise<{ success: boolean; invitedCount: number; errors: string[] }>
+ */
+export async function inviteUnregisteredUsers(
+	emails: string[],
+): Promise<{ success: boolean; invitedCount: number; errors: string[] }> {
+	const errors: string[] = [];
+	let invitedCount = 0;
+
+	try {
+		// Import the signupAction dynamically to avoid circular dependencies
+		const { signupAction } = await import('./signup');
+
+		for (const email of emails) {
+			try {
+				const result = await signupAction({
+					email,
+					skipRedirect: true,
+				});
+
+				if (result.success) {
+					invitedCount++;
+					console.log(`Invitation sent to ${email}`);
+				} else {
+					errors.push(`Failed to invite ${email}: ${result.error}`);
+				}
+			} catch (error) {
+				errors.push(`Failed to invite ${email}: ${error}`);
+			}
+		}
+
+		return {
+			success: errors.length === 0,
+			invitedCount,
+			errors,
+		};
+	} catch (error) {
+		console.error('Error inviting unregistered users:', error);
+		return {
+			success: false,
+			invitedCount,
 			errors: [...errors, `Unexpected error: ${error}`],
 		};
 	}

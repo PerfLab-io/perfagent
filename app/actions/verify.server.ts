@@ -137,3 +137,46 @@ export async function isCodeValid({
 
 	return true;
 }
+
+/**
+ * Check if a verification code exists for a target and type
+ * Returns the status: 'none', 'sent', or 'expired'
+ */
+export async function getVerificationStatus({
+	type,
+	target,
+}: {
+	type: VerificationTypes;
+	target: string;
+}): Promise<'none' | 'sent' | 'expired'> {
+	try {
+		const verificationRecord = await db
+			.select({
+				expiresAt: verification.expiresAt,
+			})
+			.from(verification)
+			.where(and(eq(verification.target, target), eq(verification.type, type)))
+			.limit(1);
+
+		if (!verificationRecord.length) {
+			return 'none';
+		}
+
+		const expiresAt = verificationRecord[0].expiresAt;
+		if (!expiresAt) {
+			return 'expired';
+		}
+
+		const now = new Date();
+		const expirationDate = new Date(expiresAt);
+
+		if (now > expirationDate) {
+			return 'expired';
+		}
+
+		return 'sent';
+	} catch (error) {
+		console.error('Error checking verification status:', error);
+		return 'none';
+	}
+}

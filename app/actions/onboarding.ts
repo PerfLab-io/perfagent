@@ -16,9 +16,8 @@ import {
 } from '@/lib/session.server';
 import { onboardingSchema } from '@/lib/validations/email';
 import crypto from 'crypto';
-import { addToWaitlist } from '@/app/actions/subscribe';
 import { resend } from '@/lib/resend';
-import { OnboardingSignupEmail } from '@/components/emails/onboarding-signup';
+import { OnboardingEmail } from '@/components/emails/onboarding';
 
 export async function createAccountAction({
 	username,
@@ -129,12 +128,11 @@ export async function createAccountAction({
 			.where(eq(role.name, 'user'))
 			.limit(1);
 
-		// Not granting agent-user role for now
-		// const agentUserRole = await db
-		// 	.select()
-		// 	.from(role)
-		// 	.where(eq(role.name, 'agent-user'))
-		// 	.limit(1);
+		const agentUserRole = await db
+			.select()
+			.from(role)
+			.where(eq(role.name, 'agent-user'))
+			.limit(1);
 
 		// Assign roles if they exist
 		if (userRole.length > 0) {
@@ -144,12 +142,12 @@ export async function createAccountAction({
 			});
 		}
 
-		// if (agentUserRole.length > 0) {
-		// 	await db.insert(roleToUser).values({
-		// 		a: agentUserRole[0].id,
-		// 		b: userId,
-		// 	});
-		// }
+		if (agentUserRole.length > 0) {
+			await db.insert(roleToUser).values({
+				a: agentUserRole[0].id,
+				b: userId,
+			});
+		}
 
 		// Create a real session for the new user
 		await createSession(userId);
@@ -157,23 +155,23 @@ export async function createAccountAction({
 		// Remove the temporary session cookie
 		await deleteTempSession();
 
-		const waitlistSub = await addToWaitlist(email);
-		if (!waitlistSub.success) {
-			return {
-				success: false,
-				error:
-					'Account created but failed to add to waitlist, please try to subscribe at https://agent.perflab.io/#signup',
-			};
-		} else {
-			await resend.emails.send({
-				from: 'PerfAgent <no-reply@perflab.io>',
-				to: email,
-				subject: 'Welcome to PerfAgent - You are now a registered user!',
-				react: OnboardingSignupEmail({
-					recipientEmail: email,
-				}),
-			});
-		}
+		await resend.emails.send({
+			from: 'PerfAgent <support@perflab.io>',
+			to: email,
+			subject: 'Welcome to PerfAgent - Your Access is Now Active! 🚀',
+			react: OnboardingEmail({
+				previewText:
+					"Welcome to PerfAgent - Let's optimize your web performance together!",
+				userName: validatedData.username,
+				heroImageUrl:
+					'https://yn20j37lsyu3f9lc.public.blob.vercel-storage.com/newsletter/hero_images/hero16-VKXKwJJzJwMhFV0ovjFpGVljf8nxLL.jpg',
+				heroImageAlt:
+					'Welcome to PerfAgent! - AI-Powered Web Performance Analysis',
+				chatUrl: 'https://agent.perflab.io/chat',
+				unsubscribeUrl: `https://agent.perflab.io/unsubscribe?email=${encodeURIComponent(email)}`,
+				recipientEmail: email,
+			}),
+		});
 
 		return {
 			success: true,
