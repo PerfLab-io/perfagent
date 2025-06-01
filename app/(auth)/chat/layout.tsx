@@ -7,7 +7,7 @@ import { AppSidebar } from '@/components/app-sidebar';
 import { SiteHeader } from '@/components/site-header';
 import { Metadata } from 'next';
 import { cookies } from 'next/headers';
-import { requireUserWithRole, SessionData } from '@/lib/session';
+import { requireUserWithRole, SessionData } from '@/lib/session.server';
 import { redirect } from 'next/navigation';
 
 export const metadata: Metadata = {

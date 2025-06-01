@@ -12,8 +12,7 @@ import {
 import bcrypt from 'bcryptjs';
 import { eq, and, or, SQL } from 'drizzle-orm';
 import { parsePermissionString, type PermissionString } from '@/lib/user';
-import { createSession } from '@/lib/session';
-import { deleteSession } from '@/lib/session';
+import { createSession, deleteSession } from '@/lib/session.server';
 import crypto from 'crypto';
 
 export async function login(email: string, password: string) {

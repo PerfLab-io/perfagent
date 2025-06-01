@@ -1,5 +1,5 @@
 import { LoginPageComponent } from '@/components/pages/login';
-import { isAuthenticated } from '@/lib/session';
+import { isAuthenticated } from '@/lib/session.server';
 import type React from 'react';
 import { redirect } from 'next/navigation';
 import TerminalWindow from '@/components/terminal-window';

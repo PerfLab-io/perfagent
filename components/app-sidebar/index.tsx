@@ -26,7 +26,7 @@ import {
 	useSidebar,
 } from '@/components/ui/sidebar';
 import { SimpleThemeToggle } from '../simple-theme-toggle';
-import { SessionData } from '@/lib/session';
+import { SessionData } from '@/lib/session.server';
 
 const data = {
 	navMain: [
