@@ -1,7 +1,7 @@
 'use server';
 
 import { isCodeValid, type VerificationTypes } from '@/app/actions/verify';
-import { createSession } from '@/lib/session';
+import { cookies } from 'next/headers';
 
 export async function verifyOtpAction({
 	code,
@@ -42,9 +42,26 @@ export async function verifyOtpAction({
 			};
 		}
 
-		// Create a session with the email as userId (temporary until account creation)
-		// This allows the user to access the onboarding page
-		await createSession(target);
+		// Create a temporary session cookie for the verified email
+		const tempSessionId = crypto.randomUUID();
+		const expirationDate = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+
+		// Create a temporary session payload with the verified email
+		const tempSessionData = {
+			id: tempSessionId,
+			email: target, // The verified email
+			expirationDate: expirationDate.toISOString(),
+		};
+
+		// Set secure temporary session cookie
+		const cookieStore = await cookies();
+		cookieStore.set('temp-session-id', JSON.stringify(tempSessionData), {
+			httpOnly: true,
+			secure: process.env.NODE_ENV === 'production',
+			sameSite: 'lax',
+			expires: expirationDate,
+			path: '/',
+		});
 
 		return {
 			success: true,

@@ -121,7 +121,7 @@ export async function isCodeValid({
 			and(
 				eq(verification.target, target),
 				eq(verification.type, type),
-				// gt(verification.expiresAt, new Date().toISOString()),
+				gt(verification.expiresAt, new Date().toISOString()),
 			),
 		)
 		.limit(1);

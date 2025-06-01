@@ -9,7 +9,11 @@ import {
 } from '@/drizzle/schema';
 import bcrypt from 'bcryptjs';
 import { eq } from 'drizzle-orm';
-import { verifySession, updateSessionUserId } from '@/lib/session';
+import {
+	verifyTempSession,
+	deleteTempSession,
+	createSession,
+} from '@/lib/session';
 import crypto from 'crypto';
 
 export async function createAccountAction({
@@ -56,15 +60,15 @@ export async function createAccountAction({
 		}
 
 		// Verify that user has a valid temporary session
-		const session = await verifySession();
-		if (!session || !session.userId.includes('@')) {
+		const tempSession = await verifyTempSession();
+		if (!tempSession) {
 			return {
 				success: false,
 				error: 'Invalid session. Please start the onboarding process again.',
 			};
 		}
 
-		const email = session.userId;
+		const email = tempSession.email;
 
 		// Check if user already exists with this email
 		const existingUser = await db
@@ -152,8 +156,11 @@ export async function createAccountAction({
 			});
 		}
 
-		// Update the session to use the actual user ID instead of the email
-		await updateSessionUserId(session.id, userId);
+		// Create a real session for the new user
+		await createSession(userId);
+
+		// Remove the temporary session cookie
+		await deleteTempSession();
 
 		return {
 			success: true,

@@ -1,23 +1,16 @@
 import { Suspense } from 'react';
 import { OnboardingForm } from '@/components/pages/onboarding-form';
 import TerminalWindow from '@/components/terminal-window';
-import { verifySession } from '@/lib/session';
 import { redirect } from 'next/navigation';
+import { verifyTempSession } from '@/lib/session';
 
 export default async function OnboardingPage() {
-	// Check if user has a valid session (from OTP verification)
-	const session = await verifySession();
+	// Check for temporary session from email verification
+	const tempSession = await verifyTempSession();
 
-	if (!session) {
-		// No session means they haven't completed OTP verification
+	if (!tempSession) {
+		// No temp session means they haven't completed OTP verification
 		redirect('/signup');
-	}
-
-	// Check if the session userId is an email (temporary session)
-	// If it's not an email, they may have already completed onboarding
-	if (!session.userId.includes('@')) {
-		// They may have already completed onboarding, redirect to chat
-		redirect('/');
 	}
 
 	return (
@@ -31,7 +24,7 @@ export default async function OnboardingPage() {
 							</div>
 						}
 					>
-						<OnboardingForm email={session.userId} />
+						<OnboardingForm email={tempSession.email} />
 					</Suspense>
 				</TerminalWindow>
 			</div>
