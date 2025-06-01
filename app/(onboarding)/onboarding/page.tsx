@@ -2,7 +2,7 @@ import { Suspense } from 'react';
 import { OnboardingForm } from '@/components/pages/onboarding-form';
 import TerminalWindow from '@/components/terminal-window';
 import { redirect } from 'next/navigation';
-import { verifySession, verifyTempSession } from '@/lib/session';
+import { verifySession, verifyTempSession } from '@/lib/session.server';
 
 export default async function OnboardingPage() {
 	// Check for temporary session from email verification

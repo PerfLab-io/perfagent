@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Mail, ArrowRight, AlertCircle } from 'lucide-react';
-import { signupAction } from '@/app/(onboarding)/signup/actions';
+import { signupAction } from '@/app/actions/signup';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { signupSchema, type SignupFormValues } from '@/lib/validations/email';

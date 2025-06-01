@@ -10,7 +10,7 @@ import {
 	ArrowRight,
 	AlertCircle,
 } from 'lucide-react';
-import { createAccountAction } from '@/app/(onboarding)/onboarding/actions';
+import { createAccountAction } from '@/app/actions/onboarding';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';

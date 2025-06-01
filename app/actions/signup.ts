@@ -1,6 +1,6 @@
 'use server';
 
-import { prepareVerification } from '@/app/actions/verify';
+import { prepareVerification } from '@/app/actions/verify.server';
 import { resend } from '@/lib/resend';
 import OnboardingOtpEmail from '@/components/emails/onboarding-otp';
 import { redirect } from 'next/navigation';

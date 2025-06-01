@@ -9,7 +9,7 @@ import {
 	InputOTPSlot,
 } from '@/components/ui/input-otp';
 import { ArrowRight } from 'lucide-react';
-import { verifyOtpAction } from '@/app/(onboarding)/verify/actions';
+import { verifyOtpAction } from '@/app/actions/verify';
 
 export function VerifyForm() {
 	const [code, setCode] = useState('');

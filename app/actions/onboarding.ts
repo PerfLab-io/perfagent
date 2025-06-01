@@ -13,7 +13,7 @@ import {
 	verifyTempSession,
 	deleteTempSession,
 	createSession,
-} from '@/lib/session';
+} from '@/lib/session.server';
 import { onboardingSchema } from '@/lib/validations/email';
 import crypto from 'crypto';
 import { addToWaitlist } from '@/app/actions/subscribe';

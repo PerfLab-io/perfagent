@@ -1,6 +1,9 @@
 'use server';
 
-import { isCodeValid, type VerificationTypes } from '@/app/actions/verify';
+import {
+	isCodeValid,
+	type VerificationTypes,
+} from '@/app/actions/verify.server';
 import { cookies } from 'next/headers';
 
 export async function verifyOtpAction({
