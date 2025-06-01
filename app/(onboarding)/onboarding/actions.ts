@@ -16,6 +16,9 @@ import {
 } from '@/lib/session';
 import { onboardingSchema } from '@/lib/validations/email';
 import crypto from 'crypto';
+import { addToWaitlist } from '@/app/actions/subscribe';
+import { resend } from '@/lib/resend';
+import { OnboardingSignupEmail } from '@/components/emails/onboarding-signup';
 
 export async function createAccountAction({
 	username,
@@ -126,11 +129,12 @@ export async function createAccountAction({
 			.where(eq(role.name, 'user'))
 			.limit(1);
 
-		const agentUserRole = await db
-			.select()
-			.from(role)
-			.where(eq(role.name, 'agent-user'))
-			.limit(1);
+		// Not granting agent-user role for now
+		// const agentUserRole = await db
+		// 	.select()
+		// 	.from(role)
+		// 	.where(eq(role.name, 'agent-user'))
+		// 	.limit(1);
 
 		// Assign roles if they exist
 		if (userRole.length > 0) {
@@ -140,18 +144,36 @@ export async function createAccountAction({
 			});
 		}
 
-		if (agentUserRole.length > 0) {
-			await db.insert(roleToUser).values({
-				a: agentUserRole[0].id,
-				b: userId,
-			});
-		}
+		// if (agentUserRole.length > 0) {
+		// 	await db.insert(roleToUser).values({
+		// 		a: agentUserRole[0].id,
+		// 		b: userId,
+		// 	});
+		// }
 
 		// Create a real session for the new user
 		await createSession(userId);
 
 		// Remove the temporary session cookie
 		await deleteTempSession();
+
+		const waitlistSub = await addToWaitlist(email);
+		if (!waitlistSub.success) {
+			return {
+				success: false,
+				error:
+					'Account created but failed to add to waitlist, please try to subscribe at https://agent.perflab.io/#signup',
+			};
+		} else {
+			await resend.emails.send({
+				from: 'PerfAgent <no-reply@perflab.io>',
+				to: email,
+				subject: 'Welcome to PerfAgent - You are now a registered user!',
+				react: OnboardingSignupEmail({
+					recipientEmail: email,
+				}),
+			});
+		}
 
 		return {
 			success: true,
