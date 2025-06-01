@@ -2,53 +2,54 @@
 
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
-import { User, UserCircle, Lock, Shield, ArrowRight } from 'lucide-react';
+import {
+	User,
+	UserCircle,
+	Lock,
+	Shield,
+	ArrowRight,
+	AlertCircle,
+} from 'lucide-react';
 import { createAccountAction } from '@/app/(onboarding)/onboarding/actions';
 import { useRouter } from 'next/navigation';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import {
+	onboardingSchema,
+	type OnboardingFormValues,
+} from '@/lib/validations/email';
 
 export function OnboardingForm({ email }: { email: string }) {
-	const [username, setUsername] = useState('');
-	const [name, setName] = useState('');
-	const [password, setPassword] = useState('');
-	const [confirmPassword, setConfirmPassword] = useState('');
-	const [agreeToTerms, setAgreeToTerms] = useState(false);
 	const [success, setSuccess] = useState(false);
-	const [error, setError] = useState<string | null>(null);
 	const [isPending, startTransition] = useTransition();
+	const [serverError, setServerError] = useState<string | null>(null);
 	const router = useRouter();
 
-	const handleSubmit = async (e: React.FormEvent) => {
-		e.preventDefault();
+	const {
+		register,
+		handleSubmit,
+		formState: { errors },
+	} = useForm<OnboardingFormValues>({
+		resolver: zodResolver(onboardingSchema),
+		defaultValues: {
+			username: '',
+			name: '',
+			password: '',
+			confirmPassword: '',
+			agreeToTerms: false,
+		},
+	});
 
-		if (!username || !name || !password || !confirmPassword) {
-			setError('All fields are required');
-			return;
-		}
-
-		if (!agreeToTerms) {
-			setError('You must agree to the Terms of Service');
-			return;
-		}
-
-		if (password !== confirmPassword) {
-			setError('Passwords do not match');
-			return;
-		}
-
-		if (password.length < 8) {
-			setError('Password must be at least 8 characters long');
-			return;
-		}
-
-		setError(null);
+	const onSubmit = async (data: OnboardingFormValues) => {
+		setServerError(null);
 
 		startTransition(async () => {
 			const result = await createAccountAction({
-				username,
-				name,
-				password,
-				confirmPassword,
-				agreeToTerms,
+				username: data.username,
+				name: data.name,
+				password: data.password,
+				confirmPassword: data.confirmPassword,
+				agreeToTerms: data.agreeToTerms,
 			});
 
 			if (result.success) {
@@ -58,7 +59,7 @@ export function OnboardingForm({ email }: { email: string }) {
 					router.push('/chat');
 				}, 1500);
 			} else {
-				setError(result.error || 'Failed to create account');
+				setServerError(result.error || 'Failed to create account');
 			}
 		});
 	};
@@ -95,7 +96,7 @@ export function OnboardingForm({ email }: { email: string }) {
 				</div>
 			</div>
 
-			<form onSubmit={handleSubmit} className="space-y-6">
+			<form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
 				{/* Username field */}
 				<div className="space-y-2">
 					<label className="text-peppermint-400 block font-mono text-sm">
@@ -107,17 +108,20 @@ export function OnboardingForm({ email }: { email: string }) {
 						</div>
 						<input
 							type="text"
-							value={username}
-							onChange={(e) => {
-								setUsername(e.target.value);
-								setError(null);
-							}}
+							{...register('username')}
 							className="bg-peppermint-900/50 border-peppermint-600 text-peppermint-50 focus:ring-peppermint-500 placeholder:text-peppermint-600 w-full rounded-md border py-3 pr-4 pl-10 font-mono focus:border-transparent focus:ring-2 focus:outline-none"
 							placeholder="username"
-							required
 							disabled={isPending}
 						/>
 					</div>
+					{errors.username && (
+						<div className="flex items-start gap-1 text-rose-400">
+							<AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
+							<span className="font-mono text-xs">
+								{errors.username.message}
+							</span>
+						</div>
+					)}
 				</div>
 
 				{/* Name field */}
@@ -131,17 +135,18 @@ export function OnboardingForm({ email }: { email: string }) {
 						</div>
 						<input
 							type="text"
-							value={name}
-							onChange={(e) => {
-								setName(e.target.value);
-								setError(null);
-							}}
+							{...register('name')}
 							className="bg-peppermint-900/50 border-peppermint-600 text-peppermint-50 focus:ring-peppermint-500 placeholder:text-peppermint-600 w-full rounded-md border py-3 pr-4 pl-10 font-mono focus:border-transparent focus:ring-2 focus:outline-none"
 							placeholder="John Doe"
-							required
 							disabled={isPending}
 						/>
 					</div>
+					{errors.name && (
+						<div className="flex items-start gap-1 text-rose-400">
+							<AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
+							<span className="font-mono text-xs">{errors.name.message}</span>
+						</div>
+					)}
 				</div>
 
 				{/* Password field */}
@@ -155,17 +160,20 @@ export function OnboardingForm({ email }: { email: string }) {
 						</div>
 						<input
 							type="password"
-							value={password}
-							onChange={(e) => {
-								setPassword(e.target.value);
-								setError(null);
-							}}
+							{...register('password')}
 							className="bg-peppermint-900/50 border-peppermint-600 text-peppermint-50 focus:ring-peppermint-500 placeholder:text-peppermint-600 w-full rounded-md border py-3 pr-4 pl-10 font-mono focus:border-transparent focus:ring-2 focus:outline-none"
 							placeholder="••••••••"
-							required
 							disabled={isPending}
 						/>
 					</div>
+					{errors.password && (
+						<div className="flex items-start gap-1 text-rose-400">
+							<AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
+							<span className="font-mono text-xs">
+								{errors.password.message}
+							</span>
+						</div>
+					)}
 				</div>
 
 				{/* Confirm Password field */}
@@ -179,17 +187,20 @@ export function OnboardingForm({ email }: { email: string }) {
 						</div>
 						<input
 							type="password"
-							value={confirmPassword}
-							onChange={(e) => {
-								setConfirmPassword(e.target.value);
-								setError(null);
-							}}
+							{...register('confirmPassword')}
 							className="bg-peppermint-900/50 border-peppermint-600 text-peppermint-50 focus:ring-peppermint-500 placeholder:text-peppermint-600 w-full rounded-md border py-3 pr-4 pl-10 font-mono focus:border-transparent focus:ring-2 focus:outline-none"
 							placeholder="••••••••"
-							required
 							disabled={isPending}
 						/>
 					</div>
+					{errors.confirmPassword && (
+						<div className="flex items-start gap-1 text-rose-400">
+							<AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
+							<span className="font-mono text-xs">
+								{errors.confirmPassword.message}
+							</span>
+						</div>
+					)}
 				</div>
 
 				{/* Terms of Service checkbox */}
@@ -197,13 +208,8 @@ export function OnboardingForm({ email }: { email: string }) {
 					<label className="flex cursor-pointer items-start gap-3">
 						<input
 							type="checkbox"
-							checked={agreeToTerms}
-							onChange={(e) => {
-								setAgreeToTerms(e.target.checked);
-								setError(null);
-							}}
+							{...register('agreeToTerms')}
 							className="bg-peppermint-900/50 border-peppermint-600 text-peppermint-500 focus:ring-peppermint-500 mt-1 h-4 w-4 rounded border focus:ring-2 focus:ring-offset-0"
-							required
 							disabled={isPending}
 						/>
 						<span className="text-peppermint-300 font-mono text-sm">
@@ -225,13 +231,22 @@ export function OnboardingForm({ email }: { email: string }) {
 							</a>
 						</span>
 					</label>
+					{errors.agreeToTerms && (
+						<div className="flex items-start gap-1 text-rose-400">
+							<AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
+							<span className="font-mono text-xs">
+								{errors.agreeToTerms.message}
+							</span>
+						</div>
+					)}
 				</div>
 
-				{/* Error message */}
-				{error && (
+				{/* Server Error message */}
+				{serverError && (
 					<div className="rounded-md border border-rose-500 bg-rose-900/30 p-3">
-						<div className="font-mono text-sm text-rose-400">
-							ERROR: {error}
+						<div className="flex items-start gap-2 text-rose-400">
+							<AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+							<div className="font-mono text-sm">ERROR: {serverError}</div>
 						</div>
 					</div>
 				)}
@@ -239,14 +254,7 @@ export function OnboardingForm({ email }: { email: string }) {
 				{/* Submit button */}
 				<Button
 					type="submit"
-					disabled={
-						isPending ||
-						!username ||
-						!name ||
-						!password ||
-						!confirmPassword ||
-						!agreeToTerms
-					}
+					disabled={isPending}
 					className="bg-peppermint-500 hover:bg-peppermint-600 text-peppermint-950 flex w-full items-center justify-center gap-2 rounded-md py-3 font-mono font-bold transition-all disabled:cursor-not-allowed disabled:opacity-50"
 				>
 					{isPending ? (
@@ -273,7 +281,7 @@ export function OnboardingForm({ email }: { email: string }) {
 						SECURITY INFO:
 					</div>
 					<div className="text-peppermint-300 space-y-1 font-mono text-xs">
-						<p>• Password must be at least 8 characters long</p>
+						<p>• Password must contain uppercase, lowercase, and number</p>
 						<p>• Username must be unique across all users</p>
 						<p>• Your data is encrypted and secure</p>
 					</div>

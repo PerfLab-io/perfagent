@@ -4,6 +4,10 @@ import { prepareVerification } from '@/app/actions/verify';
 import { resend } from '@/lib/resend';
 import OnboardingOtpEmail from '@/components/emails/onboarding-otp';
 import { redirect } from 'next/navigation';
+import { signupSchema } from '@/lib/validations/email';
+import { db } from '@/drizzle/db';
+import { user } from '@/drizzle/schema';
+import { eq } from 'drizzle-orm';
 
 // Updated to use Resend with React component
 async function sendEmail(
@@ -31,11 +35,31 @@ async function sendEmail(
 
 export async function signupAction({ email }: { email: string }) {
 	try {
-		// Validate email
-		if (!email || !email.includes('@')) {
+		// Validate email with Zod
+		const validationResult = signupSchema.safeParse({ email });
+
+		if (!validationResult.success) {
+			const firstError = validationResult.error.errors[0];
 			return {
 				success: false,
-				error: 'Invalid email address',
+				error: firstError?.message || 'Invalid email address',
+			};
+		}
+
+		const validatedEmail = validationResult.data.email;
+
+		// Check if user already exists with this email
+		const existingUser = await db
+			.select()
+			.from(user)
+			.where(eq(user.email, validatedEmail))
+			.limit(1);
+
+		if (existingUser.length > 0) {
+			return {
+				success: false,
+				error:
+					'An account with this email already exists. Please sign in instead.',
 			};
 		}
 
@@ -43,15 +67,15 @@ export async function signupAction({ email }: { email: string }) {
 		const { otp } = await prepareVerification({
 			period: 600, // 10 minutes
 			type: 'onboarding',
-			target: email,
+			target: validatedEmail,
 		});
 
 		// Send email with React component
 		const emailResult = await sendEmail(
-			email,
+			validatedEmail,
 			'Complete Your PerfAgent Onboarding',
 			{
-				email,
+				email: validatedEmail,
 				otpCode: otp,
 			},
 		);

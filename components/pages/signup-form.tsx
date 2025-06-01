@@ -2,42 +2,45 @@
 
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
-import { Mail, ArrowRight } from 'lucide-react';
+import { Mail, ArrowRight, AlertCircle } from 'lucide-react';
 import { signupAction } from '@/app/(onboarding)/signup/actions';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { signupSchema, type SignupFormValues } from '@/lib/validations/email';
 
 export function SignupForm() {
-	const [email, setEmail] = useState('');
 	const [success, setSuccess] = useState(false);
-	const [error, setError] = useState<string | null>(null);
 	const [isPending, startTransition] = useTransition();
+	const [serverError, setServerError] = useState<string | null>(null);
 
-	const handleSubmit = async (e: React.FormEvent) => {
-		e.preventDefault();
+	const {
+		register,
+		handleSubmit,
+		formState: { errors },
+		getValues,
+	} = useForm<SignupFormValues>({
+		resolver: zodResolver(signupSchema),
+		defaultValues: {
+			email: '',
+		},
+	});
 
-		if (!email) {
-			setError('Email is required');
-			return;
-		}
-
-		if (!email.includes('@')) {
-			setError('Please enter a valid email address');
-			return;
-		}
-
-		setError(null);
+	const onSubmit = async (data: SignupFormValues) => {
+		setServerError(null);
 
 		startTransition(async () => {
-			const result = await signupAction({ email });
+			const result = await signupAction({ email: data.email });
 
 			if (result.success) {
 				setSuccess(true);
 			} else {
-				setError(result.error || 'Failed to send verification email');
+				setServerError(result.error || 'Failed to send verification email');
 			}
 		});
 	};
 
 	if (success) {
+		const email = getValues('email');
 		return (
 			<>
 				<div className="mb-6">
@@ -78,7 +81,7 @@ export function SignupForm() {
 				</div>
 			</div>
 
-			<form onSubmit={handleSubmit} className="space-y-6">
+			<form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
 				{/* Email field */}
 				<div className="space-y-2">
 					<label className="text-peppermint-400 block font-mono text-sm">
@@ -90,24 +93,22 @@ export function SignupForm() {
 						</div>
 						<input
 							type="email"
-							value={email}
-							onChange={(e) => {
-								setEmail(e.target.value);
-								setError(null);
-							}}
+							{...register('email')}
 							className="bg-peppermint-900/50 border-peppermint-600 text-peppermint-50 focus:ring-peppermint-500 placeholder:text-peppermint-600 w-full rounded-md border py-3 pr-4 pl-10 font-mono focus:border-transparent focus:ring-2 focus:outline-none"
 							placeholder="user@perflab.io"
-							required
 							disabled={isPending}
 						/>
 					</div>
 				</div>
 
-				{/* Error message */}
-				{error && (
+				{/* Error messages */}
+				{(errors.email || serverError) && (
 					<div className="rounded-md border border-rose-500 bg-rose-900/30 p-3">
-						<div className="font-mono text-sm text-rose-400">
-							ERROR: {error}
+						<div className="flex items-start gap-2 text-rose-400">
+							<AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+							<div className="font-mono text-sm">
+								ERROR: {errors.email?.message || serverError}
+							</div>
 						</div>
 					</div>
 				)}
@@ -115,7 +116,7 @@ export function SignupForm() {
 				{/* Submit button */}
 				<Button
 					type="submit"
-					disabled={isPending || !email}
+					disabled={isPending}
 					className="bg-peppermint-500 hover:bg-peppermint-600 text-peppermint-950 flex w-full items-center justify-center gap-2 rounded-md py-3 font-mono font-bold transition-all disabled:cursor-not-allowed disabled:opacity-50"
 				>
 					{isPending ? (

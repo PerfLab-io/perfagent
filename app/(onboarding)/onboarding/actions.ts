@@ -14,6 +14,7 @@ import {
 	deleteTempSession,
 	createSession,
 } from '@/lib/session';
+import { onboardingSchema } from '@/lib/validations/email';
 import crypto from 'crypto';
 
 export async function createAccountAction({
@@ -30,34 +31,24 @@ export async function createAccountAction({
 	agreeToTerms: boolean;
 }) {
 	try {
-		// Validate inputs
-		if (!username || !name || !password || !confirmPassword) {
+		// Validate inputs with Zod
+		const validationResult = onboardingSchema.safeParse({
+			username,
+			name,
+			password,
+			confirmPassword,
+			agreeToTerms,
+		});
+
+		if (!validationResult.success) {
+			const firstError = validationResult.error.errors[0];
 			return {
 				success: false,
-				error: 'All fields are required',
+				error: firstError?.message || 'Invalid form data',
 			};
 		}
 
-		if (!agreeToTerms) {
-			return {
-				success: false,
-				error: 'You must agree to the Terms of Service',
-			};
-		}
-
-		if (password !== confirmPassword) {
-			return {
-				success: false,
-				error: 'Passwords do not match',
-			};
-		}
-
-		if (password.length < 8) {
-			return {
-				success: false,
-				error: 'Password must be at least 8 characters long',
-			};
-		}
+		const validatedData = validationResult.data;
 
 		// Verify that user has a valid temporary session
 		const tempSession = await verifyTempSession();
@@ -88,7 +79,7 @@ export async function createAccountAction({
 		const existingUsername = await db
 			.select()
 			.from(user)
-			.where(eq(user.username, username))
+			.where(eq(user.username, validatedData.username))
 			.limit(1);
 
 		if (existingUsername.length > 0) {
@@ -99,7 +90,7 @@ export async function createAccountAction({
 		}
 
 		// Hash the password
-		const passwordHash = await bcrypt.hash(password, 12);
+		const passwordHash = await bcrypt.hash(validatedData.password, 12);
 
 		// Create the user
 		const userId = crypto.randomUUID();
@@ -108,8 +99,8 @@ export async function createAccountAction({
 			.values({
 				id: userId,
 				email,
-				username,
-				name,
+				username: validatedData.username,
+				name: validatedData.name,
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
 			})
