@@ -11,10 +11,10 @@ export default function VerifyPage() {
 				<p>
 					Didn't receive a code?{' '}
 					<Link
-						href="/signup"
+						href="/#signup"
 						className="text-peppermint-300 hover:text-peppermint-200 underline transition-colors"
 					>
-						Request new code
+						Register for the waitlist
 					</Link>
 				</p>
 			</div>
