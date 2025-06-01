@@ -66,7 +66,7 @@ async function ensureWaitlistAudience() {
 /**
  * Adds an email to the waitlist audience
  */
-async function addToWaitlist(email: string) {
+export async function addToWaitlist(email: string) {
 	if (isLocalEnvironment) {
 		console.log(
 			`🔷 Local environment - Would add ${email} to waitlist audience`,

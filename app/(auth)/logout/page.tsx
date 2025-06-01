@@ -1,15 +1,17 @@
 'use client';
 
-import { redirect } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { logout } from '@/app/actions/login';
 import { useEffect } from 'react';
 
 export default function LogoutPage() {
+	const router = useRouter();
 	const handleLogout = async () => {
 		try {
 			const success = await logout();
+			console.log('success', success);
 			if (success) {
-				redirect('/');
+				router.push('/login');
 			} else {
 				console.error('Logout failed');
 				// Optionally show a toast notification here

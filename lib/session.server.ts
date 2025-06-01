@@ -6,7 +6,9 @@ import { eq, lt, and } from 'drizzle-orm';
 import { cache } from 'react';
 
 const SESSION_COOKIE_NAME = 'session-id';
+const TEMP_SESSION_COOKIE_NAME = 'temp-session-id';
 const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+const TEMP_SESSION_DURATION = 30 * 60 * 1000; // 30 minutes in milliseconds
 
 export interface SessionData {
 	id: string;
@@ -18,6 +20,12 @@ export interface SessionData {
 		username: string;
 		name: string | null;
 	};
+}
+
+export interface TempSessionData {
+	id: string;
+	email: string;
+	expirationDate: string;
 }
 
 /**
@@ -240,5 +248,52 @@ export async function requireUserWithRole(
 	} catch (error) {
 		console.error('Role authorization failed:', error);
 		throw error; // Re-throw to let caller handle the error
+	}
+}
+
+/**
+ * Verify and retrieve temporary session from cookie
+ * Used during onboarding flow after email verification
+ */
+export const verifyTempSession = cache(
+	async (): Promise<TempSessionData | null> => {
+		try {
+			const cookieStore = await cookies();
+			const tempSessionData = cookieStore.get(TEMP_SESSION_COOKIE_NAME)?.value;
+
+			if (!tempSessionData) {
+				return null;
+			}
+
+			const parsedData: TempSessionData = JSON.parse(tempSessionData);
+
+			// Check if temp session is expired
+			const now = new Date();
+			const expirationDate = new Date(parsedData.expirationDate);
+
+			if (now > expirationDate) {
+				// Temp session expired, clean it up
+				await deleteTempSession();
+				return null;
+			}
+
+			return parsedData;
+		} catch (error) {
+			console.error('Error verifying temp session:', error);
+			return null;
+		}
+	},
+);
+
+/**
+ * Delete temporary session cookie
+ */
+export async function deleteTempSession(): Promise<void> {
+	try {
+		const cookieStore = await cookies();
+		cookieStore.delete(TEMP_SESSION_COOKIE_NAME);
+	} catch (error) {
+		console.error('Error deleting temp session:', error);
+		throw new Error('Failed to delete temp session');
 	}
 }

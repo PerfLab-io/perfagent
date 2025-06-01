@@ -18,7 +18,7 @@ import {
 	TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useUIStore } from '@/lib/stores';
-import { SessionData } from '@/lib/session';
+import { SessionData } from '@/lib/session.server';
 
 const SIDEBAR_WIDTH = '16rem';
 const SIDEBAR_WIDTH_MOBILE = '18rem';
