@@ -106,9 +106,6 @@ export async function isCodeValid({
 	type: VerificationTypes | typeof twoFAVerifyVerificationType;
 	target: string;
 }) {
-	console.log('code', code);
-	console.log('type', type);
-	console.log('target', target);
 	const verificationRecord = await db
 		.select({
 			algorithm: verification.algorithm,

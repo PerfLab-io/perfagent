@@ -68,8 +68,8 @@ export const OtpVerificationEmail = ({
 											</Text>
 										</Section>
 										<Text className="m-0 font-mono text-sm text-[#c3e6d4]">
-											This code expires in 10 minutes. Enter it on the
-											verification page to complete your account setup.
+											This code expires in 7 days. Enter it on the verification
+											page to complete your account setup.
 										</Text>
 									</Section>
 

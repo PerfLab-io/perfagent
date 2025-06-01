@@ -65,7 +65,7 @@ export async function signupAction({ email }: { email: string }) {
 
 		// Prepare verification with 10-minute expiry
 		const { otp } = await prepareVerification({
-			period: 600, // 10 minutes
+			period: 604800, // 7 days (60 * 60 * 24 * 7)
 			type: 'onboarding',
 			target: validatedEmail,
 		});
