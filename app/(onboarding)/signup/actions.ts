@@ -15,14 +15,14 @@ async function sendEmail(
 	},
 ) {
 	try {
-		await resend.emails.send({
+		const result = await resend.emails.send({
 			from: 'PerfAgent <support@perflab.io>',
 			to,
 			subject,
 			react: OnboardingOtpEmail(emailProps),
 		});
 
-		return { success: true };
+		return { success: Boolean(result?.data) };
 	} catch (error) {
 		console.error('Error sending email:', error);
 		return { success: false };
@@ -70,5 +70,5 @@ export async function signupAction({ email }: { email: string }) {
 		};
 	}
 
-	redirect(`/verify?type=onboarding&target=${email}`);
+	redirect(`/verify?type=onboarding&target=${encodeURIComponent(email)}`);
 }

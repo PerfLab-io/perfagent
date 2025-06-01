@@ -106,6 +106,9 @@ export async function isCodeValid({
 	type: VerificationTypes | typeof twoFAVerifyVerificationType;
 	target: string;
 }) {
+	console.log('code', code);
+	console.log('type', type);
+	console.log('target', target);
 	const verificationRecord = await db
 		.select({
 			algorithm: verification.algorithm,
@@ -118,18 +121,21 @@ export async function isCodeValid({
 			and(
 				eq(verification.target, target),
 				eq(verification.type, type),
-				gt(verification.expiresAt, new Date().toISOString()),
+				// gt(verification.expiresAt, new Date().toISOString()),
 			),
 		)
 		.limit(1);
 
+	console.log('verificationRecord', verificationRecord);
+
 	if (!verificationRecord.length) return false;
 
 	const verificationData = verificationRecord[0];
-	const result = verifyTOTP({
+	const result = await verifyTOTP({
 		otp: code,
 		...verificationData,
 	});
+	console.log('result', result);
 	if (!result) return false;
 
 	return true;

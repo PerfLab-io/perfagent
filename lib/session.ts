@@ -69,25 +69,21 @@ export const verifySession = cache(async (): Promise<SessionData | null> => {
 			return null;
 		}
 
-		// Query session with user data
-		const result = await db
-			.select({
-				session: session,
-				user: user,
-			})
+		// First get the session data
+		const sessionResult = await db
+			.select()
 			.from(session)
-			.innerJoin(user, eq(session.userId, user.id))
 			.where(eq(session.id, sessionId))
 			.limit(1);
 
-		const sessionData = result[0];
-		if (!sessionData?.session) {
+		const sessionData = sessionResult[0];
+		if (!sessionData) {
 			return null;
 		}
 
 		// Check if session is expired
 		const now = new Date();
-		const expirationDate = new Date(sessionData.session.expirationDate);
+		const expirationDate = new Date(sessionData.expirationDate);
 
 		if (now > expirationDate) {
 			// Session expired, clean it up
@@ -95,15 +91,40 @@ export const verifySession = cache(async (): Promise<SessionData | null> => {
 			return null;
 		}
 
+		// Check if this is a temporary session (userId is an email)
+		if (sessionData.userId.includes('@')) {
+			// This is a temporary onboarding session
+			return {
+				id: sessionData.id,
+				userId: sessionData.userId,
+				expirationDate: sessionData.expirationDate,
+				// No user data for temporary sessions
+			};
+		}
+
+		// This is a regular session, fetch user data
+		const userResult = await db
+			.select()
+			.from(user)
+			.where(eq(user.id, sessionData.userId))
+			.limit(1);
+
+		const userData = userResult[0];
+		if (!userData) {
+			// User was deleted but session still exists, clean up
+			await deleteSession();
+			return null;
+		}
+
 		return {
-			id: sessionData.session.id,
-			userId: sessionData.session.userId,
-			expirationDate: sessionData.session.expirationDate,
+			id: sessionData.id,
+			userId: sessionData.userId,
+			expirationDate: sessionData.expirationDate,
 			user: {
-				id: sessionData.user.id,
-				email: sessionData.user.email,
-				username: sessionData.user.username,
-				name: sessionData.user.name,
+				id: userData.id,
+				email: userData.email,
+				username: userData.username,
+				name: userData.name,
 			},
 		};
 	} catch (error) {
@@ -165,6 +186,29 @@ export async function extendSession(sessionId: string): Promise<void> {
 	} catch (error) {
 		console.error('Error extending session:', error);
 		throw new Error('Failed to extend session');
+	}
+}
+
+/**
+ * Update session userId (for converting temporary email sessions to actual user IDs)
+ * @param sessionId The session ID to update
+ * @param newUserId The new user ID to set
+ */
+export async function updateSessionUserId(
+	sessionId: string,
+	newUserId: string,
+): Promise<void> {
+	try {
+		await db
+			.update(session)
+			.set({
+				userId: newUserId,
+				updatedAt: new Date().toISOString(),
+			})
+			.where(eq(session.id, sessionId));
+	} catch (error) {
+		console.error('Error updating session userId:', error);
+		throw new Error('Failed to update session userId');
 	}
 }
 

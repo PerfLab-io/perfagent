@@ -96,7 +96,7 @@ export function SignupForm() {
 								setError(null);
 							}}
 							className="bg-peppermint-900/50 border-peppermint-600 text-peppermint-50 focus:ring-peppermint-500 placeholder:text-peppermint-600 w-full rounded-md border py-3 pr-4 pl-10 font-mono focus:border-transparent focus:ring-2 focus:outline-none"
-							placeholder="user@perfagent.dev"
+							placeholder="user@perflab.io"
 							required
 							disabled={isPending}
 						/>

@@ -1,6 +1,7 @@
 'use server';
 
 import { isCodeValid, type VerificationTypes } from '@/app/actions/verify';
+import { createSession } from '@/lib/session';
 
 export async function verifyOtpAction({
 	code,
@@ -40,6 +41,10 @@ export async function verifyOtpAction({
 				error: 'Invalid or expired verification code',
 			};
 		}
+
+		// Create a session with the email as userId (temporary until account creation)
+		// This allows the user to access the onboarding page
+		await createSession(target);
 
 		return {
 			success: true,
