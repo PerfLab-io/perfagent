@@ -41,8 +41,6 @@ const isFileInputEvent = (
 	return 'target' in e && 'files' in e.target;
 };
 
-const DEFAULT_DEBOUNCE_TIME = 120;
-
 export const ChatPageComponent = () => {
 	const {
 		messages,

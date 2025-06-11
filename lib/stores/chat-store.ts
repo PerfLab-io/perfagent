@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { TraceAnalysis } from '@/lib/trace';
 import { analyseInsightsForCWV } from '@/lib/insights';
 
 // Define types for the files attached to the chat
