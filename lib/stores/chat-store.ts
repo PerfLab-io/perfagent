@@ -10,25 +10,9 @@ export interface AttachedFile {
 }
 
 interface ChatUIState {
-	// Chat UI state
-	chatStarted: boolean;
-	setChatStarted: (value: boolean) => void;
-
-	messagesVisible: boolean;
-	setMessagesVisible: (value: boolean) => void;
-
-	showFileSection: boolean;
-	setShowFileSection: (value: boolean) => void;
-
 	// Side panel state
 	showSidePanel: boolean | null;
 	setShowSidePanel: (value: boolean | null) => void;
-
-	panelAnimationComplete: boolean;
-	setPanelAnimationComplete: (value: boolean) => void;
-
-	panelExiting: boolean;
-	setPanelExiting: (value: boolean) => void;
 
 	panelContentType: 'data' | 'report';
 	setPanelContentType: (value: 'data' | 'report') => void;
@@ -85,25 +69,9 @@ interface ChatUIState {
 }
 
 export const useChatStore = create<ChatUIState>()((set) => ({
-	// Chat UI state
-	chatStarted: false,
-	setChatStarted: (value) => set({ chatStarted: value }),
-
-	messagesVisible: false,
-	setMessagesVisible: (value) => set({ messagesVisible: value }),
-
-	showFileSection: false,
-	setShowFileSection: (value) => set({ showFileSection: value }),
-
 	// Side panel state
 	showSidePanel: null,
 	setShowSidePanel: (value) => set({ showSidePanel: value }),
-
-	panelAnimationComplete: false,
-	setPanelAnimationComplete: (value) => set({ panelAnimationComplete: value }),
-
-	panelExiting: false,
-	setPanelExiting: (value) => set({ panelExiting: value }),
 
 	panelContentType: 'data',
 	setPanelContentType: (value) => set({ panelContentType: value }),
