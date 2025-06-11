@@ -15,9 +15,6 @@ interface ChatUIState {
 	setShowSidePanel: (value: boolean | null) => void;
 
 	// File and trace state
-	traceContents: string | null;
-	setTraceContents: (value: string | null) => void;
-
 	attachedFiles: AttachedFile[];
 	setAttachedFiles: (files: AttachedFile[]) => void;
 	addAttachedFile: (file: AttachedFile) => void;
@@ -71,9 +68,6 @@ export const useChatStore = create<ChatUIState>()((set) => ({
 	setShowSidePanel: (value) => set({ showSidePanel: value }),
 
 	// File and trace state
-	traceContents: null,
-	setTraceContents: (value) => set({ traceContents: value }),
-
 	attachedFiles: [],
 	setAttachedFiles: (files) => set({ attachedFiles: files }),
 	addAttachedFile: (file) =>

@@ -61,8 +61,6 @@ export const ChatPageComponent = () => {
 	const setShowSidePanel = useChatStore((state) => state.setShowSidePanel);
 
 	// File and trace state
-	const traceContents = useChatStore((state) => state.traceContents);
-	const setTraceContents = useChatStore((state) => state.setTraceContents);
 	const attachedFiles = useChatStore((state) => state.attachedFiles);
 	const setAttachedFiles = useChatStore((state) => state.setAttachedFiles);
 	const suggestions = useChatStore((state) => state.suggestions);
@@ -136,6 +134,7 @@ export const ChatPageComponent = () => {
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const formRef = useRef<HTMLFormElement>(null);
+	const traceContentsRef = useRef<string | null>(null);
 
 	// Check if a message is currently being streamed
 	const isLoading = status === 'submitted' || status === 'streaming';
@@ -198,7 +197,7 @@ export const ChatPageComponent = () => {
 				setTimeout(() => {
 					analyzeTraceFromFile(file)
 						.then((contents) => {
-							setTraceContents(contents);
+							traceContentsRef.current = contents;
 							return analyzeTrace(contents);
 						})
 						.then((trace) => {
@@ -290,9 +289,9 @@ export const ChatPageComponent = () => {
 
 	const handleAIContextChange = useCallback(
 		(callTreeContext: StandaloneCallTreeContext) => {
-			if (!traceContents || !currentNavigation) return;
+			if (!traceContentsRef.current || !currentNavigation) return;
 
-			serializeInWorker(traceContents, currentNavigation)
+			serializeInWorker(traceContentsRef.current, currentNavigation)
 				.then((serializedData) => {
 					requestAnimationFrame(() => {
 						setSerializedContext(serializedData);
@@ -306,7 +305,7 @@ export const ChatPageComponent = () => {
 					});
 				});
 		},
-		[traceContents, currentNavigation, serializeInWorker],
+		[currentNavigation, serializeInWorker],
 	);
 
 	/**
