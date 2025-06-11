@@ -14,9 +14,6 @@ interface ChatUIState {
 	showSidePanel: boolean | null;
 	setShowSidePanel: (value: boolean | null) => void;
 
-	panelContentType: 'data' | 'report';
-	setPanelContentType: (value: 'data' | 'report') => void;
-
 	// File and trace state
 	traceContents: string | null;
 	setTraceContents: (value: string | null) => void;
@@ -72,9 +69,6 @@ export const useChatStore = create<ChatUIState>()((set) => ({
 	// Side panel state
 	showSidePanel: null,
 	setShowSidePanel: (value) => set({ showSidePanel: value }),
-
-	panelContentType: 'data',
-	setPanelContentType: (value) => set({ panelContentType: value }),
 
 	// File and trace state
 	traceContents: null,

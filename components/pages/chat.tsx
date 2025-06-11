@@ -59,10 +59,6 @@ export const ChatPageComponent = () => {
 	// Side panel state
 	const showSidePanel = useChatStore((state) => state.showSidePanel);
 	const setShowSidePanel = useChatStore((state) => state.setShowSidePanel);
-	const panelContentType = useChatStore((state) => state.panelContentType);
-	const setPanelContentType = useChatStore(
-		(state) => state.setPanelContentType,
-	);
 
 	// File and trace state
 	const traceContents = useChatStore((state) => state.traceContents);
@@ -376,7 +372,6 @@ export const ChatPageComponent = () => {
 		if (reportId && reportData) {
 			setActiveReportId(reportId);
 			setShowSidePanel(true);
-			setPanelContentType('report');
 			setIsGeneratingReport(false);
 			setReportData(reportData);
 		}
@@ -563,26 +558,18 @@ export const ChatPageComponent = () => {
 
 			{/* Right panel container */}
 			<div className="max-h-[90dvh]">
-				{panelContentType === 'data' ? (
-					<DataPanel
-						visible={isPanelOpen}
-						onClose={() => setShowSidePanel(false)}
-						exiting={false}
-					/>
-				) : (
-					<MarkdownReport
-						visible={isPanelOpen}
-						onClose={() => {
-							setShowSidePanel(false);
-							setActiveReportId(null);
-						}}
-						exiting={false}
-						isGenerating={isGeneratingReport}
-						reportData={reportData || undefined}
-						onAbort={handleAbortReport}
-						reportId={activeReportId}
-					/>
-				)}
+				<MarkdownReport
+					visible={isPanelOpen}
+					onClose={() => {
+						setShowSidePanel(false);
+						setActiveReportId(null);
+					}}
+					exiting={false}
+					isGenerating={isGeneratingReport}
+					reportData={reportData || undefined}
+					onAbort={handleAbortReport}
+					reportId={activeReportId}
+				/>
 			</div>
 		</div>
 	);
