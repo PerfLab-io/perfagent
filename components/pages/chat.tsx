@@ -8,7 +8,6 @@ import { ChatMessage } from '@/components/chat-message';
 import { FilePreview } from '@/components/file-preview';
 import { SuggestedMessages } from '@/components/suggested-messages';
 import { FileDropzone } from '@/components/file-dropzone';
-import { DataPanel } from '@/components/data-panel';
 import { MarkdownReport } from '@/components/markdown-report';
 import { cn, yieldToMain } from '@/lib/utils';
 import { useChat } from '@ai-sdk/react';
