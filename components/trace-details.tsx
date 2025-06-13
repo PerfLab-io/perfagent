@@ -42,7 +42,7 @@ import type { Micro } from '@perflab/trace_engine/models/trace/types/Timing';
 import { MetricGauge } from './trace-details/metric-gauge';
 import { LinePattern } from './line-pattern';
 import { useFFmpeg } from '@/lib/hooks/use-ffmpeg';
-import { AttachedFile } from '@/app/(auth)/chat/page';
+import { AttachedFile } from '@/lib/stores/chat-store';
 import { AICallTree } from '@perflab/trace_engine/panels/timeline/utils/AICallTree';
 import { StandaloneCallTreeContext } from '@perflab/trace_engine/panels/ai_assistance/standalone';
 import useSWR from 'swr';

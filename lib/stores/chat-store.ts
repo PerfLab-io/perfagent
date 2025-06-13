@@ -9,6 +9,12 @@ export interface AttachedFile {
 	type: string;
 }
 
+// Define the Report interface
+export interface Report {
+	data: string | null;
+	id: string | null;
+}
+
 interface ChatUIState {
 	// Side panel state
 	showSidePanel: boolean | null;
@@ -48,11 +54,8 @@ interface ChatUIState {
 	) => void;
 
 	// Report state
-	reportData: string | null;
-	setReportData: (value: string | null) => void;
-
-	activeReportId: string | null;
-	setActiveReportId: (value: string | null) => void;
+	report: Report;
+	setReport: (report: Report) => void;
 
 	// Serialized context
 	serializedContext: string | null;
@@ -93,11 +96,8 @@ export const useChatStore = create<ChatUIState>()((set) => ({
 		}),
 
 	// Report state
-	reportData: null,
-	setReportData: (value) => set({ reportData: value }),
-
-	activeReportId: null,
-	setActiveReportId: (value) => set({ activeReportId: value }),
+	report: { data: null, id: null },
+	setReport: (report) => set({ report }),
 
 	// Serialized context
 	serializedContext: null,

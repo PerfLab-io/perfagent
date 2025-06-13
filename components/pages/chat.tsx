@@ -84,10 +84,8 @@ export const ChatPageComponent = () => {
 	);
 
 	// Report state
-	const reportData = useChatStore((state) => state.reportData);
-	const setReportData = useChatStore((state) => state.setReportData);
-	const activeReportId = useChatStore((state) => state.activeReportId);
-	const setActiveReportId = useChatStore((state) => state.setActiveReportId);
+	const report = useChatStore((state) => state.report);
+	const setReport = useChatStore((state) => state.setReport);
 
 	// Serialized context
 	const serializedContext = useChatStore((state) => state.serializedContext);
@@ -347,6 +345,16 @@ export const ChatPageComponent = () => {
 	);
 
 	/**
+	 * Opens a specific report in the side panel
+	 */
+	const openReport = (reportId: string, reportData: string) => {
+		if (reportId && reportData) {
+			setReport({ id: reportId, data: reportData });
+			setShowSidePanel(true);
+		}
+	};
+
+	/**
 	 * Aborts the current report generation
 	 */
 	const handleAbortReport = useCallback(() => {
@@ -355,19 +363,8 @@ export const ChatPageComponent = () => {
 
 		// Update UI state
 		setShowSidePanel(false);
-		setReportData(null);
+		setReport({ id: null, data: null });
 	}, [stop]);
-
-	/**
-	 * Opens a specific report in the side panel
-	 */
-	const openReport = (reportId: string, reportData: string) => {
-		if (reportId && reportData) {
-			setActiveReportId(reportId);
-			setShowSidePanel(true);
-			setReportData(reportData);
-		}
-	};
 
 	// No effects needed for derived state - animations handled by CSS
 
@@ -554,12 +551,12 @@ export const ChatPageComponent = () => {
 					visible={isPanelOpen}
 					onClose={() => {
 						setShowSidePanel(false);
-						setActiveReportId(null);
+						setReport({ id: null, data: null });
 					}}
 					exiting={false}
-					reportData={reportData || undefined}
+					reportData={report.data || undefined}
 					onAbort={handleAbortReport}
-					reportId={activeReportId}
+					reportId={report.id}
 				/>
 			</div>
 		</div>
