@@ -84,10 +84,6 @@ export const ChatPageComponent = () => {
 	);
 
 	// Report state
-	const isGeneratingReport = useChatStore((state) => state.isGeneratingReport);
-	const setIsGeneratingReport = useChatStore(
-		(state) => state.setIsGeneratingReport,
-	);
 	const reportData = useChatStore((state) => state.reportData);
 	const setReportData = useChatStore((state) => state.setReportData);
 	const activeReportId = useChatStore((state) => state.activeReportId);
@@ -360,7 +356,6 @@ export const ChatPageComponent = () => {
 		// Update UI state
 		setShowSidePanel(false);
 		setReportData(null);
-		setIsGeneratingReport(false);
 	}, [stop]);
 
 	/**
@@ -370,7 +365,6 @@ export const ChatPageComponent = () => {
 		if (reportId && reportData) {
 			setActiveReportId(reportId);
 			setShowSidePanel(true);
-			setIsGeneratingReport(false);
 			setReportData(reportData);
 		}
 	};
@@ -563,7 +557,6 @@ export const ChatPageComponent = () => {
 						setActiveReportId(null);
 					}}
 					exiting={false}
-					isGenerating={isGeneratingReport}
 					reportData={reportData || undefined}
 					onAbort={handleAbortReport}
 					reportId={activeReportId}

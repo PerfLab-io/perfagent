@@ -24,7 +24,6 @@ interface MarkdownReportProps {
 	visible: boolean;
 	onClose: () => void;
 	exiting?: boolean;
-	isGenerating: boolean;
 	onAbort?: () => void;
 	reportData?: string;
 	reportId?: string | null;
@@ -38,7 +37,6 @@ export const MarkdownReport = memo(function MarkdownReport({
 	visible,
 	onClose,
 	exiting = false,
-	isGenerating,
 	onAbort,
 	reportData,
 	reportId,
@@ -195,8 +193,8 @@ export const MarkdownReport = memo(function MarkdownReport({
 						<span>Download</span>
 					</Button>
 
-					{/* Abort button - only shown while generating */}
-					{isGenerating && onAbort && (
+					{/* Abort button - only shown while generating 
+					{onAbort && (
 						<Button
 							variant="ghost"
 							size="sm"
@@ -207,7 +205,7 @@ export const MarkdownReport = memo(function MarkdownReport({
 							<XCircle className="h-4 w-4" />
 							<span>Stop</span>
 						</Button>
-					)}
+					)}*/}
 
 					{/* Close button */}
 					<Button

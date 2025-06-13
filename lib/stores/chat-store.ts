@@ -48,9 +48,6 @@ interface ChatUIState {
 	) => void;
 
 	// Report state
-	isGeneratingReport: boolean;
-	setIsGeneratingReport: (value: boolean) => void;
-
 	reportData: string | null;
 	setReportData: (value: string | null) => void;
 
@@ -96,9 +93,6 @@ export const useChatStore = create<ChatUIState>()((set) => ({
 		}),
 
 	// Report state
-	isGeneratingReport: false,
-	setIsGeneratingReport: (value) => set({ isGeneratingReport: value }),
-
 	reportData: null,
 	setReportData: (value) => set({ reportData: value }),
 
