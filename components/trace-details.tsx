@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, memo } from 'react';
+import { useState, useEffect, useMemo, memo, useRef } from 'react';
 import {
 	ChevronDown,
 	ChevronRight,
@@ -94,23 +94,18 @@ export const FileContextSection = memo(function FileContextSection({
 	const [inpAnimationFrames, setInpAnimationFrames] = useState<
 		SyntheticExtendedAnimationFramePair[] | undefined
 	>();
-	const [inpInteractionAnimation, setInpInteractionAnimation] = useState<
-		string | null
-	>(null);
-
-	useEffect(() => {
-		onINPInteractionAnimationChange?.({
-			animationFrameInteractionImageUrl: inpInteractionAnimation,
-			isLoading,
-			progress,
-			error,
-		});
-	}, [isLoading, progress, error, inpInteractionAnimation]);
+	const inpInteractionAnimationRef = useRef<string | null>(null);
 
 	const handleConvert = async (files: Array<File | Blob | string>) => {
 		const output = await convertToFormat('webp', files, { outputType: 'url' });
 		if (output && typeof output === 'string') {
-			setInpInteractionAnimation(output);
+			inpInteractionAnimationRef.current = output;
+			onINPInteractionAnimationChange?.({
+				animationFrameInteractionImageUrl: output,
+				isLoading,
+				progress,
+				error,
+			});
 		}
 	};
 
