@@ -83,9 +83,7 @@ export const FileContextSection = memo(function FileContextSection({
 	onINPInteractionAnimationChange,
 	onAIContextChange,
 }: FileContextSectionProps) {
-	// Add a new state to track the initial animation
-	const [isInitialRender, setIsInitialRender] = useState(true);
-	const [isExpanded, setIsExpanded] = useState(true);
+	const [isExpanded, setIsExpanded] = useState(false);
 	const { data: selectedNavigation, mutate: setSelectedNavigation } = useSWR<
 		string | null
 	>('navigation-id', null, {
@@ -282,21 +280,6 @@ export const FileContextSection = memo(function FileContextSection({
 		};
 	}, [traceAnalysis]);
 
-	// Add useEffect to handle the animation sequence
-	useEffect(() => {
-		if (isVisible && isInitialRender) {
-			// Start with the panel closed
-			setIsExpanded(false);
-
-			// After a short delay, mark initial render as complete
-			const timer = setTimeout(() => {
-				setIsInitialRender(false);
-			}, 600); // Animation duration
-
-			return () => clearTimeout(timer);
-		}
-	}, [isVisible, isInitialRender]);
-
 	useEffect(() => {
 		if (traceAnalysis && __insights) {
 			onTraceNavigationChange(selectedNavigation || __insights[0][0]);
@@ -365,7 +348,7 @@ export const FileContextSection = memo(function FileContextSection({
 					? 'border-peppermint-300 dark:border-peppermint-900 max-h-[600px] overflow-y-auto border'
 					: 'border-peppermint-300 dark:border-peppermint-900 max-h-[40px] border border-dashed',
 
-				isInitialRender && 'file-context-appear',
+				isVisible && 'file-context-appear',
 			)}
 		>
 			{/* Header */}
