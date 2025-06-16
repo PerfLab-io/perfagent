@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, memo } from 'react';
+import { useState, useEffect, useMemo, memo, useRef } from 'react';
 import {
 	ChevronDown,
 	ChevronRight,
@@ -42,7 +42,7 @@ import type { Micro } from '@perflab/trace_engine/models/trace/types/Timing';
 import { MetricGauge } from './trace-details/metric-gauge';
 import { LinePattern } from './line-pattern';
 import { useFFmpeg } from '@/lib/hooks/use-ffmpeg';
-import { AttachedFile } from '@/app/(auth)/chat/page';
+import { AttachedFile } from '@/lib/stores/chat-store';
 import { AICallTree } from '@perflab/trace_engine/panels/timeline/utils/AICallTree';
 import { StandaloneCallTreeContext } from '@perflab/trace_engine/panels/ai_assistance/standalone';
 import useSWR from 'swr';
@@ -83,11 +83,7 @@ export const FileContextSection = memo(function FileContextSection({
 	onINPInteractionAnimationChange,
 	onAIContextChange,
 }: FileContextSectionProps) {
-	// First, add a max-height to the main container when expanded
-	// Add a new state to track the initial animation
-	const [isInitialRender, setIsInitialRender] = useState(true);
-	const [isExpanded, setIsExpanded] = useState(true);
-	const [isAnimating, setIsAnimating] = useState(false);
+	const [isExpanded, setIsExpanded] = useState(false);
 	const { data: selectedNavigation, mutate: setSelectedNavigation } = useSWR<
 		string | null
 	>('navigation-id', null, {
@@ -98,23 +94,18 @@ export const FileContextSection = memo(function FileContextSection({
 	const [inpAnimationFrames, setInpAnimationFrames] = useState<
 		SyntheticExtendedAnimationFramePair[] | undefined
 	>();
-	const [inpInteractionAnimation, setInpInteractionAnimation] = useState<
-		string | null
-	>(null);
-
-	useEffect(() => {
-		onINPInteractionAnimationChange?.({
-			animationFrameInteractionImageUrl: inpInteractionAnimation,
-			isLoading,
-			progress,
-			error,
-		});
-	}, [isLoading, progress, error, inpInteractionAnimation]);
+	const inpInteractionAnimationRef = useRef<string | null>(null);
 
 	const handleConvert = async (files: Array<File | Blob | string>) => {
 		const output = await convertToFormat('webp', files, { outputType: 'url' });
 		if (output && typeof output === 'string') {
-			setInpInteractionAnimation(output);
+			inpInteractionAnimationRef.current = output;
+			onINPInteractionAnimationChange?.({
+				animationFrameInteractionImageUrl: output,
+				isLoading,
+				progress,
+				error,
+			});
 		}
 	};
 
@@ -284,25 +275,6 @@ export const FileContextSection = memo(function FileContextSection({
 		};
 	}, [traceAnalysis]);
 
-	// Add useEffect to handle the animation sequence
-	useEffect(() => {
-		if (isVisible && isInitialRender) {
-			// Start with the panel closed
-			setIsExpanded(false);
-
-			// Set animating state to true
-			setIsAnimating(true);
-
-			// After a short delay, mark initial render as complete
-			const timer = setTimeout(() => {
-				setIsInitialRender(false);
-				setIsAnimating(false);
-			}, 600); // Animation duration
-
-			return () => clearTimeout(timer);
-		}
-	}, [isVisible, isInitialRender]);
-
 	useEffect(() => {
 		if (traceAnalysis && __insights) {
 			onTraceNavigationChange(selectedNavigation || __insights[0][0]);
@@ -370,9 +342,8 @@ export const FileContextSection = memo(function FileContextSection({
 				isExpanded
 					? 'border-peppermint-300 dark:border-peppermint-900 max-h-[600px] overflow-y-auto border'
 					: 'border-peppermint-300 dark:border-peppermint-900 max-h-[40px] border border-dashed',
-				isAnimating &&
-					'translate-x-1 -translate-y-1 shadow-[-4px_4px_0_hsl(var(--border-color))]',
-				isInitialRender && 'file-context-appear',
+
+				isVisible && 'file-context-appear',
 			)}
 		>
 			{/* Header */}

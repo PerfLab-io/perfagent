@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { TraceAnalysis } from '@/lib/trace';
 import { analyseInsightsForCWV } from '@/lib/insights';
 
 // Define types for the files attached to the chat
@@ -10,34 +9,18 @@ export interface AttachedFile {
 	type: string;
 }
 
+// Define the Report interface
+export interface Report {
+	data: string | null;
+	id: string | null;
+}
+
 interface ChatUIState {
-	// Chat UI state
-	chatStarted: boolean;
-	setChatStarted: (value: boolean) => void;
-
-	messagesVisible: boolean;
-	setMessagesVisible: (value: boolean) => void;
-
-	showFileSection: boolean;
-	setShowFileSection: (value: boolean) => void;
-
 	// Side panel state
 	showSidePanel: boolean | null;
 	setShowSidePanel: (value: boolean | null) => void;
 
-	panelAnimationComplete: boolean;
-	setPanelAnimationComplete: (value: boolean) => void;
-
-	panelExiting: boolean;
-	setPanelExiting: (value: boolean) => void;
-
-	panelContentType: 'data' | 'report';
-	setPanelContentType: (value: 'data' | 'report') => void;
-
 	// File and trace state
-	traceContents: string | null;
-	setTraceContents: (value: string | null) => void;
-
 	attachedFiles: AttachedFile[];
 	setAttachedFiles: (files: AttachedFile[]) => void;
 	addAttachedFile: (file: AttachedFile) => void;
@@ -71,14 +54,8 @@ interface ChatUIState {
 	) => void;
 
 	// Report state
-	isGeneratingReport: boolean;
-	setIsGeneratingReport: (value: boolean) => void;
-
-	reportData: string | null;
-	setReportData: (value: string | null) => void;
-
-	activeReportId: string | null;
-	setActiveReportId: (value: string | null) => void;
+	report: Report;
+	setReport: (report: Report) => void;
 
 	// Serialized context
 	serializedContext: string | null;
@@ -86,33 +63,11 @@ interface ChatUIState {
 }
 
 export const useChatStore = create<ChatUIState>()((set) => ({
-	// Chat UI state
-	chatStarted: false,
-	setChatStarted: (value) => set({ chatStarted: value }),
-
-	messagesVisible: false,
-	setMessagesVisible: (value) => set({ messagesVisible: value }),
-
-	showFileSection: false,
-	setShowFileSection: (value) => set({ showFileSection: value }),
-
 	// Side panel state
 	showSidePanel: null,
 	setShowSidePanel: (value) => set({ showSidePanel: value }),
 
-	panelAnimationComplete: false,
-	setPanelAnimationComplete: (value) => set({ panelAnimationComplete: value }),
-
-	panelExiting: false,
-	setPanelExiting: (value) => set({ panelExiting: value }),
-
-	panelContentType: 'data',
-	setPanelContentType: (value) => set({ panelContentType: value }),
-
 	// File and trace state
-	traceContents: null,
-	setTraceContents: (value) => set({ traceContents: value }),
-
 	attachedFiles: [],
 	setAttachedFiles: (files) => set({ attachedFiles: files }),
 	addAttachedFile: (file) =>
@@ -141,14 +96,8 @@ export const useChatStore = create<ChatUIState>()((set) => ({
 		}),
 
 	// Report state
-	isGeneratingReport: false,
-	setIsGeneratingReport: (value) => set({ isGeneratingReport: value }),
-
-	reportData: null,
-	setReportData: (value) => set({ reportData: value }),
-
-	activeReportId: null,
-	setActiveReportId: (value) => set({ activeReportId: value }),
+	report: { data: null, id: null },
+	setReport: (report) => set({ report }),
 
 	// Serialized context
 	serializedContext: null,

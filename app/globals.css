@@ -290,6 +290,23 @@
 	}
 }
 
+@keyframes file-context-appear {
+	0% {
+		opacity: 0;
+		transform: translateY(-10px) scale(0.95);
+	}
+	50% {
+		opacity: 1;
+		transform: translateX(4px) translateY(-4px) scale(1.02);
+		box-shadow: -4px 4px 0 hsl(var(--border-color));
+	}
+	100% {
+		opacity: 1;
+		transform: translateY(0) scale(1);
+		box-shadow: none;
+	}
+}
+
 /* Add these to the existing animations in the file */
 .animate-bounce {
 	animation: bounce 1s infinite ease-in-out;
@@ -305,6 +322,10 @@
 
 .animate-spin-slow {
 	animation: spin-slow 1.5s infinite ease-in-out;
+}
+
+.file-context-appear {
+	animation: file-context-appear 600ms ease-out forwards;
 }
 
 /* Remove the container query section and replace with this */

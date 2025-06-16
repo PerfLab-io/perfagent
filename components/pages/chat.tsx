@@ -8,7 +8,6 @@ import { ChatMessage } from '@/components/chat-message';
 import { FilePreview } from '@/components/file-preview';
 import { SuggestedMessages } from '@/components/suggested-messages';
 import { FileDropzone } from '@/components/file-dropzone';
-import { DataPanel } from '@/components/data-panel';
 import { MarkdownReport } from '@/components/markdown-report';
 import { cn, yieldToMain } from '@/lib/utils';
 import { useChat } from '@ai-sdk/react';
@@ -41,8 +40,6 @@ const isFileInputEvent = (
 	return 'target' in e && 'files' in e.target;
 };
 
-const DEFAULT_DEBOUNCE_TIME = 120;
-
 export const ChatPageComponent = () => {
 	const {
 		messages,
@@ -58,34 +55,11 @@ export const ChatPageComponent = () => {
 		id: 'current-chat',
 	});
 
-	// Use the chat store for state management
-	// Chat UI state
-	const chatStarted = useChatStore((state) => state.chatStarted);
-	const setChatStarted = useChatStore((state) => state.setChatStarted);
-	const messagesVisible = useChatStore((state) => state.messagesVisible);
-	const setMessagesVisible = useChatStore((state) => state.setMessagesVisible);
-	const showFileSection = useChatStore((state) => state.showFileSection);
-	const setShowFileSection = useChatStore((state) => state.setShowFileSection);
-
 	// Side panel state
 	const showSidePanel = useChatStore((state) => state.showSidePanel);
 	const setShowSidePanel = useChatStore((state) => state.setShowSidePanel);
-	const panelAnimationComplete = useChatStore(
-		(state) => state.panelAnimationComplete,
-	);
-	const setPanelAnimationComplete = useChatStore(
-		(state) => state.setPanelAnimationComplete,
-	);
-	const panelExiting = useChatStore((state) => state.panelExiting);
-	const setPanelExiting = useChatStore((state) => state.setPanelExiting);
-	const panelContentType = useChatStore((state) => state.panelContentType);
-	const setPanelContentType = useChatStore(
-		(state) => state.setPanelContentType,
-	);
 
 	// File and trace state
-	const traceContents = useChatStore((state) => state.traceContents);
-	const setTraceContents = useChatStore((state) => state.setTraceContents);
 	const attachedFiles = useChatStore((state) => state.attachedFiles);
 	const setAttachedFiles = useChatStore((state) => state.setAttachedFiles);
 	const suggestions = useChatStore((state) => state.suggestions);
@@ -110,14 +84,8 @@ export const ChatPageComponent = () => {
 	);
 
 	// Report state
-	const isGeneratingReport = useChatStore((state) => state.isGeneratingReport);
-	const setIsGeneratingReport = useChatStore(
-		(state) => state.setIsGeneratingReport,
-	);
-	const reportData = useChatStore((state) => state.reportData);
-	const setReportData = useChatStore((state) => state.setReportData);
-	const activeReportId = useChatStore((state) => state.activeReportId);
-	const setActiveReportId = useChatStore((state) => state.setActiveReportId);
+	const report = useChatStore((state) => state.report);
+	const setReport = useChatStore((state) => state.setReport);
 
 	// Serialized context
 	const serializedContext = useChatStore((state) => state.serializedContext);
@@ -125,10 +93,41 @@ export const ChatPageComponent = () => {
 		(state) => state.setSerializedContext,
 	);
 
+	// Pure functions to derive state
+	const getChatUIState = () => {
+		const chatStarted = messages.length > 0;
+		const messagesVisible = chatStarted; // Simple CSS-driven animation
+		const showFileSection = attachedFiles.length > 0;
+		const hasActiveFile = currentContextFile !== null;
+
+		return {
+			chatStarted,
+			messagesVisible,
+			showFileSection,
+			hasActiveFile,
+		};
+	};
+
+	const getPanelState = () => {
+		const isPanelOpen = showSidePanel === true;
+		const isPanelInitial = showSidePanel === null;
+
+		return {
+			isPanelOpen,
+			isPanelInitial,
+		};
+	};
+
+	// Derived state from pure functions
+	const { chatStarted, messagesVisible, showFileSection, hasActiveFile } =
+		getChatUIState();
+	const { isPanelOpen, isPanelInitial } = getPanelState();
+
 	// Refs
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const formRef = useRef<HTMLFormElement>(null);
+	const traceContentsRef = useRef<string | null>(null);
 
 	// Check if a message is currently being streamed
 	const isLoading = status === 'submitted' || status === 'streaming';
@@ -191,7 +190,7 @@ export const ChatPageComponent = () => {
 				setTimeout(() => {
 					analyzeTraceFromFile(file)
 						.then((contents) => {
-							setTraceContents(contents);
+							traceContentsRef.current = contents;
 							return analyzeTrace(contents);
 						})
 						.then((trace) => {
@@ -283,9 +282,9 @@ export const ChatPageComponent = () => {
 
 	const handleAIContextChange = useCallback(
 		(callTreeContext: StandaloneCallTreeContext) => {
-			if (!traceContents || !currentNavigation) return;
+			if (!traceContentsRef.current || !currentNavigation) return;
 
-			serializeInWorker(traceContents, currentNavigation)
+			serializeInWorker(traceContentsRef.current, currentNavigation)
 				.then((serializedData) => {
 					requestAnimationFrame(() => {
 						setSerializedContext(serializedData);
@@ -299,7 +298,7 @@ export const ChatPageComponent = () => {
 					});
 				});
 		},
-		[traceContents, currentNavigation, serializeInWorker],
+		[currentNavigation, serializeInWorker],
 	);
 
 	/**
@@ -324,8 +323,7 @@ export const ChatPageComponent = () => {
 				originalHandleSubmit(e as any, {
 					body,
 				});
-				// Hide file section after submission
-				setShowFileSection(false);
+				// Clear attached files after submission
 				setAttachedFiles([]);
 				// Clear suggestions when submitting a message
 				setSuggestions([]);
@@ -347,6 +345,16 @@ export const ChatPageComponent = () => {
 	);
 
 	/**
+	 * Opens a specific report in the side panel
+	 */
+	const openReport = (reportId: string, reportData: string) => {
+		if (reportId && reportData) {
+			setReport({ id: reportId, data: reportData });
+			setShowSidePanel(true);
+		}
+	};
+
+	/**
 	 * Aborts the current report generation
 	 */
 	const handleAbortReport = useCallback(() => {
@@ -355,68 +363,10 @@ export const ChatPageComponent = () => {
 
 		// Update UI state
 		setShowSidePanel(false);
-		setPanelExiting(true);
-		setReportData(null);
-		setIsGeneratingReport(false);
-
-		// Reset the report state after the exit animation completes
-		setTimeout(() => {
-			setPanelExiting(false);
-		}, 300);
+		setReport({ id: null, data: null });
 	}, [stop]);
 
-	/**
-	 * Opens a specific report in the side panel
-	 */
-	const openReport = (reportId: string, reportData: string) => {
-		if (reportId && reportData) {
-			setActiveReportId(reportId);
-			setShowSidePanel(true);
-			setPanelContentType('report');
-			setIsGeneratingReport(false);
-			setReportData(reportData);
-		}
-	};
-
-	// Effect: Initialize chat and handle message visibility
-	useEffect(() => {
-		if (messages.length > 0) {
-			if (!chatStarted) {
-				setChatStarted(true);
-				// Delay showing messages until input animation completes
-				setTimeout(() => {
-					setMessagesVisible(true);
-				}, 500);
-			}
-		}
-	}, [messages, chatStarted]);
-
-	// Effect: Handle file section visibility based on attached files
-	useEffect(() => {
-		setShowFileSection(attachedFiles?.length > 0);
-	}, [attachedFiles, isLoading]);
-
-	// Effect: Handle side panel animation sequencing
-	useEffect(() => {
-		if (showSidePanel) {
-			setPanelExiting(false);
-			const timer = setTimeout(() => {
-				setPanelAnimationComplete(true);
-			}, 100);
-			return () => clearTimeout(timer);
-		} else {
-			if (panelAnimationComplete) {
-				setPanelExiting(true);
-				const timer = setTimeout(() => {
-					setPanelAnimationComplete(false);
-					setPanelExiting(false);
-				}, 80);
-				return () => clearTimeout(timer);
-			} else {
-				setPanelAnimationComplete(false);
-			}
-		}
-	}, [showSidePanel, panelAnimationComplete]);
+	// No effects needed for derived state - animations handled by CSS
 
 	const currentAssistantMessageId = useMemo(() => {
 		return messages.findLast((message) => message.role === 'assistant')?.id;
@@ -426,11 +376,7 @@ export const ChatPageComponent = () => {
 		<div
 			className={cn(
 				'dual-panel-container group relative flex-1',
-				showSidePanel
-					? 'panel-active'
-					: showSidePanel === null
-						? ''
-						: 'panel-inactive',
+				isPanelOpen ? 'panel-active' : isPanelInitial ? '' : 'panel-inactive',
 			)}
 		>
 			{/* Left panel with chat */}
@@ -446,7 +392,7 @@ export const ChatPageComponent = () => {
 						metrics={contextFileInsights}
 						onTraceNavigationChange={handleTraceNavigationChange}
 						currentFile={currentContextFile}
-						isVisible={currentContextFile != null}
+						isVisible={hasActiveFile}
 						traceAnalysis={traceAnalysis || null}
 						onINPInteractionAnimationChange={
 							setContextFileINPInteractionAnimation
@@ -601,26 +547,17 @@ export const ChatPageComponent = () => {
 
 			{/* Right panel container */}
 			<div className="max-h-[90dvh]">
-				{panelContentType === 'data' ? (
-					<DataPanel
-						visible={!!showSidePanel && panelAnimationComplete}
-						onClose={() => setShowSidePanel(false)}
-						exiting={panelExiting}
-					/>
-				) : (
-					<MarkdownReport
-						visible={!!showSidePanel && panelAnimationComplete}
-						onClose={() => {
-							setShowSidePanel(false);
-							setActiveReportId(null);
-						}}
-						exiting={panelExiting}
-						isGenerating={isGeneratingReport}
-						reportData={reportData || undefined}
-						onAbort={handleAbortReport}
-						reportId={activeReportId}
-					/>
-				)}
+				<MarkdownReport
+					visible={isPanelOpen}
+					onClose={() => {
+						setShowSidePanel(false);
+						setReport({ id: null, data: null });
+					}}
+					exiting={false}
+					reportData={report.data || undefined}
+					onAbort={handleAbortReport}
+					reportId={report.id}
+				/>
 			</div>
 		</div>
 	);
