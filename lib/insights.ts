@@ -196,17 +196,15 @@ export function analyseInsightsForCWV(
 				},
 			);
 
-			const mainFrameOrigin = new URL(
-				networkRequestsTillLCP.at(-1)?.args.data.requestingFrameUrl || '',
-			);
-
 			if (navigationTimings) {
+				let lcpRequestFrame: string | undefined = undefined;
 				for (const [key, value] of navigationTimings.entries()) {
 					const normalizedTiming = microSecondsToMilliSeconds(value.timing);
 					if (key === 'LCP') {
 						_lcp.metricValue = normalizedTiming;
 						// @ts-ignore
 						_lcp.metricScore = value.classification;
+						lcpRequestFrame = value.navigation?.args.data?.documentLoaderURL;
 					}
 				}
 
@@ -262,6 +260,14 @@ export function analyseInsightsForCWV(
 					.find((_e) => _e.name === 'SyntheticNetworkRequest') as
 					| SyntheticNetworkRequest
 					| undefined;
+
+				console.log('insights', insights);
+
+				const mainFrameOrigin = new URL(
+					networkRequestsTillLCP.at(-1)?.args.data.requestingFrameUrl ||
+						lcpRequestFrame ||
+						'about:blank',
+				);
 
 				const mappedURLs = networkRequestsTillLCP
 					.reduce<Map<string, RequestMap>>((reqMap, entry) => {
