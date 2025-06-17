@@ -34,7 +34,10 @@ const getNetworkActivityUpToLCPEvent = (
 	  }
 	| undefined => {
 	const {
-		PageLoadMetrics: { allMarkerEvents: loadTimeMetrics },
+		PageLoadMetrics: {
+			allMarkerEvents: loadTimeMetrics,
+			metricScoresByFrameId,
+		},
 	} = traceAnalysis.parsedTrace;
 
 	const insights = traceAnalysis.insights.get(selectedNavigation);
@@ -43,6 +46,19 @@ const getNetworkActivityUpToLCPEvent = (
 	);
 
 	if (!insights || !LCPEvent) return undefined;
+
+	const LCPEventFrame = metricScoresByFrameId.get(LCPEvent.args.frame);
+
+	const navigationTimings = LCPEventFrame?.get(
+		LCPEvent.args.data?.navigationId || selectedNavigation,
+	);
+
+	let lcpRequestFrame: string | undefined = undefined;
+	for (const [key, value] of navigationTimings?.entries() || []) {
+		if (key === 'LCP') {
+			lcpRequestFrame = value.navigation?.args.data?.documentLoaderURL;
+		}
+	}
 
 	const navigationBounds = insights.bounds;
 	const networkRequestsTillLCP =
@@ -53,7 +69,9 @@ const getNetworkActivityUpToLCPEvent = (
 		});
 
 	const mainFrameOrigin = new URL(
-		networkRequestsTillLCP.at(-1)?.args.data.requestingFrameUrl || '',
+		networkRequestsTillLCP.at(-1)?.args.data.requestingFrameUrl ||
+			lcpRequestFrame ||
+			'about:blank',
 	);
 
 	const lcpNetworkRequest = insights.model.LCPDiscovery.relatedEvents
