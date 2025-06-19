@@ -278,6 +278,7 @@ export const FileContextSection = memo(function FileContextSection({
 	useEffect(() => {
 		if (traceAnalysis && __insights) {
 			onTraceNavigationChange(selectedNavigation || __insights[0][0]);
+			setSelectedNavigation(selectedNavigation || __insights[0][0]);
 		}
 	}, [traceAnalysis, onTraceNavigationChange, __insights]);
 
