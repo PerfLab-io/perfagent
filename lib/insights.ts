@@ -261,8 +261,6 @@ export function analyseInsightsForCWV(
 					| SyntheticNetworkRequest
 					| undefined;
 
-				console.log('insights', insights);
-
 				const mainFrameOrigin = new URL(
 					networkRequestsTillLCP.at(-1)?.args.data.requestingFrameUrl ||
 						lcpRequestFrame ||
