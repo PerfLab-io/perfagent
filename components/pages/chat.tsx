@@ -111,10 +111,8 @@ export const ChatPageComponent = () => {
 
 	// Check if a message is currently being streamed
 	const isLoading = status === 'submitted' || status === 'streaming';
-	const [messagesContainerRef, messagesEndRef] = useCallback(
-		() => useScrollToBottom<HTMLDivElement>(),
-		[],
-	)();
+	const [messagesContainerRef, messagesEndRef] =
+		useScrollToBottom<HTMLDivElement>();
 
 	const { serializeInWorker } = useSerializationWorker();
 
