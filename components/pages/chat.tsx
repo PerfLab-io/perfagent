@@ -93,35 +93,15 @@ export const ChatPageComponent = () => {
 		(state) => state.setSerializedContext,
 	);
 
-	// Pure functions to derive state
-	const getChatUIState = () => {
-		const chatStarted = messages.length > 0;
-		const messagesVisible = chatStarted; // Simple CSS-driven animation
-		const showFileSection = attachedFiles.length > 0;
-		const hasActiveFile = currentContextFile !== null;
+	// Chat UI derived state
+	const chatStarted = messages.length > 0;
+	const messagesVisible = chatStarted; // Simple CSS-driven animation
+	const showFileSection = attachedFiles.length > 0;
+	const hasActiveFile = currentContextFile !== null;
 
-		return {
-			chatStarted,
-			messagesVisible,
-			showFileSection,
-			hasActiveFile,
-		};
-	};
-
-	const getPanelState = () => {
-		const isPanelOpen = showSidePanel === true;
-		const isPanelInitial = showSidePanel === null;
-
-		return {
-			isPanelOpen,
-			isPanelInitial,
-		};
-	};
-
-	// Derived state from pure functions
-	const { chatStarted, messagesVisible, showFileSection, hasActiveFile } =
-		getChatUIState();
-	const { isPanelOpen, isPanelInitial } = getPanelState();
+	// Panel derived state
+	const isPanelOpen = showSidePanel === true;
+	const isPanelInitial = showSidePanel === null;
 
 	// Refs
 	const fileInputRef = useRef<HTMLInputElement>(null);
@@ -131,10 +111,8 @@ export const ChatPageComponent = () => {
 
 	// Check if a message is currently being streamed
 	const isLoading = status === 'submitted' || status === 'streaming';
-	const [messagesContainerRef, messagesEndRef] = useCallback(
-		() => useScrollToBottom<HTMLDivElement>(),
-		[],
-	)();
+	const [messagesContainerRef, messagesEndRef] =
+		useScrollToBottom<HTMLDivElement>();
 
 	const { serializeInWorker } = useSerializationWorker();
 

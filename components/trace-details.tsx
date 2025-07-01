@@ -435,7 +435,7 @@ export const FileContextSection = memo(function FileContextSection({
 						</Select>
 					</div>
 
-					{/* Core Web Vitals Section - Updated with better visuals */}
+					{/* Core Web Vitals Section */}
 					<div className="mt-4">
 						<h4 className="text-peppermint-800 dark:text-peppermint-200 mb-2 max-w-96 truncate text-xs font-semibold">
 							Core Web Vitals for:{' '}
@@ -522,7 +522,7 @@ export const FileContextSection = memo(function FileContextSection({
 						</div>
 					</div>
 
-					{/* Request Timeline - Updated with overlaid markers 
+					{/* Request Timeline 
 					<div className="mt-4">
 						<h4 className="text-peppermint-800 dark:text-peppermint-200 mb-2 text-xs font-semibold">
 							Request Timeline
