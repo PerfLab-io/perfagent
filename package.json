@@ -19,7 +19,7 @@
     "@ffmpeg/util": "^0.12.2",
     "@hono/zod-validator": "^0.4.3",
     "@hookform/resolvers": "^3.10.0",
-    "@mastra/core": "^0.7.0",
+    "@mastra/core": "^0.10.8",
     "@opentelemetry/api-logs": "^0.200.0",
     "@opentelemetry/instrumentation": "^0.200.0",
     "@opentelemetry/sdk-logs": "^0.200.0",
