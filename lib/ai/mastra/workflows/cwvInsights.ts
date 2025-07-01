@@ -1,6 +1,6 @@
 import { type CoreMessage, type DataStreamWriter, coreMessageSchema } from 'ai';
 
-import { Step, Workflow } from '@mastra/core/workflows';
+import { createStep, createWorkflow } from '@mastra/core/workflows';
 import { z } from 'zod';
 import dedent from 'dedent';
 import { renderFlameGraphCanvas } from '@/components/flamegraph/canvas';
@@ -9,79 +9,6 @@ import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 
 const messageSchema = coreMessageSchema;
-
-const topicSchemaOutput = z.object({
-	topic: z
-		.enum(['LCP', 'CLS', 'INP'])
-		.describe(
-			'Insight topic to analyze based on the user prompt. The list reffers to CLS, INP and LCP related queries',
-		),
-});
-
-type TriggerSchema = {
-	messages: CoreMessage[];
-	insights: z.infer<typeof insightsSchema>;
-	inpInteractionAnimation: string | null;
-	aiContext: string | null;
-	dataStream: DataStreamWriter;
-};
-
-const topicStep = new Step({
-	id: 'analysis-topic',
-	description: 'Picks a topic based on the user prompt',
-	inputSchema: z.object({
-		messages: z.array(messageSchema),
-	}),
-	outputSchema: topicSchemaOutput,
-	execute: async ({ context, mastra, runId }) => {
-		const { messages, dataStream } =
-			context.getStepResult<TriggerSchema>('trigger');
-
-		if (!mastra) {
-			throw new Error('Mastra not found');
-		}
-
-		dataStream.writeData({
-			type: 'text',
-			runId,
-			status: 'started',
-			content: {
-				type: 'trace-insight',
-				data: {
-					id: 'trace-insight',
-					type: 'trace-insight',
-					timestamp: Date.now(),
-					title: 'Trace Analysis',
-					message: 'Selecting topic...',
-				},
-			},
-		});
-
-		const response = await mastra.getAgent('topicsAgent').generate(messages, {
-			output: topicSchemaOutput,
-		});
-
-		dataStream.writeData({
-			type: 'text',
-			runId,
-			status: 'in-progress',
-			content: {
-				type: 'trace-insight',
-				data: {
-					id: 'trace-insight',
-					type: 'trace-insight',
-					timestamp: Date.now(),
-					title: 'Trace Analysis',
-					message: `Selected topic: ${response.object.topic}`,
-				},
-			},
-		});
-
-		return {
-			topic: response.object.topic,
-		};
-	},
-});
 
 const insightReportSchema = z.object({
 	metric: z.string(),
@@ -141,26 +68,116 @@ const insightsSchema = z.object({
 	INP: insightReportSchema,
 });
 
-const extractInsightData = new Step({
-	id: 'extract-insight-data',
-	description: 'Extracts the insight data from the insights',
-	execute: async ({ context, mastra, runId }) => {
-		const triggerData = context?.getStepResult<TriggerSchema>('trigger');
-		const topicStepResult = context?.getStepResult<{
-			topic: string;
-		}>('analysis-topic');
+const workflowInputSchema = z.object({
+	dataStream: z.object({
+		writeData: z.function().args(
+			z.object({
+				type: z.string(),
+				content: z.any(),
+			}),
+		),
+	}),
+	messages: z.array(messageSchema),
+	insights: insightsSchema.describe('The insights to analyze'),
+	inpInteractionAnimation: z
+		.string()
+		.or(z.null())
+		.describe('The INP interaction animation'),
+	aiContext: z
+		.string()
+		.or(z.null())
+		.describe('The call tree context serialized'),
+});
 
-		if (!triggerData) {
-			throw new Error('Trigger data not found');
-		}
+const topicSchemaOutput = z.object({
+	topic: z
+		.enum(['LCP', 'CLS', 'INP'])
+		.describe(
+			'Insight topic to analyze based on the user prompt. The list reffers to CLS, INP and LCP related queries',
+		),
+});
+
+type TriggerSchema = {
+	messages: CoreMessage[];
+	insights: z.infer<typeof insightsSchema>;
+	inpInteractionAnimation: string | null;
+	aiContext: string | null;
+	dataStream: DataStreamWriter;
+};
+
+const topicStep = createStep({
+	id: 'analysis-topic',
+	inputSchema: workflowInputSchema,
+	outputSchema: topicSchemaOutput,
+	execute: async ({ mastra, runId, getInitData }) => {
+		const triggerData = getInitData() as TriggerSchema;
+		const { dataStream, messages } = triggerData;
+
 		if (!mastra) {
 			throw new Error('Mastra not found');
 		}
 
-		const { dataStream: dataStreamWriter } = triggerData;
-		const { topic } = topicStepResult;
+		dataStream.writeData({
+			type: 'text',
+			runId,
+			status: 'started',
+			content: {
+				type: 'trace-insight',
+				data: {
+					id: 'trace-insight',
+					type: 'trace-insight',
+					timestamp: Date.now(),
+					title: 'Trace Analysis',
+					message: 'Selecting topic...',
+				},
+			},
+		});
 
-		dataStreamWriter.writeData({
+		const response = await mastra.getAgent('topicsAgent').generate(messages, {
+			output: topicSchemaOutput,
+		});
+
+		dataStream.writeData({
+			type: 'text',
+			runId,
+			status: 'in-progress',
+			content: {
+				type: 'trace-insight',
+				data: {
+					id: 'trace-insight',
+					type: 'trace-insight',
+					timestamp: Date.now(),
+					title: 'Trace Analysis',
+					message: `Selected topic: ${response.object.topic}`,
+				},
+			},
+		});
+
+		return {
+			topic: response.object.topic,
+		};
+	},
+});
+
+const extractInsightData = createStep({
+	id: 'extract-insight-data',
+	inputSchema: topicSchemaOutput,
+	outputSchema: z.object({
+		insightsForTopic: insightReportSchema,
+		topic: topicSchemaOutput.shape.topic,
+	}),
+	execute: async ({ mastra, runId, getInitData, getStepResult }) => {
+		// @ts-expect-error - TODO: fix this type error
+		const { topic } = getStepResult<typeof topicStep>('analysis-topic');
+
+		const triggerData = getInitData() as TriggerSchema;
+		const { insights, dataStream } = triggerData;
+
+		if (!mastra) {
+			throw new Error('Mastra not found');
+		}
+
+		dataStream.writeData({
 			type: 'text',
 			runId,
 			status: 'in-progress',
@@ -178,15 +195,16 @@ const extractInsightData = new Step({
 
 		const insightsForTopic = ((topic) => {
 			if (topic === 'LCP') {
-				return triggerData.insights.LCP;
+				return insights.LCP;
 			}
 			if (topic === 'CLS') {
-				return triggerData.insights.CLS;
+				return insights.CLS;
 			}
 			if (topic === 'INP') {
-				return triggerData.insights.INP;
+				return insights.INP;
 			}
-		})(topicStepResult.topic);
+			return insights.LCP; // fallback
+		})(topic);
 
 		return {
 			insightsForTopic,
@@ -195,16 +213,22 @@ const extractInsightData = new Step({
 	},
 });
 
-const generateExtraReportData = new Step({
+const generateExtraReportData = createStep({
 	id: 'generate-extra-report-data',
-	description: 'Generates the extra report data',
-	execute: async ({ context }) => {
-		const { insightsForTopic, topic } = context?.getStepResult<{
-			insightsForTopic: z.infer<
-				(typeof insightsSchema.shape)['CLS' | 'INP' | 'LCP']
-			>;
-			topic: string;
-		}>('extract-insight-data');
+	inputSchema: z.object({
+		insightsForTopic: insightReportSchema,
+		topic: topicSchemaOutput.shape.topic,
+	}),
+	outputSchema: z.object({
+		reportDetails: z
+			.object({
+				reportImage: z.string().optional(),
+				reportMarkdown: z.string().optional(),
+			})
+			.optional(),
+	}),
+	execute: async ({ inputData }) => {
+		const { insightsForTopic, topic } = inputData;
 
 		if (topic === 'INP' && insightsForTopic.extras) {
 			let reportDetails: {
@@ -303,34 +327,32 @@ const generateExtraReportData = new Step({
 	},
 });
 
-const analyzeTrace = new Step({
+const analyzeTrace = createStep({
 	id: 'analyze-trace',
-	description: 'Analyzes a trace insights',
-	execute: async ({ context, mastra, runId }) => {
-		const triggerData = context?.getStepResult<TriggerSchema>('trigger');
+	inputSchema: z.object({
+		insightsForTopic: insightReportSchema,
+		topic: topicSchemaOutput.shape.topic,
+		reportDetails: z
+			.object({
+				reportImage: z.string().optional(),
+				reportMarkdown: z.string().optional(),
+			})
+			.optional(),
+	}),
+	outputSchema: z.object({
+		type: z.string(),
+		topic: topicSchemaOutput.shape.topic.optional(),
+		insightsForTopic: insightReportSchema.optional(),
+		error: z.string().optional(),
+	}),
+	execute: async ({ inputData, mastra, runId, getInitData }) => {
+		const { insightsForTopic, topic, reportDetails } = inputData;
+		const triggerData = getInitData() as TriggerSchema;
+		const { dataStream, inpInteractionAnimation, aiContext } = triggerData;
 
-		const { insightsForTopic, topic } = context?.getStepResult<{
-			insightsForTopic: z.infer<
-				(typeof insightsSchema.shape)['CLS' | 'INP' | 'LCP']
-			>;
-			topic: string;
-		}>('extract-insight-data');
-
-		const { reportDetails } = context?.getStepResult<{
-			reportDetails: {
-				reportImage?: string;
-				reportMarkdown?: string;
-			};
-		}>('generate-extra-report-data');
-
-		if (!triggerData) {
-			throw new Error('Trigger data not found');
-		}
 		if (!mastra) {
 			throw new Error('Mastra not found');
 		}
-
-		const { dataStream: dataStreamWriter } = triggerData;
 
 		try {
 			if (!insightsForTopic) {
@@ -347,7 +369,7 @@ const analyzeTrace = new Step({
 				insightsForTopic.extras = undefined;
 			}
 
-			dataStreamWriter.writeData({
+			dataStream.writeData({
 				type: 'text',
 				runId,
 				status: 'in-progress',
@@ -384,9 +406,9 @@ const analyzeTrace = new Step({
 					}
 					
 					${
-						topic === 'INP' && triggerData.inpInteractionAnimation
+						topic === 'INP' && inpInteractionAnimation
 							? `Use the following image on the same section of the report as the flamegraph data visualization for the INP interaction, as it represents the moment of the interaction captured from the trace screenshots as an animated webp image:
-					![INP Interaction on timeline](${triggerData.inpInteractionAnimation})
+					![INP Interaction on timeline](${inpInteractionAnimation})
 					Make sure to include the image above the flamegraph data visualization on the same section of the report.
 					`
 							: ''
@@ -396,7 +418,7 @@ const analyzeTrace = new Step({
 			]);
 
 			for await (const chunk of reportStream.textStream) {
-				dataStreamWriter.writeData({
+				dataStream.writeData({
 					type: 'text',
 					runId,
 					status: 'in-progress',
@@ -408,7 +430,7 @@ const analyzeTrace = new Step({
 			}
 
 			if (topic === 'LCP' && LCPExtras) {
-				dataStreamWriter.writeData({
+				dataStream.writeData({
 					type: 'text',
 					runId,
 					status: 'in-progress',
@@ -418,7 +440,7 @@ const analyzeTrace = new Step({
 					},
 				});
 
-				dataStreamWriter.writeData({
+				dataStream.writeData({
 					type: 'text',
 					runId,
 					status: 'in-progress',
@@ -475,7 +497,7 @@ const analyzeTrace = new Step({
 				]);
 
 				for await (const chunk of networkAssistantStream.textStream) {
-					dataStreamWriter.writeData({
+					dataStream.writeData({
 						type: 'text',
 						runId,
 						status: 'in-progress',
@@ -487,8 +509,8 @@ const analyzeTrace = new Step({
 				}
 			}
 
-			if (triggerData.aiContext && topic === 'INP') {
-				dataStreamWriter.writeData({
+			if (aiContext && topic === 'INP') {
+				dataStream.writeData({
 					type: 'text',
 					runId,
 					status: 'in-progress',
@@ -498,7 +520,7 @@ const analyzeTrace = new Step({
 					},
 				});
 
-				dataStreamWriter.writeData({
+				dataStream.writeData({
 					type: 'text',
 					runId,
 					status: 'in-progress',
@@ -518,7 +540,7 @@ const analyzeTrace = new Step({
 				const traceAssistantStream = await traceAssistant.stream([
 					{
 						role: 'user',
-						content: triggerData.aiContext,
+						content: aiContext,
 					},
 					{
 						role: 'user',
@@ -560,7 +582,7 @@ const analyzeTrace = new Step({
 				]);
 
 				for await (const chunk of traceAssistantStream.textStream) {
-					dataStreamWriter.writeData({
+					dataStream.writeData({
 						type: 'text',
 						runId,
 						status: 'in-progress',
@@ -572,7 +594,7 @@ const analyzeTrace = new Step({
 				}
 			}
 
-			dataStreamWriter.writeData({
+			dataStream.writeData({
 				type: 'text',
 				runId,
 				status: 'complete',
@@ -599,7 +621,7 @@ const analyzeTrace = new Step({
 				},
 			]);
 
-			agentStream.mergeIntoDataStream(dataStreamWriter);
+			agentStream.mergeIntoDataStream(dataStream);
 
 			return {
 				type: 'trace_analysis',
@@ -619,34 +641,20 @@ const analyzeTrace = new Step({
 	},
 });
 
-const cwvInsightsWorkflow = new Workflow({
-	name: 'trace-analysis-workflow',
-	triggerSchema: z.object({
-		dataStream: z.object({
-			writeData: z.function().args(
-				z.object({
-					type: z.string(),
-					content: z.any(),
-				}),
-			),
-		}),
-		messages: z.array(messageSchema),
-		insights: insightsSchema.describe('The insights to analyze'),
-		inpInteractionAnimation: z
-			.string()
-			.or(z.null())
-			.describe('The INP interaction animation'),
-		aiContext: z
-			.string()
-			.or(z.null())
-			.describe('The call tree context serialized'),
+const cwvInsightsWorkflow = createWorkflow({
+	id: 'trace-analysis-workflow',
+	inputSchema: workflowInputSchema,
+	outputSchema: z.object({
+		type: z.string(),
+		topic: z.string().optional(),
+		insightsForTopic: insightReportSchema.optional(),
+		error: z.string().optional(),
 	}),
 })
-	.step(topicStep)
+	.then(topicStep)
 	.then(extractInsightData)
 	.then(generateExtraReportData)
-	.then(analyzeTrace);
-
-cwvInsightsWorkflow.commit();
+	.then(analyzeTrace)
+	.commit();
 
 export { cwvInsightsWorkflow };
