@@ -167,8 +167,7 @@ const extractInsightData = createStep({
 		topic: topicSchemaOutput.shape.topic,
 	}),
 	execute: async ({ mastra, runId, getInitData, getStepResult }) => {
-		// @ts-expect-error - TODO: fix this type error
-		const { topic } = getStepResult<typeof topicStep>('analysis-topic');
+		const { topic } = getStepResult(topicStep);
 
 		const triggerData = getInitData() as TriggerSchema;
 		const { insights, dataStream } = triggerData;
