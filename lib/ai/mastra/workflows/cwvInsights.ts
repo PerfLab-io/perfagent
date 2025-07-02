@@ -166,8 +166,8 @@ const extractInsightData = createStep({
 		insightsForTopic: insightReportSchema,
 		topic: topicSchemaOutput.shape.topic,
 	}),
-	execute: async ({ mastra, runId, getInitData, getStepResult }) => {
-		const { topic } = getStepResult(topicStep);
+	execute: async ({ mastra, runId, getInitData, inputData }) => {
+		const { topic } = inputData;
 
 		const triggerData = getInitData() as TriggerSchema;
 		const { insights, dataStream } = triggerData;
@@ -219,6 +219,8 @@ const generateExtraReportData = createStep({
 		topic: topicSchemaOutput.shape.topic,
 	}),
 	outputSchema: z.object({
+		insightsForTopic: insightReportSchema,
+		topic: topicSchemaOutput.shape.topic,
 		reportDetails: z
 			.object({
 				reportImage: z.string().optional(),
@@ -317,10 +319,14 @@ const generateExtraReportData = createStep({
 			}
 			return {
 				reportDetails,
+				insightsForTopic,
+				topic,
 			};
 		} else {
 			return {
 				reportDetails: undefined,
+				insightsForTopic,
+				topic,
 			};
 		}
 	},
