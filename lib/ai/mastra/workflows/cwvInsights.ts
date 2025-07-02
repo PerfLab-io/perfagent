@@ -10,56 +10,81 @@ const require = createRequire(import.meta.url);
 
 const messageSchema = coreMessageSchema;
 
+// Common base schemas
+const rawEventSchema = z.object({
+	ts: z.number(),
+	pid: z.number(),
+	tid: z.number(),
+	dur: z.number().optional(),
+});
+
+const timelineSchema = z.object({
+	min: z.number(),
+	max: z.number(),
+	range: z.number(),
+});
+
+const metricBreakdownSchema = z.array(
+	z.object({ label: z.string(), value: z.number() })
+);
+
+const metricScoreSchema = z.enum([
+	'good',
+	'needs improvement',
+	'bad',
+	'unclassified',
+]);
+
+const topicSchema = z.enum(['LCP', 'CLS', 'INP']);
+
+// Event and animation frame schemas
+const formattedEventSchema = z.object({
+	ts: z.number(),
+	dur: z.number(),
+	inputDelay: z.number(),
+	processingStart: z.number(),
+	processingEnd: z.number(),
+	presentationDelay: z.number(),
+});
+
+const animationPhaseSchema = z.object({
+	name: z.string(),
+	dur: z.number(),
+	ts: z.number(),
+	rawSourceEvent: z.any(),
+});
+
+const animationFrameSchema = z.object({
+	phases: z.array(animationPhaseSchema),
+});
+
+// Extras union schemas
+const inpExtrasSchema = z.object({
+	formattedEvent: formattedEventSchema,
+	timeline: timelineSchema,
+	animationFrames: z.array(animationFrameSchema),
+});
+
+const lcpExtrasSchema = z.object({
+	networkStackInfo: z.string(),
+});
+
+const extrasSchema = inpExtrasSchema.or(lcpExtrasSchema);
+
+// Report details schema
+const reportDetailsSchema = z.object({
+	reportImage: z.string().optional(),
+	reportMarkdown: z.string().optional(),
+});
+
 const insightReportSchema = z.object({
 	metric: z.string(),
 	metricValue: z.number(),
 	metricType: z.enum(['time', 'score']),
-	metricBreakdown: z.array(z.object({ label: z.string(), value: z.number() })),
-	metricScore: z
-		.enum(['good', 'needs improvement', 'bad', 'unclassified'])
-		.optional(),
-	rawEvent: z
-		.object({
-			ts: z.number(),
-			pid: z.number(),
-			tid: z.number(),
-			dur: z.number().optional(),
-		})
-		.optional(),
-	extras: z
-		.object({
-			formattedEvent: z.object({
-				ts: z.number(),
-				dur: z.number(),
-				inputDelay: z.number(),
-				processingStart: z.number(),
-				processingEnd: z.number(),
-				presentationDelay: z.number(),
-			}),
-			timeline: z.object({
-				min: z.number(),
-				max: z.number(),
-				range: z.number(),
-			}),
-			animationFrames: z.array(
-				z.object({
-					phases: z.array(
-						z.object({
-							name: z.string(),
-							dur: z.number(),
-							ts: z.number(),
-							rawSourceEvent: z.any(),
-						}),
-					),
-				}),
-			),
-		})
-		.or(
-			z.object({
-				networkStackInfo: z.string(),
-			}),
-		)
-		.optional(),
+	metricBreakdown: metricBreakdownSchema,
+	metricScore: metricScoreSchema.optional(),
+	rawEvent: rawEventSchema.optional(),
+	extras: extrasSchema.optional(),
 });
 
 const insightsSchema = z.object({
@@ -90,11 +115,9 @@ const workflowInputSchema = z.object({
 });
 
 const topicSchemaOutput = z.object({
-	topic: z
-		.enum(['LCP', 'CLS', 'INP'])
-		.describe(
-			'Insight topic to analyze based on the user prompt. The list reffers to CLS, INP and LCP related queries',
-		),
+	topic: topicSchema.describe(
+		'Insight topic to analyze based on the user prompt. The list reffers to CLS, INP and LCP related queries',
+	),
 });
 
 type TriggerSchema = {
@@ -164,7 +187,7 @@ const extractInsightData = createStep({
 	inputSchema: topicSchemaOutput,
 	outputSchema: z.object({
 		insightsForTopic: insightReportSchema,
-		topic: topicSchemaOutput.shape.topic,
+		topic: topicSchema,
 	}),
 	execute: async ({ mastra, runId, getInitData, inputData }) => {
 		const { topic } = inputData;
@@ -216,32 +239,28 @@ const generateExtraReportData = createStep({
 	id: 'generate-extra-report-data',
 	inputSchema: z.object({
 		insightsForTopic: insightReportSchema,
-		topic: topicSchemaOutput.shape.topic,
+		topic: topicSchema,
 	}),
 	outputSchema: z.object({
 		insightsForTopic: insightReportSchema,
-		topic: topicSchemaOutput.shape.topic,
-		reportDetails: z
-			.object({
-				reportImage: z.string().optional(),
-				reportMarkdown: z.string().optional(),
-			})
-			.optional(),
+		topic: topicSchema,
+		reportDetails: reportDetailsSchema.optional(),
 	}),
 	execute: async ({ inputData }) => {
 		const { insightsForTopic, topic } = inputData;
 
-		if (topic === 'INP' && insightsForTopic.extras) {
+		if (topic === 'INP' && insightsForTopic.extras && 'formattedEvent' in insightsForTopic.extras) {
 			let reportDetails: {
 				reportImage?: string;
 				reportMarkdown?: string;
 			} = {};
 
-			const interaction = insightsForTopic.extras.formattedEvent;
+			const inpExtras = insightsForTopic.extras as z.infer<typeof inpExtrasSchema>;
+			const interaction = inpExtras.formattedEvent;
 			const startTime = (interaction?.ts || 0) - 30_000;
 			const endTime =
 				(interaction?.ts || 0) + (interaction?.dur || 0) + 300_000;
-			const timeline = insightsForTopic.extras.timeline;
+			const timeline = inpExtras.timeline;
 
 			try {
 				// Try to load the node canvas module and render the interactions track
@@ -267,7 +286,7 @@ const generateExtraReportData = createStep({
 					processedData: null,
 					showInteractions: true,
 					showAnnotations: false,
-					interactions: [insightsForTopic.extras.formattedEvent],
+					interactions: [inpExtras.formattedEvent],
 					annotations: [],
 					selectedAnnotation: null,
 				});
@@ -302,8 +321,8 @@ const generateExtraReportData = createStep({
 				};
 			}
 
-			if (insightsForTopic.extras.animationFrames.length > 0) {
-				const eventsOnAnimationFrames = insightsForTopic.extras.animationFrames;
+			if (inpExtras.animationFrames.length > 0) {
+				const eventsOnAnimationFrames = inpExtras.animationFrames;
 
 				reportDetails.reportMarkdown =
 					reportDetails.reportMarkdown +
@@ -336,13 +355,8 @@ const analyzeTrace = createStep({
 	id: 'analyze-trace',
 	inputSchema: z.object({
 		insightsForTopic: insightReportSchema,
-		topic: topicSchemaOutput.shape.topic,
-		reportDetails: z
-			.object({
-				reportImage: z.string().optional(),
-				reportMarkdown: z.string().optional(),
-			})
-			.optional(),
+		topic: topicSchema,
+		reportDetails: reportDetailsSchema.optional(),
 	}),
 	outputSchema: z.object({
 		type: z.string(),
