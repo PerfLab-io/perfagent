@@ -84,7 +84,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 								});
 
 								const _run = await run.start({
-									triggerData: {
+									inputData: {
 										// @ts-expect-error - TODO: fix this type error
 										insights,
 										dataStream: dataStreamWriter,
@@ -116,7 +116,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 							});
 
 							const _run = await run.start({
-								triggerData: {
+								inputData: {
 									messages,
 									dataStream: dataStreamWriter,
 								},

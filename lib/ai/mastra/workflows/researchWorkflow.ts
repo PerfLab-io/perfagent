@@ -5,7 +5,7 @@ import {
 	smoothStream,
 } from 'ai';
 
-import { Step, Workflow } from '@mastra/core/workflows';
+import { createStep, createWorkflow } from '@mastra/core/workflows';
 import { z } from 'zod';
 import dedent from 'dedent';
 import { serverEnv } from '@/lib/env/server';
@@ -102,31 +102,36 @@ const generateStepIds = (plan: z.infer<typeof researchPlanSchema>) => {
 	};
 };
 
+const workflowInputSchema = z.object({
+	dataStream: z.object({
+		writeData: z.function().args(
+			z.object({
+				type: z.string(),
+				content: z.any(),
+			}),
+		),
+	}),
+	messages: z.array(messageSchema),
+});
+
 type TriggerSchema = {
 	messages: CoreMessage[];
 	dataStream: DataStreamWriter;
 };
 
-const researchPlanning = new Step({
+const researchPlanning = createStep({
 	id: 'research-planning',
-	description: "Builds a research plan based on user's input",
-	inputSchema: z.object({
-		messages: z.array(messageSchema),
-	}),
+	inputSchema: workflowInputSchema,
 	outputSchema: researchPlanSchema,
-	execute: async ({ context, runId, mastra }) => {
-		const triggerData = context?.getStepResult<TriggerSchema>('trigger');
+	execute: async ({ runId, mastra, getInitData }) => {
+		const triggerData = getInitData() as TriggerSchema;
+		const { dataStream, messages } = triggerData;
 
-		if (!triggerData) {
-			throw new Error('Trigger data not found');
-		}
 		if (!mastra) {
 			throw new Error('Mastra not found');
 		}
 
-		const { dataStream: dataStreamWriter, messages } = triggerData;
-
-		dataStreamWriter.writeData({
+		dataStream.writeData({
 			type: 'research_update',
 			runId,
 			status: 'started',
@@ -143,7 +148,7 @@ const researchPlanning = new Step({
 			},
 		});
 
-		dataStreamWriter.writeData({
+		dataStream.writeData({
 			type: 'research_update',
 			runId,
 			status: 'in-progress',
@@ -167,7 +172,7 @@ const researchPlanning = new Step({
 				output: researchPlanSchema,
 			});
 
-		dataStreamWriter.writeData({
+		dataStream.writeData({
 			type: 'research_update',
 			runId,
 			status: 'in-progress',
@@ -222,22 +227,13 @@ const researchStepsSchema = z.object({
 	totalSteps: z.number(),
 });
 
-const researchSteps = new Step({
+const researchSteps = createStep({
 	id: 'research-steps',
-	description: 'Assembles the research plan into a list of steps',
+	inputSchema: researchPlanSchema,
 	outputSchema: researchStepsSchema,
-	execute: async ({ context, runId }) => {
-		const triggerData = context?.getStepResult<TriggerSchema>('trigger');
-		const researchPlan =
-			context?.getStepResult<z.infer<typeof researchPlanSchema>>(
-				'research-planning',
-			);
-
-		if (!triggerData) {
-			throw new Error('Trigger data not found');
-		}
-
-		const { dataStream: dataStreamWriter } = triggerData;
+	execute: async ({ inputData: researchPlan, runId, getInitData }) => {
+		const triggerData = getInitData() as TriggerSchema;
+		const { dataStream } = triggerData;
 
 		console.log('==========researchPlan', researchPlan);
 
@@ -247,7 +243,7 @@ const researchSteps = new Step({
 		const totalSteps =
 			stepIds.searchSteps.length + stepIds.analysisSteps.length + 1;
 
-		dataStreamWriter.writeData({
+		dataStream.writeData({
 			type: 'research_update',
 			runId,
 			status: 'in-progress',
@@ -286,20 +282,15 @@ const searchWebSchema = z.object({
 	completedSteps: z.number(),
 });
 
-const searchWeb = new Step({
+const searchWeb = createStep({
 	id: 'search-web',
-	description:
-		'Searches the web based on the data from the research steps plan',
-	execute: async ({ context, runId, mastra }) => {
-		const triggerData = context?.getStepResult<TriggerSchema>('trigger');
-		const researchStepsStepResult =
-			context?.getStepResult<z.infer<typeof researchStepsSchema>>(
-				'research-steps',
-			);
+	inputSchema: researchStepsSchema,
+	outputSchema: searchWebSchema,
+	execute: async ({ inputData, runId, mastra, getInitData }) => {
+		const triggerData = getInitData() as TriggerSchema;
+		const { dataStream } = triggerData;
+		const { stepIds, completedSteps, totalSteps } = inputData;
 
-		if (!triggerData) {
-			throw new Error('Trigger data not found');
-		}
 		if (!mastra) {
 			throw new Error('Mastra not found');
 		}
@@ -308,15 +299,12 @@ const searchWeb = new Step({
 			throw new Error('Tavily client not found');
 		}
 
-		const { dataStream: dataStreamWriter } = triggerData;
-		const { stepIds, completedSteps, totalSteps } = researchStepsStepResult;
-
 		const searchResults: z.infer<typeof searchWebSchema>['searchResults'] = [];
 		let _newCompletedSteps = completedSteps;
 
 		for (const step of stepIds.searchSteps) {
 			// Send running annotation for this search step
-			dataStreamWriter.writeData({
+			dataStream.writeData({
 				type: 'research_update',
 				runId,
 				status: 'in-progress',
@@ -365,7 +353,7 @@ const searchWeb = new Step({
 			}
 
 			// Send progress annotation for the search step
-			dataStreamWriter.writeData({
+			dataStream.writeData({
 				type: 'research_update',
 				runId,
 				status: 'in-progress',
@@ -390,7 +378,7 @@ const searchWeb = new Step({
 		}
 
 		// Send completed annotation for the search step
-		dataStreamWriter.writeData({
+		dataStream.writeData({
 			type: 'research_update',
 			runId,
 			status: 'in-progress',
@@ -431,39 +419,27 @@ const analysisResultSchema = z
 	)
 	.max(3);
 
-const analyzeResults = new Step({
+const analyzeResults = createStep({
 	id: 'analyze-results',
-	description: 'Analyzes the results of the research',
-	outputSchema: z.object({
-		analysisResults: analysisResultSchema,
-		completedSteps: z.number(),
-	}),
-	execute: async ({ context, runId, mastra }) => {
-		const triggerData = context?.getStepResult<TriggerSchema>('trigger');
-		const researchStepsStepResult =
-			context?.getStepResult<z.infer<typeof researchStepsSchema>>(
-				'research-steps',
-			);
-		const searchWebStepResult =
-			context?.getStepResult<z.infer<typeof searchWebSchema>>('search-web');
+	inputSchema: searchWebSchema,
+	outputSchema: analyzeResultsSchema,
+	execute: async ({ inputData, runId, mastra, getInitData, getStepResult }) => {
+		const triggerData = getInitData() as TriggerSchema;
+		const { dataStream } = triggerData;
+		const { searchResults, completedSteps } = inputData;
+		const researchStepsResult = getStepResult(researchSteps);
+		const { stepIds, totalSteps } = researchStepsResult;
 
-		if (!triggerData) {
-			throw new Error('Trigger data not found');
-		}
 		if (!mastra) {
 			throw new Error('Mastra not found');
 		}
-
-		const { dataStream: dataStreamWriter } = triggerData;
-		const { searchResults, completedSteps } = searchWebStepResult;
-		const { stepIds, totalSteps } = researchStepsStepResult;
 
 		// Perform analyses
 		const _analysisResults: z.infer<typeof analysisResultSchema> = [];
 		let _completedSteps = completedSteps;
 
 		for (const step of stepIds.analysisSteps) {
-			dataStreamWriter.writeData({
+			dataStream.writeData({
 				type: 'research_update',
 				runId,
 				status: 'in-progress',
@@ -506,7 +482,7 @@ const analyzeResults = new Step({
 			_analysisResults.push(...analysisResult.findings);
 			_completedSteps++;
 
-			dataStreamWriter.writeData({
+			dataStream.writeData({
 				type: 'research_update',
 				runId,
 				status: 'in-progress',
@@ -528,7 +504,7 @@ const analyzeResults = new Step({
 			});
 		}
 
-		dataStreamWriter.writeData({
+		dataStream.writeData({
 			type: 'research_update',
 			runId,
 			status: 'in-progress',
@@ -549,41 +525,34 @@ const analyzeResults = new Step({
 		return {
 			analysisResults: _analysisResults,
 			completedSteps: _completedSteps,
+			totalSteps,
 		};
 	},
 });
 
-const researchReport = new Step({
+const researchReport = createStep({
 	id: 'research-report',
-	description: 'Generates a research report based on the results and analysis',
-	execute: async ({ context, runId, mastra }) => {
-		const triggerData = context?.getStepResult<TriggerSchema>('trigger');
-		const researchPlan =
-			context?.getStepResult<z.infer<typeof researchPlanSchema>>(
-				'research-planning',
-			);
-		const researchStepsStepResult =
-			context?.getStepResult<z.infer<typeof researchStepsSchema>>(
-				'research-steps',
-			);
-		const searchWebStepResult =
-			context?.getStepResult<z.infer<typeof searchWebSchema>>('search-web');
-		const analyzeResultsStepResult =
-			context?.getStepResult<z.infer<typeof analyzeResultsSchema>>(
-				'analyze-results',
-			);
+	inputSchema: analyzeResultsSchema,
+	outputSchema: z.object({
+		type: z.string(),
+		runId: z.string(),
+		researchPlan: researchPlanSchema,
+		searchResults: z.array(z.any()),
+		analysisResults: z.array(z.any()),
+		progress: z.number(),
+	}),
+	execute: async ({ inputData, runId, mastra, getInitData, getStepResult }) => {
+		const triggerData = getInitData() as TriggerSchema;
+		const { dataStream, messages } = triggerData;
+		const { analysisResults, totalSteps } = inputData;
+		
+		const researchPlan = getStepResult(researchPlanning);
+		const searchWebResult = getStepResult(searchWeb);
+		const { searchResults } = searchWebResult;
 
-		if (!triggerData) {
-			throw new Error('Trigger data not found');
-		}
 		if (!mastra) {
 			throw new Error('Mastra not found');
 		}
-
-		const { dataStream: dataStreamWriter, messages } = triggerData;
-		const { searchResults } = searchWebStepResult;
-		const { totalSteps } = researchStepsStepResult;
-		const { analysisResults } = analyzeResultsStepResult;
 
 		const reportStream = await mastra.getAgent('largeAssistant').stream(
 			[
@@ -616,7 +585,7 @@ const researchReport = new Step({
 		);
 
 		for await (const chunk of reportStream.textStream) {
-			dataStreamWriter.writeData({
+			dataStream.writeData({
 				type: 'research_update',
 				runId,
 				status: 'in-progress',
@@ -649,7 +618,7 @@ const researchReport = new Step({
 			},
 		);
 
-		dataStreamWriter.writeData({
+		dataStream.writeData({
 			type: 'research_update',
 			runId,
 			status: 'complete',
@@ -667,7 +636,7 @@ const researchReport = new Step({
 			},
 		});
 
-		agentSummary.mergeIntoDataStream(dataStreamWriter);
+		agentSummary.mergeIntoDataStream(dataStream);
 
 		return {
 			type: 'research',
@@ -680,26 +649,23 @@ const researchReport = new Step({
 	},
 });
 
-const researchWorkflow = new Workflow({
-	name: 'research-workflow',
-	triggerSchema: z.object({
-		dataStream: z.object({
-			writeData: z.function().args(
-				z.object({
-					type: z.string(),
-					content: z.any(),
-				}),
-			),
-		}),
-		messages: z.array(messageSchema),
+const researchWorkflow = createWorkflow({
+	id: 'research-workflow',
+	inputSchema: workflowInputSchema,
+	outputSchema: z.object({
+		type: z.string(),
+		runId: z.string(),
+		researchPlan: researchPlanSchema,
+		searchResults: z.array(z.any()),
+		analysisResults: z.array(z.any()),
+		progress: z.number(),
 	}),
 })
-	.step(researchPlanning)
+	.then(researchPlanning)
 	.then(researchSteps)
 	.then(searchWeb)
 	.then(analyzeResults)
-	.then(researchReport);
-
-researchWorkflow.commit();
+	.then(researchReport)
+	.commit();
 
 export { researchWorkflow };

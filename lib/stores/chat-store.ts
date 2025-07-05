@@ -15,6 +15,13 @@ export interface Report {
 	id: string | null;
 }
 
+export interface INPInteractionAnimation {
+	animationFrameInteractionImageUrl: string | null;
+	isLoading: boolean;
+	progress: number;
+	error: string | null;
+}
+
 interface ChatUIState {
 	// Side panel state
 	showSidePanel: boolean | null;
@@ -38,19 +45,9 @@ interface ChatUIState {
 		insights: ReturnType<typeof analyseInsightsForCWV> | null,
 	) => void;
 
-	contextFileINPInteractionAnimation: {
-		animationFrameInteractionImageUrl: string | null;
-		isLoading: boolean;
-		progress: number;
-		error: string | null;
-	} | null;
+	contextFileINPInteractionAnimation: INPInteractionAnimation | null;
 	setContextFileINPInteractionAnimation: (
-		animation: {
-			animationFrameInteractionImageUrl: string | null;
-			isLoading: boolean;
-			progress: number;
-			error: string | null;
-		} | null,
+		animation: INPInteractionAnimation | null,
 	) => void;
 
 	// Report state
