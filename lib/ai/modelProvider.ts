@@ -34,7 +34,7 @@ const google = createGoogleGenerativeAI({
 });
 
 const googleModels = {
-	default_model: google('gemini-2.5-flash-preview-04-17', {
+	default_model: google('gemini-2.5-flash', {
 		structuredOutputs: true,
 	}),
 	topics_model: google('gemini-2.0-flash-lite', {
