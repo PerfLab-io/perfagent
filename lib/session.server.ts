@@ -99,7 +99,7 @@ export const verifySession = cache(async (): Promise<SessionData | null> => {
 
 		if (now > expirationDate) {
 			// Session expired, clean it up
-			await deleteSession();
+			void deleteSession().catch(console.error);
 			return null;
 		}
 
