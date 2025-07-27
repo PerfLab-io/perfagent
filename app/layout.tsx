@@ -73,6 +73,35 @@ export default function RootLayout({
 				<meta name="application-name" content="PerfAgent" />
 				<meta name="theme-color" content="#4ade80" />
 
+				{/* Performance optimizations */}
+				<link rel="preconnect" href="https://fonts.googleapis.com" />
+				<link
+					rel="preconnect"
+					href="https://fonts.gstatic.com"
+					crossOrigin=""
+				/>
+				<link rel="dns-prefetch" href="//vercel.live" />
+				<link rel="dns-prefetch" href="//vitals.vercel-analytics.com" />
+				{/* Reduce layout shifts */}
+				<style
+					dangerouslySetInnerHTML={{
+						__html: `
+						/* Prevent layout shifts during font loading */
+						.font-mono { font-display: swap; }
+						
+						/* Optimize animation performance */
+						* {
+							-webkit-font-smoothing: antialiased;
+							-moz-osx-font-smoothing: grayscale;
+						}
+						
+						/* Critical above-the-fold styles */
+						body { margin: 0; }
+						.min-h-screen { min-height: 100vh; }
+					`,
+					}}
+				/>
+
 				{/* Schema.org markup for Google */}
 				<script
 					type="application/ld+json"
