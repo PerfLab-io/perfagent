@@ -53,6 +53,9 @@ importers:
       '@opentelemetry/sdk-logs':
         specifier: ^0.200.0
         version: 0.200.0(@opentelemetry/api@1.9.0)
+      '@perflab/mastra-mcp':
+        specifier: ^0.10.7
+        version: 0.10.7(@mastra/core@0.10.8(@hono/zod-validator@0.4.3(hono@4.7.5)(zod@3.24.2))(openapi-types@12.1.3)(react@19.0.0)(zod@3.24.2))(zod@3.24.2)
       '@perflab/trace_engine':
         specifier: 0.1.10
         version: 0.1.10
@@ -3253,6 +3256,12 @@ packages:
     engines: {node: ^18.19.0 || >=20.6.0}
     peerDependencies:
       '@opentelemetry/api': ^1.1.0
+
+  '@perflab/mastra-mcp@0.10.7':
+    resolution: {integrity: sha512-DATWXh8zqvK6e1MwSd0Q8HgXB4meYF3hALBK/Vx82iz9oTUb/va5UtI8Vmbjd3Fvns8nG6nhweGBMKynb3a24Q==}
+    peerDependencies:
+      '@mastra/core': '>=0.10.2-0 <0.12.0-0'
+      zod: ^3.0.0
 
   '@perflab/trace_engine@0.1.10':
     resolution: {integrity: sha512-/762YEqUIRq1kDl/wVe98vQieeZt/G0ftnuwUjZm13yhAZWAUqN0XzjqDwpy9Wx19dGGHINgrxXUauc5hBQ17Q==}
@@ -14386,6 +14395,20 @@ snapshots:
     dependencies:
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/core': 2.0.1(@opentelemetry/api@1.9.0)
+
+  '@perflab/mastra-mcp@0.10.7(@mastra/core@0.10.8(@hono/zod-validator@0.4.3(hono@4.7.5)(zod@3.24.2))(openapi-types@12.1.3)(react@19.0.0)(zod@3.24.2))(zod@3.24.2)':
+    dependencies:
+      '@apidevtools/json-schema-ref-parser': 14.1.1
+      '@mastra/core': 0.10.8(@hono/zod-validator@0.4.3(hono@4.7.5)(zod@3.24.2))(openapi-types@12.1.3)(react@19.0.0)(zod@3.24.2)
+      '@modelcontextprotocol/sdk': 1.17.0
+      date-fns: 4.1.0
+      exit-hook: 4.0.0
+      fast-deep-equal: 3.1.3
+      uuid: 11.1.0
+      zod: 3.24.2
+      zod-from-json-schema: 0.0.5
+    transitivePeerDependencies:
+      - supports-color
 
   '@perflab/trace_engine@0.1.10':
     dependencies:
