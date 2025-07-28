@@ -3,6 +3,7 @@
 import { checkAgentAccess, grantRole, login } from '@/app/actions/login';
 import { ArrowRight, Eye, EyeOff, Lock, User } from 'lucide-react';
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import type React from 'react';
 import { useState } from 'react';
 import { Button } from '../ui/button';
@@ -192,12 +193,12 @@ export const LoginPageComponent = () => {
 					<div className="text-peppermint-300 space-y-1 font-mono text-xs">
 						<p>
 							We are currently in private preview stage for the chat. Please{' '}
-							<a
+							<Link
 								href="/#signup"
 								className="text-peppermint-300 hover:text-peppermint-200 underline transition-colors"
 							>
 								signup to the waitlist here
-							</a>
+							</Link>
 						</p>
 					</div>
 				</div>
