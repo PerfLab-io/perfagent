@@ -21,6 +21,7 @@ import {
 import { DEFAULT_MCP_SERVERS } from '@/lib/ai/defaultMCPServers';
 import { createMcpAwareLargeAssistant } from '@/lib/ai/mastra/agents/largeAssistant';
 import { createMcpAwareRouterAgent } from '@/lib/ai/mastra/agents/router';
+import { transformMcpToolsetsForMastra } from '@/lib/ai/mastra/toolsetTransformer';
 
 export const runtime = 'nodejs';
 
@@ -203,6 +204,14 @@ chat.delete('/mcp/servers/:id', async (c) => {
 
 // POST endpoint for chat
 chat.post('/chat', zValidator('json', requestSchema), async (c) => {
+	// Initialize variables in outer scope for proper cleanup
+	let mcpContext: {
+		client: any;
+		toolsets: Record<string, any>;
+		tools: Record<string, any>;
+		userId?: string;
+	} | null = null;
+
 	try {
 		const body = c.req.valid('json');
 		const messages = convertToCoreMessages(body.messages);
@@ -219,19 +228,29 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 		}
 
 		// Get MCP toolsets if user is authenticated
-		let toolsets = {};
+		let rawToolsets = {};
+		let transformedMcp = { toolsets: {}, tools: {} };
 		let mcpClient = null;
 		const sessionData = await verifySession();
 		if (sessionData) {
 			mcpClient = await createUserMcpClient(sessionData.userId);
 			if (mcpClient) {
 				try {
-					toolsets = await mcpClient.getToolsets();
+					rawToolsets = await mcpClient.getToolsets();
+					transformedMcp = transformMcpToolsetsForMastra(rawToolsets);
 				} catch (error) {
 					console.error('Error fetching MCP toolsets:', error);
 				}
 			}
 		}
+
+		// Create request-scoped MCP context
+		mcpContext = {
+			client: mcpClient,
+			toolsets: transformedMcp.toolsets,
+			tools: transformedMcp.tools,
+			userId: sessionData?.userId,
+		};
 
 		const dataStream = createDataStream({
 			execute: async (dataStreamWriter) => {
@@ -239,8 +258,8 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 
 				// Use MCP-aware router if toolsets are available
 				const routerAgent =
-					toolsets && Object.keys(toolsets).length > 0
-						? createMcpAwareRouterAgent(toolsets)
+					mcpContext?.toolsets && Object.keys(mcpContext.toolsets).length > 0
+						? createMcpAwareRouterAgent(mcpContext.toolsets, mcpContext.tools)
 						: mastra.getAgent('routerAgent');
 
 				const { object } = await routerAgent.generate(messages, {
@@ -260,7 +279,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 							},
 						],
 						{
-							toolsets,
+							toolsets: mcpContext?.toolsets || {},
 						},
 					);
 					stream.mergeIntoDataStream(dataStreamWriter, {
@@ -303,7 +322,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 										},
 									],
 									{
-										toolsets,
+										toolsets: mcpContext?.toolsets || {},
 									},
 								);
 								stream.mergeIntoDataStream(dataStreamWriter);
@@ -329,12 +348,16 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 						default:
 							// Use MCP-aware agent if toolsets are available
 							const agent =
-								toolsets && Object.keys(toolsets).length > 0
-									? createMcpAwareLargeAssistant(toolsets)
+								mcpContext?.toolsets &&
+								Object.keys(mcpContext.toolsets).length > 0
+									? createMcpAwareLargeAssistant(
+											mcpContext.toolsets,
+											mcpContext.tools,
+										)
 									: mastra.getAgent('largeAssistant');
 
 							const stream = await agent.stream(messages, {
-								toolsets,
+								toolsets: mcpContext?.toolsets || {},
 							});
 							stream.mergeIntoDataStream(dataStreamWriter, {
 								sendReasoning: true,
@@ -343,25 +366,9 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 							break;
 					}
 				}
-
-				// Disconnect MCP client when done
-				if (mcpClient) {
-					try {
-						await mcpClient.disconnect();
-					} catch (error) {
-						console.error('Error disconnecting MCP client:', error);
-					}
-				}
 			},
 			onError: (error) => {
-				// Disconnect MCP client on error
-				if (mcpClient) {
-					try {
-						mcpClient.disconnect();
-					} catch (err) {
-						console.error('Error disconnecting MCP client:', err);
-					}
-				}
+				console.error('Error in chat API:', error);
 				return error instanceof Error ? error.message : String(error);
 			},
 		});
@@ -376,10 +383,39 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 		}
 
 		return stream(c, (stream) =>
-			stream.pipe(dataStream.pipeThrough(new TextEncoderStream())),
+			stream
+				.pipe(dataStream.pipeThrough(new TextEncoderStream()))
+				.catch((error) => {
+					console.error('Error in chat API:', error);
+					throw error;
+				})
+				.finally(async () => {
+					// Disconnect MCP client after streaming completes
+					if (mcpContext?.client) {
+						try {
+							await mcpContext.client.disconnect();
+							console.log('MCP client disconnected successfully');
+						} catch (error) {
+							console.error('Error disconnecting MCP client:', error);
+						}
+					}
+				}),
 		);
 	} catch (error) {
 		console.error('Error in chat API:', error);
+
+		// Disconnect MCP client on any error during initialization
+		if (mcpContext?.client) {
+			try {
+				await mcpContext.client.disconnect();
+				console.log('MCP client disconnected due to error');
+			} catch (disconnectError) {
+				console.error(
+					'Error disconnecting MCP client on error:',
+					disconnectError,
+				);
+			}
+		}
 
 		if (error instanceof Error && error.name === 'AbortError') {
 			// Return a specific status code for aborted requests

@@ -11,16 +11,19 @@ export const routerAgent = new Agent({
 
 /**
  * Creates an MCP-aware version of the router agent
- * @param toolsets - Available MCP toolsets
- * @returns Agent instance with MCP-aware prompt
+ * @param toolsets - Available MCP toolsets for prompts
+ * @param tools - Available MCP tools for AI SDK execution
+ * @returns Agent instance with MCP-aware prompt and tools
  */
 export function createMcpAwareRouterAgent(
 	toolsets?: Record<string, any>,
+	tools?: Record<string, any>,
 ): Agent {
 	return new Agent({
 		name: 'PerfAgent router (MCP-enabled)',
 		instructions: enhancePromptWithMcpContext(routerSystemPrompt, toolsets),
 		model: perflab.languageModel('topics_model'),
+		tools: tools || {},
 	});
 }
 

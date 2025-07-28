@@ -13,15 +13,18 @@ export const largeAssistant = new Agent({
 
 /**
  * Creates an MCP-aware version of the large assistant agent
- * @param toolsets - Available MCP toolsets
- * @returns Agent instance with MCP-aware prompt
+ * @param toolsets - Available MCP toolsets for prompts
+ * @param tools - Available MCP tools for AI SDK execution
+ * @returns Agent instance with MCP-aware prompt and tools
  */
 export function createMcpAwareLargeAssistant(
 	toolsets?: Record<string, any>,
+	tools?: Record<string, any>,
 ): Agent {
 	return new Agent({
 		name: 'PerfAgent assistant (MCP-enabled)',
 		instructions: createMcpAwareLargeModelPrompt(toolsets),
 		model: perflab.languageModel('default_model'),
+		tools: tools || {},
 	});
 }
