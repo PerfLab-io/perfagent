@@ -31,6 +31,7 @@ export async function createUserMcpClient(userId: string) {
 
 	// Initialize MCP client with user's servers
 	const client = new MCPClient({
+		id: `user-${userId}-${Date.now()}`,
 		servers: serverConfig,
 	});
 
@@ -86,9 +87,7 @@ export async function getMcpPrompt(
 export async function registerElicitationHandler(
 	client: MCPClient,
 	serverName: string,
-	handler: (
-		request: any,
-	) => Promise<{
+	handler: (request: any) => Promise<{
 		action: 'accept' | 'decline' | 'cancel';
 		content?: any;
 		_meta?: any;
@@ -117,6 +116,7 @@ export async function getMcpServerInfo(userId: string, serverId: string) {
 
 	// Create a temporary client just for this server
 	const client = new MCPClient({
+		id: `user-${userId}-${Date.now()}`,
 		servers: {
 			[serverRecord.name]: {
 				url: new URL(serverRecord.url),
