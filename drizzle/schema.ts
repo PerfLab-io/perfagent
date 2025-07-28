@@ -682,6 +682,15 @@ export const mcpServers = pgTable(
 		name: text().notNull(),
 		url: text().notNull(),
 		enabled: boolean().default(true).notNull(),
+		// OAuth authentication status
+		authStatus: text('auth_status').default('unknown').notNull(), // 'unknown', 'required', 'authorized', 'failed'
+		// OAuth token storage (encrypted)
+		accessToken: text('access_token'),
+		refreshToken: text('refresh_token'),
+		tokenExpiresAt: timestamp('token_expires_at', {
+			precision: 3,
+			mode: 'string',
+		}),
 		createdAt: timestamp('created_at', { precision: 3, mode: 'string' })
 			.default(sql`CURRENT_TIMESTAMP`)
 			.notNull(),
