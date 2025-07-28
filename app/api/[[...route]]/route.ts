@@ -10,6 +10,15 @@ import { mastra } from '@/lib/ai/mastra';
 import { langfuse } from '@/lib/tools/langfuse';
 import { routerOutputSchema } from '@/lib/ai/mastra/agents/router';
 import dedent from 'dedent';
+import { verifySession } from '@/lib/session.server';
+import { db } from '@/drizzle/db';
+import { mcpServers } from '@/drizzle/schema';
+import { eq, and } from 'drizzle-orm';
+import {
+	createUserMcpClient,
+	getMcpServerInfo,
+} from '@/lib/ai/mastra/mcpClient';
+import { DEFAULT_MCP_SERVERS } from '@/lib/ai/defaultMCPServers';
 
 export const runtime = 'nodejs';
 
@@ -28,6 +37,168 @@ const requestSchema = z.object({
 // Create Hono app for chat API
 const chat = new Hono().basePath('/api');
 
+// MCP Server management endpoints
+// GET /api/mcp/servers - List user's MCP servers
+chat.get('/mcp/servers', async (c) => {
+	try {
+		const sessionData = await verifySession();
+		if (!sessionData) {
+			return c.json({ error: 'Authentication required' }, 401);
+		}
+
+		const servers = await db
+			.select()
+			.from(mcpServers)
+			.where(eq(mcpServers.userId, sessionData.userId));
+
+		return c.json(servers);
+	} catch (error) {
+		console.error('Error fetching MCP servers:', error);
+		return c.json({ error: 'Failed to fetch servers' }, 500);
+	}
+});
+
+// POST /api/mcp/servers - Create a new MCP server
+const createServerSchema = z.object({
+	name: z.string().min(1),
+	url: z.string().url(),
+});
+
+chat.post('/mcp/servers', zValidator('json', createServerSchema), async (c) => {
+	try {
+		const sessionData = await verifySession();
+		if (!sessionData) {
+			return c.json({ error: 'Authentication required' }, 401);
+		}
+
+		const { name, url } = c.req.valid('json');
+		const serverId = crypto.randomUUID();
+
+		await db.insert(mcpServers).values({
+			id: serverId,
+			userId: sessionData.userId,
+			name,
+			url,
+			enabled: true,
+			createdAt: new Date().toISOString(),
+			updatedAt: new Date().toISOString(),
+		});
+
+		return c.json({ id: serverId, name, url, enabled: true });
+	} catch (error) {
+		console.error('Error creating MCP server:', error);
+		return c.json({ error: 'Failed to create server' }, 500);
+	}
+});
+
+// PATCH /api/mcp/servers/:id - Update a server
+const updateServerSchema = z.object({
+	name: z.string().min(1).optional(),
+	enabled: z.boolean().optional(),
+});
+
+chat.patch(
+	'/mcp/servers/:id',
+	zValidator('json', updateServerSchema),
+	async (c) => {
+		try {
+			const sessionData = await verifySession();
+			if (!sessionData) {
+				return c.json({ error: 'Authentication required' }, 401);
+			}
+
+			const serverId = c.req.param('id');
+			const updates = c.req.valid('json');
+
+			// Verify ownership
+			const server = await db
+				.select()
+				.from(mcpServers)
+				.where(
+					and(
+						eq(mcpServers.id, serverId),
+						eq(mcpServers.userId, sessionData.userId),
+					),
+				)
+				.limit(1);
+
+			if (server.length === 0) {
+				return c.json({ error: 'Server not found' }, 404);
+			}
+
+			await db
+				.update(mcpServers)
+				.set({
+					...updates,
+					updatedAt: new Date().toISOString(),
+				})
+				.where(eq(mcpServers.id, serverId));
+
+			return c.json({ success: true });
+		} catch (error) {
+			console.error('Error updating MCP server:', error);
+			return c.json({ error: 'Failed to update server' }, 500);
+		}
+	},
+);
+
+// GET /api/mcp/server-info/:id - Get server capabilities
+chat.get('/mcp/server-info/:id', async (c) => {
+	try {
+		const sessionData = await verifySession();
+		if (!sessionData) {
+			return c.json({ error: 'Authentication required' }, 401);
+		}
+
+		const serverId = c.req.param('id');
+		const serverInfo = await getMcpServerInfo(sessionData.userId, serverId);
+
+		if (!serverInfo) {
+			return c.json({ error: 'Server not found' }, 404);
+		}
+
+		return c.json(serverInfo);
+	} catch (error) {
+		console.error('Error fetching server info:', error);
+		return c.json({ error: 'Failed to fetch server info' }, 500);
+	}
+});
+
+// DELETE /api/mcp/servers/:id - Delete a server
+chat.delete('/mcp/servers/:id', async (c) => {
+	try {
+		const sessionData = await verifySession();
+		if (!sessionData) {
+			return c.json({ error: 'Authentication required' }, 401);
+		}
+
+		const serverId = c.req.param('id');
+
+		// Verify ownership before deletion
+		const server = await db
+			.select()
+			.from(mcpServers)
+			.where(
+				and(
+					eq(mcpServers.id, serverId),
+					eq(mcpServers.userId, sessionData.userId),
+				),
+			)
+			.limit(1);
+
+		if (server.length === 0) {
+			return c.json({ error: 'Server not found' }, 404);
+		}
+
+		await db.delete(mcpServers).where(eq(mcpServers.id, serverId));
+
+		return c.json({ success: true });
+	} catch (error) {
+		console.error('Error deleting MCP server:', error);
+		return c.json({ error: 'Failed to delete server' }, 500);
+	}
+});
+
 // POST endpoint for chat
 chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 	try {
@@ -45,6 +216,21 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 			return c.json({ error: 'No messages provided' }, 400);
 		}
 
+		// Get MCP toolsets if user is authenticated
+		let toolsets = {};
+		let mcpClient = null;
+		const sessionData = await verifySession();
+		if (sessionData) {
+			mcpClient = await createUserMcpClient(sessionData.userId);
+			if (mcpClient) {
+				try {
+					toolsets = await mcpClient.getToolsets();
+				} catch (error) {
+					console.error('Error fetching MCP toolsets:', error);
+				}
+			}
+		}
+
 		const dataStream = createDataStream({
 			execute: async (dataStreamWriter) => {
 				dataStreamWriter.writeData('initialized call');
@@ -58,14 +244,19 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 				const smallAssistant = mastra.getAgent('smallAssistant');
 
 				if (object.certainty < 0.5) {
-					const stream = await smallAssistant.stream([
-						...messages,
+					const stream = await smallAssistant.stream(
+						[
+							...messages,
+							{
+								role: 'assistant',
+								content:
+									'Unclear user request, I should kindly ask for clarification and steer the conversation back on track.',
+							},
+						],
 						{
-							role: 'assistant',
-							content:
-								'Unclear user request, I should kindly ask for clarification and steer the conversation back on track.',
+							toolsets,
 						},
-					]);
+					);
 					stream.mergeIntoDataStream(dataStreamWriter, {
 						sendReasoning: true,
 						sendSources: true,
@@ -96,14 +287,19 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 
 								unsubscribe();
 							} else {
-								const stream = await smallAssistant.stream([
-									...messages,
+								const stream = await smallAssistant.stream(
+									[
+										...messages,
+										{
+											role: 'assistant',
+											content:
+												'User request is missing required data for analysis, I should kindly prompt the user to attach the trace json file containing the data to process the request. I should remind the user that I only process Google Chrome trace files and refer to the official blog post: https://developer.chrome.com/blog/devtools-tips-39?hl=en.',
+										},
+									],
 									{
-										role: 'assistant',
-										content:
-											'User request is missing required data for analysis, I should kindly prompt the user to attach the trace json file containing the data to process the request. I should remind the user that I only process Google Chrome trace files and refer to the official blog post: https://developer.chrome.com/blog/devtools-tips-39?hl=en.',
+										toolsets,
 									},
-								]);
+								);
 								stream.mergeIntoDataStream(dataStreamWriter);
 							}
 							break;
@@ -127,7 +323,9 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 						default:
 							const stream = await mastra
 								.getAgent('largeAssistant')
-								.stream(messages);
+								.stream(messages, {
+									toolsets,
+								});
 							stream.mergeIntoDataStream(dataStreamWriter, {
 								sendReasoning: true,
 								sendSources: true,
@@ -135,8 +333,25 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 							break;
 					}
 				}
+
+				// Disconnect MCP client when done
+				if (mcpClient) {
+					try {
+						await mcpClient.disconnect();
+					} catch (error) {
+						console.error('Error disconnecting MCP client:', error);
+					}
+				}
 			},
 			onError: (error) => {
+				// Disconnect MCP client on error
+				if (mcpClient) {
+					try {
+						mcpClient.disconnect();
+					} catch (err) {
+						console.error('Error disconnecting MCP client:', err);
+					}
+				}
 				return error instanceof Error ? error.message : String(error);
 			},
 		});
@@ -198,3 +413,5 @@ chat.post('/suggest', zValidator('json', requestSchema), async (c) => {
 
 export const GET = handle(chat);
 export const POST = handle(chat);
+export const PATCH = handle(chat);
+export const DELETE = handle(chat);
