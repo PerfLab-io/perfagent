@@ -19,6 +19,8 @@ import {
 	getMcpServerInfo,
 } from '@/lib/ai/mastra/mcpClient';
 import { DEFAULT_MCP_SERVERS } from '@/lib/ai/defaultMCPServers';
+import { createMcpAwareLargeAssistant } from '@/lib/ai/mastra/agents/largeAssistant';
+import { createMcpAwareRouterAgent } from '@/lib/ai/mastra/agents/router';
 
 export const runtime = 'nodejs';
 
@@ -235,7 +237,11 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 			execute: async (dataStreamWriter) => {
 				dataStreamWriter.writeData('initialized call');
 
-				const routerAgent = mastra.getAgent('routerAgent');
+				// Use MCP-aware router if toolsets are available
+				const routerAgent =
+					toolsets && Object.keys(toolsets).length > 0
+						? createMcpAwareRouterAgent(toolsets)
+						: mastra.getAgent('routerAgent');
 
 				const { object } = await routerAgent.generate(messages, {
 					output: routerOutputSchema,
@@ -321,11 +327,15 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 							unsubscribe();
 							break;
 						default:
-							const stream = await mastra
-								.getAgent('largeAssistant')
-								.stream(messages, {
-									toolsets,
-								});
+							// Use MCP-aware agent if toolsets are available
+							const agent =
+								toolsets && Object.keys(toolsets).length > 0
+									? createMcpAwareLargeAssistant(toolsets)
+									: mastra.getAgent('largeAssistant');
+
+							const stream = await agent.stream(messages, {
+								toolsets,
+							});
 							stream.mergeIntoDataStream(dataStreamWriter, {
 								sendReasoning: true,
 								sendSources: true,

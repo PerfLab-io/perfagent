@@ -619,6 +619,11 @@ ${grounding}
 
 -- Today's date is ${new Date().toLocaleDateString()}
 
+## Available Tools and Capabilities
+
+You may have access to external tools and services through connected MCP (Model Context Protocol) servers that can enhance your analysis capabilities.
+When answering questions, consider what tools you have available and whether any of your available external tools could provide additional insights or perform specific tasks that would benefit the user's request.
+
 ## Main goals
 
 When asked, and only when specifically asked, You should state that you can help with the following:
@@ -628,6 +633,7 @@ When asked, and only when specifically asked, You should state that you can help
 - Suggest Optimization Strategies
 - Explain Web Performance Metrics
 - Research and provide insights on web performance topics
+- Execute external tools to enhance analysis (when available)
 
 For any other casual message or greeting, you should not mention your main goals but simply answer politely and help the user with their question.
 You can provide a short description for each of the above goals better explain what each one means. And offer the user to choose which one they are interested in to better assist them.
@@ -676,6 +682,13 @@ You are a sentiment analysis and smart router that will analyse user messages an
 You have the following workflows available:
 - cwvInsightsWorkflow: A workflow that will analyse a trace file or user's (app, website, page, portal, etc.) metrics data and provide insights about the performance. This workflow is not required for general questions about performance, only for use when user's message is related to 'their' (app, website, page, portal, etc.) metrics or trace data.
 - researchWorkflow: A workflow that will research a given topic and provide a report about the findings.
+
+**MCP Tool Considerations:**
+When external MCP tools are available, consider that:
+- Simple questions can often be answered directly using available tools without needing full workflows
+- Some analysis or even initial research questions might be better handled with those external tools first rather than reaching out to workflows right away
+- If the user's request could be fulfilled with available external tools, lean towards null workflow with higher certainty for direct tool usage
+- Always consider whether MCP tools can provide more specific and immediate value than general research workflows
 
 Example possible outcome:
 { // I may need the insights workflow: User asks about his own performance metrics but there's a medium level of uncertainty if you should use the cwvInsightsWorkflow or the researchWorkflow, so you preffer to choose the cwvInsightsWorkflow
@@ -754,3 +767,88 @@ type ResearchPlan = {
 
 ${grounding}
 `;
+
+/**
+ * Enhances a system prompt with MCP tool awareness when toolsets are available
+ * @param basePrompt - The base system prompt to enhance
+ * @param toolsets - Available MCP toolsets (optional)
+ * @returns Enhanced prompt with MCP context or original prompt
+ */
+export function enhancePromptWithMcpContext(
+	basePrompt: string,
+	toolsets?: Record<string, any>,
+): string {
+	if (!toolsets || Object.keys(toolsets).length === 0) {
+		return basePrompt;
+	}
+
+	// Extract tool information from toolsets
+	const availableTools: string[] = [];
+	const toolCategories = new Set<string>();
+
+	for (const [serverName, toolset] of Object.entries(toolsets)) {
+		if (toolset?.tools) {
+			for (const tool of toolset.tools) {
+				if (tool.name && tool.description) {
+					availableTools.push(`- **${tool.name}**: ${tool.description}`);
+
+					// Categorize tools based on description keywords
+					const desc = tool.description.toLowerCase();
+					if (desc.includes('code') || desc.includes('development')) {
+						toolCategories.add('code analysis');
+					} else if (desc.includes('test') || desc.includes('performance')) {
+						toolCategories.add('performance testing');
+					} else if (desc.includes('website') || desc.includes('web')) {
+						toolCategories.add('website analysis');
+					} else if (desc.includes('data') || desc.includes('process')) {
+						toolCategories.add('data processing');
+					} else {
+						toolCategories.add('general utilities');
+					}
+				}
+			}
+		}
+	}
+
+	if (availableTools.length === 0) {
+		return basePrompt;
+	}
+
+	// Create MCP context section
+	const mcpContext = `
+## Connected External Tools
+
+You currently have access to the following external tools through MCP servers:
+
+${availableTools.join('\n')}
+
+**Important Guidelines for Tool Usage:**
+- Consider using these tools when they can provide specific analysis or data that would enhance your web performance insights
+- These tools can help with tasks like code analysis, performance testing, data processing, and website optimization
+- When a user's question could benefit from external tool analysis, suggest or use the appropriate tools
+- Always explain what tools you're using and why they're relevant to the user's performance question
+- Tool results should be integrated into your web performance analysis and recommendations
+
+**Tool Categories Available:** ${Array.from(toolCategories).join(', ')}
+
+`;
+
+	// Insert the MCP context after the main heading but before the main goals
+	const enhancedPrompt = basePrompt.replace(
+		/## Main goals/,
+		`${mcpContext}## Main goals`,
+	);
+
+	return enhancedPrompt;
+}
+
+/**
+ * Creates an MCP-aware system prompt for the large model
+ * @param toolsets - Available MCP toolsets (optional)
+ * @returns Enhanced system prompt with MCP context
+ */
+export function createMcpAwareLargeModelPrompt(
+	toolsets?: Record<string, any>,
+): string {
+	return enhancePromptWithMcpContext(largeModelSystemPrompt, toolsets);
+}
