@@ -4,6 +4,7 @@ import { db } from '@/drizzle/db';
 import { session, user, role, roleToUser } from '@/drizzle/schema';
 import { eq, lt, and } from 'drizzle-orm';
 import { cache } from 'react';
+import crypto from 'crypto';
 
 const SESSION_COOKIE_NAME = 'session-id';
 const TEMP_SESSION_COOKIE_NAME = 'temp-session-id';

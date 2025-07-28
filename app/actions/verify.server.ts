@@ -4,6 +4,7 @@ import { generateTOTP, verifyTOTP } from '@epic-web/totp';
 import { db } from '@/drizzle/db';
 import { verification } from '@/drizzle/schema';
 import { eq, and, gt } from 'drizzle-orm';
+import crypto from 'crypto';
 
 export const twoFAVerifyVerificationType = '2fa-verify';
 const types = [
