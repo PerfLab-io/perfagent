@@ -534,6 +534,7 @@ export const userRelations = relations(user, ({ one, many }) => ({
 	organizations: many(organizationMember),
 	sentInvites: many(organizationInvite, { relationName: 'invitedBy' }),
 	receivedInvites: many(organizationInvite, { relationName: 'invitedUser' }),
+	mcpServers: many(mcpServers),
 }));
 
 export const userImageRelations = relations(userImage, ({ one }) => ({
@@ -672,3 +673,41 @@ export const organizationInviteRelations = relations(
 		}),
 	}),
 );
+
+export const mcpServers = pgTable(
+	'mcp_servers',
+	{
+		id: text().primaryKey().notNull(),
+		userId: text('user_id').notNull(),
+		name: text().notNull(),
+		url: text().notNull(),
+		enabled: boolean().default(true).notNull(),
+		createdAt: timestamp('created_at', { precision: 3, mode: 'string' })
+			.default(sql`CURRENT_TIMESTAMP`)
+			.notNull(),
+		updatedAt: timestamp('updated_at', {
+			precision: 3,
+			mode: 'string',
+		}).notNull(),
+	},
+	(table) => [
+		index('mcp_servers_userId_idx').using(
+			'btree',
+			table.userId.asc().nullsLast().op('text_ops'),
+		),
+		foreignKey({
+			columns: [table.userId],
+			foreignColumns: [user.id],
+			name: 'mcp_servers_userId_fkey',
+		})
+			.onUpdate('cascade')
+			.onDelete('cascade'),
+	],
+);
+
+export const mcpServersRelations = relations(mcpServers, ({ one }) => ({
+	user: one(user, {
+		fields: [mcpServers.userId],
+		references: [user.id],
+	}),
+}));

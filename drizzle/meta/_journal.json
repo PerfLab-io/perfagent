@@ -1,20 +1,27 @@
 {
-  "version": "7",
-  "dialect": "postgresql",
-  "entries": [
-    {
-      "idx": 0,
-      "version": "7",
-      "when": 1748037232396,
-      "tag": "0000_loud_ser_duncan",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1753141586799,
-      "tag": "0001_married_hobgoblin",
-      "breakpoints": true
-    }
-  ]
+	"version": "7",
+	"dialect": "postgresql",
+	"entries": [
+		{
+			"idx": 0,
+			"version": "7",
+			"when": 1748037232396,
+			"tag": "0000_loud_ser_duncan",
+			"breakpoints": true
+		},
+		{
+			"idx": 1,
+			"version": "7",
+			"when": 1753141586799,
+			"tag": "0001_married_hobgoblin",
+			"breakpoints": true
+		},
+		{
+			"idx": 2,
+			"version": "7",
+			"when": 1753658799442,
+			"tag": "0002_faithful_kid_colt",
+			"breakpoints": true
+		}
+	]
 }
