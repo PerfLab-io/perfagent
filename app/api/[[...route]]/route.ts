@@ -17,6 +17,8 @@ import { eq, and } from 'drizzle-orm';
 import {
 	createUserMcpClient,
 	getMcpServerInfo,
+	handleOAuthAuthorizationCode,
+	testMcpServerConnection,
 } from '@/lib/ai/mastra/mcpClient';
 import { DEFAULT_MCP_SERVERS } from '@/lib/ai/defaultMCPServers';
 import { createMcpAwareLargeAssistant } from '@/lib/ai/mastra/agents/largeAssistant';
@@ -83,9 +85,18 @@ chat.post('/mcp/servers', zValidator('json', createServerSchema), async (c) => {
 			name,
 			url,
 			enabled: true,
+			authStatus: 'unknown', // Will be tested after creation
 			createdAt: new Date().toISOString(),
 			updatedAt: new Date().toISOString(),
 		});
+
+		// Test the connection to detect OAuth requirements
+		try {
+			await testMcpServerConnection(sessionData.userId, serverId);
+		} catch (error) {
+			// If connection test fails, still return success but with unknown status
+			console.log('Server connection test failed:', error);
+		}
 
 		return c.json({ id: serverId, name, url, enabled: true });
 	} catch (error) {
@@ -199,6 +210,300 @@ chat.delete('/mcp/servers/:id', async (c) => {
 	} catch (error) {
 		console.error('Error deleting MCP server:', error);
 		return c.json({ error: 'Failed to delete server' }, 500);
+	}
+});
+
+// POST /api/mcp/servers/:id/test - Test connection to MCP server
+chat.post('/mcp/servers/:id/test', async (c) => {
+	try {
+		const sessionData = await verifySession();
+		if (!sessionData) {
+			return c.json({ error: 'Authentication required' }, 401);
+		}
+
+		const serverId = c.req.param('id');
+
+		const result = await testMcpServerConnection(sessionData.userId, serverId);
+		return c.json(result);
+	} catch (error) {
+		console.error('Error testing MCP server connection:', error);
+		return c.json(
+			{
+				error: 'Connection test failed',
+				message: error instanceof Error ? error.message : 'Unknown error',
+			},
+			500,
+		);
+	}
+});
+
+// OAuth callback endpoints
+
+// GET /api/mcp/oauth/callback - Handle OAuth authorization callback
+const oauthCallbackSchema = z.object({
+	code: z.string(),
+	state: z.string(),
+	iss: z.string().optional(), // issuer parameter
+});
+
+chat.get(
+	'/mcp/oauth/callback',
+	zValidator('query', oauthCallbackSchema),
+	async (c) => {
+		try {
+			const { code, state, iss } = c.req.valid('query');
+
+			// Don't require authentication - validate using state and issuer instead
+
+			// Find the server by matching the issuer and auth status
+			// Since we don't have session data, we need to find all servers requiring auth that match the issuer
+			const servers = await db
+				.select()
+				.from(mcpServers)
+				.where(eq(mcpServers.authStatus, 'required'));
+
+			let matchingServer = null;
+			if (iss) {
+				// Try to match by issuer URL
+				matchingServer = servers.find((server) => {
+					try {
+						const serverUrl = new URL(server.url);
+						const issuerUrl = new URL(iss);
+						return serverUrl.origin === issuerUrl.origin;
+					} catch {
+						return false;
+					}
+				});
+			}
+
+			// If no issuer match, take the first server requiring auth (for backward compatibility)
+			if (!matchingServer && servers.length > 0) {
+				matchingServer = servers[0];
+			}
+
+			if (!matchingServer) {
+				return c.html(`
+					<html>
+						<body>
+							<h1>Authorization Error</h1>
+							<p>No matching server found for this authorization callback.</p>
+							<p><a href="/mcp-servers">Return to MCP Servers</a></p>
+						</body>
+					</html>
+				`);
+			}
+
+			const serverRecord = matchingServer;
+
+			// Create a temporary MCP client to handle the OAuth callback
+			const mcpClient = await createUserMcpClient(serverRecord.userId);
+			if (!mcpClient) {
+				return c.json({ error: 'Failed to create MCP client' }, 500);
+			}
+
+			try {
+				// Handle the OAuth authorization code
+				await handleOAuthAuthorizationCode(
+					serverRecord.userId,
+					serverRecord.name,
+					code,
+					state,
+					mcpClient,
+				);
+
+				// Update server status to authorized
+				await db
+					.update(mcpServers)
+					.set({
+						authStatus: 'authorized',
+						updatedAt: new Date().toISOString(),
+					})
+					.where(eq(mcpServers.id, serverRecord.id));
+
+				// Disconnect the temporary client
+				await mcpClient.disconnect();
+
+				// Redirect to the MCP servers page with success message
+				return c.html(`
+					<html>
+						<body>
+							<h1>Authorization Successful</h1>
+							<p>Successfully authorized access to ${serverRecord.name}!</p>
+							<p><a href="/mcp-servers">Return to MCP Servers</a></p>
+							<script>
+								// Auto-redirect after 3 seconds
+								setTimeout(() => {
+									window.location.href = '/mcp-servers';
+								}, 3000);
+							</script>
+						</body>
+					</html>
+				`);
+			} catch (error) {
+				console.error('OAuth callback error:', error);
+
+				// Update server status to failed
+				await db
+					.update(mcpServers)
+					.set({
+						authStatus: 'failed',
+						updatedAt: new Date().toISOString(),
+					})
+					.where(eq(mcpServers.id, serverRecord.id));
+
+				// Disconnect the temporary client on error
+				await mcpClient.disconnect();
+
+				return c.html(`
+					<html>
+						<body>
+							<h1>Authorization Failed</h1>
+							<p>Failed to authorize access to ${serverRecord.name}.</p>
+							<p>Error: ${error instanceof Error ? error.message : 'Unknown error'}</p>
+							<p><a href="/mcp-servers">Return to MCP Servers</a></p>
+						</body>
+					</html>
+				`);
+			}
+		} catch (error) {
+			console.error('OAuth callback error:', error);
+			return c.html(`
+				<html>
+					<body>
+						<h1>Authorization Error</h1>
+						<p>An unexpected error occurred during authorization.</p>
+						<p><a href="/mcp-servers">Return to MCP Servers</a></p>
+					</body>
+				</html>
+			`);
+		}
+	},
+);
+
+// Also handle POST requests for OAuth callback (some OAuth servers use POST)
+chat.post('/mcp/oauth/callback', async (c) => {
+	try {
+		// Don't require authentication - validate using state and issuer instead
+
+		// Try to get parameters from query string first
+		const url = new URL(c.req.url);
+		let code = url.searchParams.get('code');
+		let state = url.searchParams.get('state');
+		let iss = url.searchParams.get('iss');
+
+		// If not in query params, try to parse from body
+		if (!code || !state) {
+			try {
+				const body = await c.req.text();
+				if (!code) code = body.match(/code=([^&]+)/)?.[1] || null;
+				if (!state) state = body.match(/state=([^&]+)/)?.[1] || null;
+				if (!iss) iss = body.match(/iss=([^&]+)/)?.[1] || null;
+			} catch (error) {
+				console.log('Failed to parse body:', error);
+			}
+		}
+
+		if (!code || !state) {
+			return c.json({ error: 'Missing code or state parameter' }, 400);
+		}
+
+		// Find the server by matching the issuer and auth status
+		const servers = await db
+			.select()
+			.from(mcpServers)
+			.where(eq(mcpServers.authStatus, 'required'));
+
+		let matchingServer = null;
+		if (iss) {
+			const decodedIss = decodeURIComponent(iss);
+			matchingServer = servers.find((server) => {
+				try {
+					const serverUrl = new URL(server.url);
+					const issuerUrl = new URL(decodedIss);
+					return serverUrl.origin === issuerUrl.origin;
+				} catch {
+					return false;
+				}
+			});
+		}
+
+		if (!matchingServer && servers.length > 0) {
+			matchingServer = servers[0];
+		}
+
+		if (!matchingServer) {
+			return c.json(
+				{ error: 'No matching server found for this authorization callback' },
+				404,
+			);
+		}
+
+		const serverRecord = matchingServer;
+
+		// Create a temporary MCP client to handle the OAuth callback
+		const mcpClient = await createUserMcpClient(serverRecord.userId);
+		if (!mcpClient) {
+			return c.json({ error: 'Failed to create MCP client' }, 500);
+		}
+
+		try {
+			// Handle the OAuth authorization code
+			await handleOAuthAuthorizationCode(
+				serverRecord.userId,
+				serverRecord.name,
+				code,
+				state,
+				mcpClient,
+			);
+
+			// Update server status to authorized
+			await db
+				.update(mcpServers)
+				.set({
+					authStatus: 'authorized',
+					updatedAt: new Date().toISOString(),
+				})
+				.where(eq(mcpServers.id, serverRecord.id));
+
+			// Disconnect the temporary client
+			await mcpClient.disconnect();
+
+			return c.json({
+				success: true,
+				message: `Successfully authorized ${serverRecord.name}`,
+			});
+		} catch (error) {
+			console.error('OAuth callback error:', error);
+
+			// Update server status to failed
+			await db
+				.update(mcpServers)
+				.set({
+					authStatus: 'failed',
+					updatedAt: new Date().toISOString(),
+				})
+				.where(eq(mcpServers.id, serverRecord.id));
+
+			// Disconnect the temporary client on error
+			await mcpClient.disconnect();
+
+			return c.json(
+				{
+					error: 'OAuth authorization failed',
+					message: error instanceof Error ? error.message : 'Unknown error',
+				},
+				500,
+			);
+		}
+	} catch (error) {
+		console.error('OAuth callback error:', error);
+		return c.json(
+			{
+				error: 'OAuth callback failed',
+				message: error instanceof Error ? error.message : 'Unknown error',
+			},
+			500,
+		);
 	}
 });
 
@@ -455,6 +760,75 @@ chat.post('/suggest', zValidator('json', requestSchema), async (c) => {
 	);
 
 	return c.json(stream.object);
+});
+
+// POST /api/mcp/resource - Read a specific MCP resource
+const resourceSchema = z.object({
+	uri: z.string(),
+	serverName: z.string().optional(),
+});
+
+chat.post('/mcp/resource', zValidator('json', resourceSchema), async (c) => {
+	try {
+		const sessionData = await verifySession();
+		if (!sessionData) {
+			return c.json({ error: 'Authentication required' }, 401);
+		}
+
+		const { uri, serverName } = c.req.valid('json');
+
+		// Create MCP client for the user
+		const mcpClient = await createUserMcpClient(sessionData.userId);
+		if (!mcpClient) {
+			return c.json({ error: 'No MCP client available' }, 404);
+		}
+
+		try {
+			// If serverName is provided, read from specific server
+			if (serverName) {
+				const content = await mcpClient.resources.read(serverName, uri);
+				await mcpClient.disconnect();
+				return c.json(content);
+			} else {
+				// Try to find the resource across all servers
+				const servers = await db
+					.select()
+					.from(mcpServers)
+					.where(
+						and(
+							eq(mcpServers.userId, sessionData.userId),
+							eq(mcpServers.enabled, true),
+						),
+					);
+
+				for (const server of servers) {
+					try {
+						const content = await mcpClient.resources.read(server.name, uri);
+						await mcpClient.disconnect();
+						return c.json(content);
+					} catch (error) {
+						// Continue to next server if resource not found
+						continue;
+					}
+				}
+
+				await mcpClient.disconnect();
+				return c.json({ error: 'Resource not found in any server' }, 404);
+			}
+		} catch (error) {
+			await mcpClient.disconnect();
+			throw error;
+		}
+	} catch (error) {
+		console.error('Error reading MCP resource:', error);
+		return c.json(
+			{
+				error: 'Failed to read resource',
+				message: error instanceof Error ? error.message : 'Unknown error',
+			},
+			500,
+		);
+	}
 });
 
 export const GET = handle(chat);

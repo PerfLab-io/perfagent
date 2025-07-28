@@ -7,6 +7,11 @@ import type { UIMessage } from '@ai-sdk/ui-utils';
 import { FeedbackButtons } from '@/components/feedback-buttons';
 import { MarkdownRenderer } from './markdown-renderer';
 import { ArtifactComponent } from '@/components/data-stream-handler';
+import { MCPResourceList } from '@/components/mcp-resource';
+import {
+	useMCPResources,
+	extractMCPResourcesFromMessage,
+} from '@/lib/hooks/use-mcp-resources';
 
 /**
  * Chat message component props
@@ -44,8 +49,17 @@ export function ChatMessage({
 	// Refs
 	const messageEndRef = useRef<HTMLDivElement>(null);
 
+	// MCP resources hook
+	const { loadingStates, contents, loadResourceContent } = useMCPResources();
+
 	const isMessageIsWaiting = useMemo(
 		() => isMessageWaiting(message),
+		[message],
+	);
+
+	// Extract MCP resources from tool invocations
+	const mcpResourceGroups = useMemo(
+		() => extractMCPResourcesFromMessage(message),
 		[message],
 	);
 
@@ -119,6 +133,23 @@ export function ChatMessage({
 						openArtifact={openArtifact}
 					/>
 				)}
+
+				{/* Render MCP resources */}
+				{message.role === 'assistant' && mcpResourceGroups.length > 0 && (
+					<div className="mb-4 space-y-4">
+						{mcpResourceGroups.map((group, index) => (
+							<MCPResourceList
+								key={`${group.serverName}-${index}`}
+								resources={group.resources}
+								serverName={group.serverName}
+								onLoadContent={(resource) => loadResourceContent(resource)}
+								loadingStates={loadingStates}
+								contents={contents}
+							/>
+						))}
+					</div>
+				)}
+
 				{/* Message bubble - Always render for assistant, even if empty */}
 				{messageText ? (
 					<div className={styles.messageBubble}>

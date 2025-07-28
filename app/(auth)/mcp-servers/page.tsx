@@ -22,7 +22,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { Loader2, Plus, Server, Settings, Trash2 } from 'lucide-react';
+import {
+	Loader2,
+	Plus,
+	Server,
+	Trash2,
+	ExternalLink,
+	AlertCircle,
+	CheckCircle,
+	XCircle,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import {
 	AlertDialog,
@@ -40,6 +49,7 @@ interface MCPServer {
 	name: string;
 	url: string;
 	enabled: boolean;
+	authStatus?: 'unknown' | 'required' | 'authorized' | 'failed';
 	createdAt: string;
 	updatedAt: string;
 }
@@ -62,6 +72,7 @@ export default function MCPServersPage() {
 	const [loadingServerInfo, setLoadingServerInfo] = useState<
 		Record<string, boolean>
 	>({});
+	const [authUrls, setAuthUrls] = useState<Record<string, string>>({});
 
 	useEffect(() => {
 		fetchServers();
@@ -74,10 +85,17 @@ export default function MCPServersPage() {
 			const data = await response.json();
 			setServers(data);
 
-			// Fetch info for each server
+			// Test connection for each server to update auth status
 			data.forEach((server: MCPServer) => {
 				if (server.enabled) {
-					fetchServerInfo(server.id);
+					if (server.authStatus === 'authorized') {
+						fetchServerInfo(server.id);
+					} else if (server.authStatus === 'unknown') {
+						testServerConnection(server.id);
+					} else if (server.authStatus === 'required' && !authUrls[server.id]) {
+						// If auth is required but we don't have the auth URL yet, test to get it
+						testServerConnection(server.id);
+					}
 				}
 			});
 		} catch (error) {
@@ -98,6 +116,34 @@ export default function MCPServersPage() {
 			console.error('Failed to fetch server info:', error);
 		} finally {
 			setLoadingServerInfo((prev) => ({ ...prev, [serverId]: false }));
+		}
+	};
+
+	const testServerConnection = async (serverId: string) => {
+		try {
+			const response = await fetch(`/api/mcp/servers/${serverId}/test`, {
+				method: 'POST',
+			});
+			const result = await response.json();
+
+			if (result.status === 'auth_required') {
+				// Store the auth URL even if it's null (for manual setup cases)
+				setAuthUrls((prev) => ({
+					...prev,
+					[serverId]: result.authUrl || 'manual_setup',
+				}));
+			} else if (result.status === 'authorized') {
+				// Remove from auth URLs if it was there
+				setAuthUrls((prev) => {
+					const newUrls = { ...prev };
+					delete newUrls[serverId];
+					return newUrls;
+				});
+				// Fetch server info since it's now authorized
+				fetchServerInfo(serverId);
+			}
+		} catch (error) {
+			console.error('Failed to test server connection:', error);
 		}
 	};
 
@@ -122,13 +168,15 @@ export default function MCPServersPage() {
 			const newServer = await response.json();
 			setServers([...servers, newServer]);
 			setIsAddDialogOpen(false);
+
+			// Reset form
 			setNewServerName('');
 			setNewServerUrl('');
 
 			toast.success('MCP server added successfully');
 
-			// Fetch info for the new server
-			fetchServerInfo(newServer.id);
+			// Fetch the updated servers list to get the auth status
+			fetchServers();
 		} catch (error) {
 			toast.error('Failed to add MCP server');
 		}
@@ -252,6 +300,10 @@ export default function MCPServersPage() {
 									placeholder="https://example.com/api/mcp"
 								/>
 							</div>
+							<p className="text-muted-foreground text-sm">
+								OAuth authentication will be automatically detected and
+								configured if required by the server.
+							</p>
 						</div>
 						<DialogFooter>
 							<Button
@@ -281,15 +333,73 @@ export default function MCPServersPage() {
 					servers.map((server) => {
 						const counts = getCapabilitiesCount(server.id);
 						const isLoadingInfo = loadingServerInfo[server.id];
+						const authUrl = authUrls[server.id];
+
+						const getAuthStatusIcon = () => {
+							switch (server.authStatus) {
+								case 'authorized':
+									return <CheckCircle className="h-4 w-4 text-green-500" />;
+								case 'required':
+									return <AlertCircle className="h-4 w-4 text-yellow-500" />;
+								case 'failed':
+									return <XCircle className="h-4 w-4 text-red-500" />;
+								default:
+									return (
+										<Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+									);
+							}
+						};
+
+						const getAuthStatusBadge = () => {
+							switch (server.authStatus) {
+								case 'authorized':
+									return (
+										<Badge variant="outline" className="text-xs text-green-600">
+											Authorized
+										</Badge>
+									);
+								case 'required':
+									return (
+										<Badge
+											variant="outline"
+											className="text-xs text-yellow-600"
+										>
+											Auth Required
+										</Badge>
+									);
+								case 'failed':
+									return (
+										<Badge variant="outline" className="text-xs text-red-600">
+											Failed
+										</Badge>
+									);
+								default:
+									return (
+										<Badge variant="outline" className="text-xs text-gray-600">
+											Checking...
+										</Badge>
+									);
+							}
+						};
 
 						return (
 							<Card key={server.id}>
 								<CardHeader>
 									<div className="flex items-center justify-between">
 										<div className="flex items-center space-x-4">
-											<Server className="h-5 w-5" />
+											<div className="relative">
+												<Server className="h-5 w-5" />
+												<div className="absolute -top-1 -right-1">
+													{getAuthStatusIcon()}
+												</div>
+											</div>
 											<div>
-												<CardTitle className="text-xl">{server.name}</CardTitle>
+												<div className="flex items-center space-x-2">
+													<CardTitle className="text-xl">
+														{server.name}
+													</CardTitle>
+													{getAuthStatusBadge()}
+												</div>
 												<CardDescription>{server.url}</CardDescription>
 											</div>
 										</div>
@@ -310,6 +420,47 @@ export default function MCPServersPage() {
 								</CardHeader>
 								{server.enabled && (
 									<CardContent>
+										{server.authStatus === 'required' && authUrl && (
+											<div className="mb-4 rounded-md border border-yellow-200 bg-yellow-50 p-3">
+												<p className="mb-2 text-sm text-yellow-800">
+													Authentication required.
+												</p>
+												{authUrl === 'manual_setup' ? (
+													<div>
+														<p className="mb-2 text-xs text-yellow-700">
+															OAuth authentication required but could not
+															auto-discover authorization server. Please check
+															server documentation for OAuth setup instructions.
+														</p>
+														<Button
+															variant="outline"
+															size="sm"
+															disabled
+															className="border-yellow-300 text-yellow-600"
+														>
+															<AlertCircle className="mr-2 h-4 w-4" />
+															Manual Setup Required
+														</Button>
+													</div>
+												) : (
+													<div>
+														<p className="mb-2 text-sm text-yellow-800">
+															Click here to continue:
+														</p>
+														<Button
+															variant="outline"
+															size="sm"
+															onClick={() => window.open(authUrl, '_blank')}
+															className="border-yellow-300 text-yellow-700 hover:bg-yellow-100"
+														>
+															<ExternalLink className="mr-2 h-4 w-4" />
+															Authorize Access
+														</Button>
+													</div>
+												)}
+											</div>
+										)}
+
 										{isLoadingInfo ? (
 											<div className="text-muted-foreground flex items-center space-x-2 text-sm">
 												<Loader2 className="h-4 w-4 animate-spin" />
@@ -332,11 +483,11 @@ export default function MCPServersPage() {
 													{counts.promptCount === 1 ? 'Prompt' : 'Prompts'}
 												</Badge>
 											</div>
-										) : (
+										) : server.authStatus === 'authorized' ? (
 											<p className="text-muted-foreground text-sm">
 												Unable to fetch server capabilities
 											</p>
-										)}
+										) : null}
 									</CardContent>
 								)}
 							</Card>
