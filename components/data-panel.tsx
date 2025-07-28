@@ -70,7 +70,7 @@ export function DataPanel({
 			}}
 		>
 			<div className="mb-6 flex items-center justify-between">
-				<h2 className="text-2xl font-bold text-foreground">
+				<h2 className="text-foreground text-2xl font-bold">
 					Go Learning Analytics
 				</h2>
 				<Button
@@ -84,7 +84,7 @@ export function DataPanel({
 			</div>
 
 			{/* Tab navigation */}
-			<div className="mb-6 flex gap-2 border-b border-border pb-2">
+			<div className="border-border mb-6 flex gap-2 border-b pb-2">
 				<Button
 					variant={activeTab === 'overview' ? 'default' : 'ghost'}
 					onClick={() => setActiveTab('overview')}
@@ -203,7 +203,7 @@ export function DataPanel({
 									].map((topic, i) => (
 										<div
 											key={i}
-											className="flex w-[100px] flex-col items-center rounded-lg border border-border bg-background p-3"
+											className="border-border bg-background flex w-[100px] flex-col items-center rounded-lg border p-3"
 										>
 											<div className="relative mb-2 h-16 w-16">
 												<svg viewBox="0 0 36 36" className="h-full w-full">
@@ -274,7 +274,7 @@ export function DataPanel({
 											>
 												<div className="flex w-full grow items-end justify-center">
 													<div
-														className="w-4/5 rounded-t-sm bg-linear-to-t from-indigo-600 to-peppermint-400 transition-all duration-500 ease-out"
+														className="to-peppermint-400 w-4/5 rounded-t-sm bg-linear-to-t from-indigo-600 transition-all duration-500 ease-out"
 														style={{
 															height: `${item.score}%`,
 															animationName: animate ? 'growUp' : 'none',
@@ -308,8 +308,8 @@ export function DataPanel({
 							<CardContent>
 								<div className="grid grid-cols-1 gap-6 md:grid-cols-2">
 									<div>
-										<h3 className="mb-3 flex items-center gap-2 text-sm font-medium text-peppermint-600 dark:text-peppermint-400">
-											<div className="rounded-full bg-peppermint-100 p-1.5 dark:bg-peppermint-900">
+										<h3 className="text-peppermint-600 dark:text-peppermint-400 mb-3 flex items-center gap-2 text-sm font-medium">
+											<div className="bg-peppermint-100 dark:bg-peppermint-900 rounded-full p-1.5">
 												<Activity className="h-4 w-4" />
 											</div>
 											Strengths
@@ -323,9 +323,9 @@ export function DataPanel({
 												{ topic: 'Functions', score: 80 },
 											].map((item, i) => (
 												<li key={i} className="flex items-center gap-3">
-													<div className="h-2 grow rounded-full bg-peppermint-200 dark:bg-peppermint-800">
+													<div className="bg-peppermint-200 dark:bg-peppermint-800 h-2 grow rounded-full">
 														<div
-															className="h-full rounded-full bg-peppermint-500"
+															className="bg-peppermint-500 h-full rounded-full"
 															style={{
 																width: `${item.score}%`,
 																animationName: animate ? 'growRight' : 'none',
@@ -348,8 +348,8 @@ export function DataPanel({
 									</div>
 
 									<div>
-										<h3 className="mb-3 flex items-center gap-2 text-sm font-medium text-merino-600 dark:text-merino-400">
-											<div className="rounded-full bg-merino-100 p-1.5 dark:bg-merino-900">
+										<h3 className="text-merino-600 dark:text-merino-400 mb-3 flex items-center gap-2 text-sm font-medium">
+											<div className="bg-merino-100 dark:bg-merino-900 rounded-full p-1.5">
 												<Activity className="h-4 w-4" />
 											</div>
 											Areas for Improvement
@@ -363,9 +363,9 @@ export function DataPanel({
 												{ topic: 'Testing', score: 50 },
 											].map((item, i) => (
 												<li key={i} className="flex items-center gap-3">
-													<div className="h-2 grow rounded-full bg-merino-200 dark:bg-merino-900">
+													<div className="bg-merino-200 dark:bg-merino-900 h-2 grow rounded-full">
 														<div
-															className="h-full rounded-full bg-merino-500"
+															className="bg-merino-500 h-full rounded-full"
 															style={{
 																width: `${item.score}%`,
 																animationName: animate ? 'growRight' : 'none',
@@ -403,17 +403,17 @@ export function DataPanel({
 							<CardContent>
 								<div className="relative h-64">
 									{/* Grid lines */}
-									<div className="absolute inset-0 grid grid-cols-6 grid-rows-4 border-l border-t border-border">
+									<div className="border-border absolute inset-0 grid grid-cols-6 grid-rows-4 border-t border-l">
 										{[...Array(4)].map((_, i) => (
 											<div
 												key={i}
-												className="col-span-6 border-b border-border"
+												className="border-border col-span-6 border-b"
 											></div>
 										))}
 										{[...Array(6)].map((_, i) => (
 											<div
 												key={i}
-												className="row-span-4 border-r border-border"
+												className="border-border row-span-4 border-r"
 											></div>
 										))}
 									</div>
@@ -471,7 +471,7 @@ export function DataPanel({
 									</svg>
 
 									{/* X and Y axis labels */}
-									<div className="absolute bottom-0 left-0 right-0 flex justify-between px-2 text-xs text-foreground">
+									<div className="text-foreground absolute right-0 bottom-0 left-0 flex justify-between px-2 text-xs">
 										<span>Jan</span>
 										<span>Feb</span>
 										<span>Mar</span>
@@ -481,7 +481,7 @@ export function DataPanel({
 										<span>Jul</span>
 									</div>
 
-									<div className="absolute bottom-0 left-0 top-0 flex flex-col justify-between py-2 text-xs text-foreground">
+									<div className="text-foreground absolute top-0 bottom-0 left-0 flex flex-col justify-between py-2 text-xs">
 										<span>100%</span>
 										<span>75%</span>
 										<span>50%</span>
@@ -556,7 +556,7 @@ export function DataPanel({
 									</div>
 
 									<h3 className="mb-1 text-lg font-medium">Current Streak</h3>
-									<p className="text-center text-sm text-foreground">
+									<p className="text-foreground text-center text-sm">
 										Keep practicing Go daily to maintain your streak!
 									</p>
 								</div>
@@ -574,7 +574,7 @@ export function DataPanel({
 											<span className="text-sm">Current pace</span>
 											<span className="text-sm font-medium">7.5 hrs/week</span>
 										</div>
-										<div className="h-2 rounded-full border border-border bg-background">
+										<div className="border-border bg-background h-2 rounded-full border">
 											<div
 												className="h-full rounded-full bg-indigo-500"
 												style={{
@@ -593,9 +593,9 @@ export function DataPanel({
 											<span className="text-sm">Target pace</span>
 											<span className="text-sm font-medium">10 hrs/week</span>
 										</div>
-										<div className="h-2 rounded-full border border-border bg-background">
+										<div className="border-border bg-background h-2 rounded-full border">
 											<div
-												className="h-full rounded-full bg-peppermint-500"
+												className="bg-peppermint-500 h-full rounded-full"
 												style={{
 													width: '100%',
 													animationName: animate ? 'growRight' : 'none',
@@ -614,7 +614,7 @@ export function DataPanel({
 											<span>Your pace</span>
 										</div>
 										<div className="flex items-center gap-1.5">
-											<div className="h-3 w-3 rounded-full bg-peppermint-500"></div>
+											<div className="bg-peppermint-500 h-3 w-3 rounded-full"></div>
 											<span>Target pace</span>
 										</div>
 									</div>

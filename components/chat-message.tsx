@@ -82,10 +82,10 @@ export function ChatMessage({
 			'rounded-lg p-3',
 			message.role === 'user'
 				? 'bg-midnight-600 text-white'
-				: 'group relative border border-border bg-background text-foreground transition-all duration-300 hover:-translate-y-1 hover:translate-x-1 hover:shadow-[-4px_4px_0_hsl(var(--border-color))]',
+				: 'group border-border bg-background text-foreground relative border transition-all duration-300 hover:translate-x-1 hover:-translate-y-1 hover:shadow-[-4px_4px_0_hsl(var(--border-color))]',
 			isStreaming &&
 				message.role === 'assistant' &&
-				'-translate-y-1 translate-x-1 shadow-[-4px_4px_0_hsl(var(--border-color))]',
+				'translate-x-1 -translate-y-1 shadow-[-4px_4px_0_hsl(var(--border-color))]',
 		),
 
 		// Timestamp style
@@ -104,8 +104,8 @@ export function ChatMessage({
 		<div className={styles.messageContainer}>
 			{/* Bot avatar */}
 			{!isUser && (
-				<div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-merino-100 dark:bg-merino-700">
-					<Bot className="h-5 w-5 text-merino-600 dark:text-merino-100" />
+				<div className="bg-merino-100 dark:bg-merino-700 flex h-8 w-8 shrink-0 items-center justify-center rounded-full">
+					<Bot className="text-merino-600 dark:text-merino-100 h-5 w-5" />
 				</div>
 			)}
 
@@ -155,7 +155,7 @@ export function ChatMessage({
 
 			{/* User avatar */}
 			{isUser && (
-				<div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-midnight-600">
+				<div className="bg-midnight-600 flex h-8 w-8 shrink-0 items-center justify-center rounded-full">
 					<User className="h-5 w-5 text-white" />
 				</div>
 			)}

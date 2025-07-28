@@ -10,6 +10,7 @@ import {
 	FileTextIcon,
 	HelpCircleIcon,
 	SettingsIcon,
+	ServerIcon,
 } from 'lucide-react';
 
 import { NavDocuments } from './nav-documents';
@@ -85,6 +86,11 @@ const data = {
 		},
 	],
 	navSecondary: [
+		{
+			title: 'MCP Servers',
+			url: '/mcp-servers',
+			icon: ServerIcon,
+		},
 		{
 			title: 'Settings',
 			url: '#',

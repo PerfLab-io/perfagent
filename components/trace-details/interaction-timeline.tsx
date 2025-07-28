@@ -21,7 +21,7 @@ export function InteractionTimeline({
 	return (
 		<div
 			className={cn(
-				'relative h-8 w-full overflow-hidden rounded bg-peppermint-100 dark:bg-peppermint-900/40',
+				'bg-peppermint-100 dark:bg-peppermint-900/40 relative h-8 w-full overflow-hidden rounded',
 				className,
 			)}
 		>

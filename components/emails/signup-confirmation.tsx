@@ -35,7 +35,7 @@ export const SignupEmail = ({
 							<Section className="border-b border-dotted border-[#67cb87] bg-[#0d312d] p-4">
 								<div style={{ alignItems: 'center', display: 'flex' }}>
 									<div className="mr-2 h-3 w-3 rounded-full bg-[#67cb87]"></div>
-									<Text className="m-0 font-mono text-xs uppercase tracking-wider text-[#67cb87]">
+									<Text className="m-0 font-mono text-xs tracking-wider text-[#67cb87] uppercase">
 										PERFAGENT WAITLIST - SIGNUP CONFIRMATION
 									</Text>
 								</div>

@@ -4,10 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export function LandingBanner() {
 	return (
-		<div className="relative w-full overflow-hidden bg-peppermint-50 text-foreground dark:bg-background">
+		<div className="bg-peppermint-50 text-foreground dark:bg-background relative w-full overflow-hidden">
 			{/* Dotted background pattern */}
 			<svg
-				className="absolute inset-0 h-full w-full text-foreground"
+				className="text-foreground absolute inset-0 h-full w-full"
 				width="100%"
 				height="100%"
 				xmlns="http://www.w3.org/2000/svg"
@@ -25,14 +25,14 @@ export function LandingBanner() {
 				<rect width="100%" height="100%" fill="url(#dots-pattern)" />
 			</svg>
 
-			<div className="container relative mx-auto px-4 py-8 md:py-10">
+			<div className="relative container mx-auto px-4 py-8 md:py-10">
 				<div className="flex flex-col gap-12 lg:flex-row">
-					<div className="flex-1 bg-background p-4">
-						<h1 className="mb-6 text-5xl font-bold text-foreground">
+					<div className="bg-background flex-1 p-4">
+						<h1 className="text-foreground mb-6 text-5xl font-bold">
 							Understanding Performance Problems Is Hard
 						</h1>
 
-						<p className="max-w-xl text-lg text-foreground opacity-90">
+						<p className="text-foreground max-w-xl text-lg opacity-90">
 							Web performance issues can be complex and difficult to diagnose.
 							PerfAgent gives you AI-powered insights that make optimizations
 							more accessible. Turning hours of debugging into minutes of
@@ -44,7 +44,7 @@ export function LandingBanner() {
 					<div className="relative w-full lg:w-1/3">
 						{/* Diagonal lines pattern for card */}
 						<svg
-							className="absolute -left-4 top-4 w-full text-foreground"
+							className="text-foreground absolute top-4 -left-4 w-full"
 							style={{ height: 'calc(100% - 3rem)' }}
 							xmlns="http://www.w3.org/2000/svg"
 						>
@@ -67,7 +67,7 @@ export function LandingBanner() {
 							<rect width="100%" height="100%" fill="url(#diagonal-lines)" />
 						</svg>
 
-						<Card className="relative rounded-none border border-border bg-card text-foreground shadow-none dark:text-peppermint-950">
+						<Card className="border-border bg-card text-foreground dark:text-peppermint-950 relative rounded-none border shadow-none">
 							<CardHeader>
 								<CardTitle className="text-2xl font-bold">
 									Perf Intelligence at your fingertips

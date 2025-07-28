@@ -26,7 +26,7 @@ export async function fetchMetadata(url: string): Promise<LinkMetadata | null> {
 		const response = await fetch(proxyUrl, {
 			headers: {
 				'Accept-Language': navigator.language || 'en-US',
-			}
+			},
 		});
 
 		if (!response.ok) {

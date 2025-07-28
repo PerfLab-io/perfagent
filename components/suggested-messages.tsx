@@ -63,9 +63,9 @@ export function SuggestedMessages({
 				visible ? 'max-h-[300px] opacity-100' : 'max-h-0 opacity-0',
 			)}
 		>
-			<div className="pb-1 pt-2">
-				<div className="mb-2 flex items-center gap-2 text-sm text-foreground">
-					<Lightbulb className="h-4 w-4 text-merino-600 dark:text-merino-300" />
+			<div className="pt-2 pb-1">
+				<div className="text-foreground mb-2 flex items-center gap-2 text-sm">
+					<Lightbulb className="text-merino-600 dark:text-merino-300 h-4 w-4" />
 					<span>Suggested questions based on your trace file:</span>
 				</div>
 				<div className="flex flex-wrap gap-2">
@@ -73,15 +73,15 @@ export function SuggestedMessages({
 						// Skeleton UI for loading state
 						<>
 							{loadingTimeout ? (
-								<div className="text-sm italic text-foreground">
+								<div className="text-foreground text-sm italic">
 									Taking longer than expected to load suggestions...
 								</div>
 							) : (
 								<>
-									<Skeleton className="h-9 w-32 rounded-lg bg-peppermint-200 dark:bg-peppermint-700" />
-									<Skeleton className="h-9 w-48 rounded-lg bg-peppermint-200 dark:bg-peppermint-700" />
-									<Skeleton className="h-9 w-40 rounded-lg bg-peppermint-200 dark:bg-peppermint-700" />
-									<Skeleton className="h-9 w-36 rounded-lg bg-peppermint-200 dark:bg-peppermint-700" />
+									<Skeleton className="bg-peppermint-200 dark:bg-peppermint-700 h-9 w-32 rounded-lg" />
+									<Skeleton className="bg-peppermint-200 dark:bg-peppermint-700 h-9 w-48 rounded-lg" />
+									<Skeleton className="bg-peppermint-200 dark:bg-peppermint-700 h-9 w-40 rounded-lg" />
+									<Skeleton className="bg-peppermint-200 dark:bg-peppermint-700 h-9 w-36 rounded-lg" />
 								</>
 							)}
 						</>
@@ -94,14 +94,14 @@ export function SuggestedMessages({
 									onClick={() => handleSelectSuggestion(suggestion)}
 									className={cn(
 										'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm transition-colors',
-										'focus:outline-hidden focus:ring-0',
+										'focus:ring-0 focus:outline-hidden',
 										isActive
-											? 'border border-merino-800 bg-merino-50 text-merino-800 dark:border-merino-900 dark:bg-merino-100 dark:text-merino-900'
-											: 'border border-border bg-background text-foreground hover:border-merino-600 hover:bg-merino-50 hover:text-merino-600 dark:hover:border-merino-900 dark:hover:bg-merino-50 dark:hover:text-merino-900',
+											? 'border-merino-800 bg-merino-50 text-merino-800 dark:border-merino-900 dark:bg-merino-100 dark:text-merino-900 border'
+											: 'border-border bg-background text-foreground hover:border-merino-600 hover:bg-merino-50 hover:text-merino-600 dark:hover:border-merino-900 dark:hover:bg-merino-50 dark:hover:text-merino-900 border',
 									)}
 								>
 									{isActive && (
-										<Check className="h-3.5 w-3.5 text-merino-600 dark:text-merino-400" />
+										<Check className="text-merino-600 dark:text-merino-400 h-3.5 w-3.5" />
 									)}
 									{suggestion}
 								</button>

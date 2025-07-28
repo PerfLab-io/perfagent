@@ -25,7 +25,7 @@ const timelineSchema = z.object({
 });
 
 const metricBreakdownSchema = z.array(
-	z.object({ label: z.string(), value: z.number() })
+	z.object({ label: z.string(), value: z.number() }),
 );
 
 const metricScoreSchema = z.enum([
@@ -249,13 +249,19 @@ const generateExtraReportData = createStep({
 	execute: async ({ inputData }) => {
 		const { insightsForTopic, topic } = inputData;
 
-		if (topic === 'INP' && insightsForTopic.extras && 'formattedEvent' in insightsForTopic.extras) {
+		if (
+			topic === 'INP' &&
+			insightsForTopic.extras &&
+			'formattedEvent' in insightsForTopic.extras
+		) {
 			let reportDetails: {
 				reportImage?: string;
 				reportMarkdown?: string;
 			} = {};
 
-			const inpExtras = insightsForTopic.extras as z.infer<typeof inpExtrasSchema>;
+			const inpExtras = insightsForTopic.extras as z.infer<
+				typeof inpExtrasSchema
+			>;
 			const interaction = inpExtras.formattedEvent;
 			const startTime = (interaction?.ts || 0) - 30_000;
 			const endTime =

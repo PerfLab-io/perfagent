@@ -192,7 +192,7 @@ export const DonutChart = ({
 			>
 				{/* Background circle */}
 				<circle
-					className="stroke-current text-muted"
+					className="text-muted stroke-current"
 					strokeWidth="12"
 					cx="50"
 					cy="50"
@@ -352,9 +352,9 @@ export function GenerativeCard({
 
 	// Card container classes
 	const cardClasses = cn(
-		'group relative mt-4 w-full max-w-sm rounded-xl border-border bg-background transition-all duration-300 hover:-translate-y-1 hover:translate-x-1 hover:shadow-[-8px_8px_0_hsl(var(--border-color))]',
+		'group border-border bg-background relative mt-4 w-full max-w-sm rounded-xl transition-all duration-300 hover:translate-x-1 hover:-translate-y-1 hover:shadow-[-8px_8px_0_hsl(var(--border-color))]',
 		isLoading
-			? '-translate-y-1 translate-x-1 shadow-[-8px_8px_0_hsl(var(--border-color))]'
+			? 'translate-x-1 -translate-y-1 shadow-[-8px_8px_0_hsl(var(--border-color))]'
 			: '',
 	);
 
@@ -367,7 +367,7 @@ export function GenerativeCard({
 	return (
 		<Card className={cardClasses}>
 			<CardHeader className="flex flex-row items-center justify-between p-4 pb-2">
-				<CardTitle className="text-lg font-bold text-foreground">
+				<CardTitle className="text-foreground text-lg font-bold">
 					{isLoading && !isCancelled ? (
 						<Skeleton className="h-6 w-3/4" />
 					) : (
@@ -381,7 +381,7 @@ export function GenerativeCard({
 						<Button
 							variant="ghost"
 							size="icon"
-							className="h-8 w-8 rounded-full border-destructive hover:bg-destructive/10 hover:text-destructive"
+							className="border-destructive hover:bg-destructive/10 hover:text-destructive h-8 w-8 rounded-full"
 							onClick={onAbort}
 							title="Cancel breakdown"
 							aria-label="Cancel breakdown"

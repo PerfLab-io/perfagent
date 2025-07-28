@@ -213,12 +213,12 @@ export function FileDropzone({
 			cn(
 				'absolute inset-0 z-50 flex flex-col items-center justify-center',
 				'rounded-lg border-4 border-dashed transition-all duration-300',
-				'backdrop-blur-xs animate-in fade-in zoom-in-95',
+				'animate-in fade-in zoom-in-95 backdrop-blur-xs',
 				isHovering
 					? 'animate-pulse-border border-peppermint-500 dark:border-peppermint-400'
 					: 'shadow-none',
 				isDropping
-					? 'scale-95 border-peppermint-500 opacity-90 dark:border-peppermint-400'
+					? 'border-peppermint-500 dark:border-peppermint-400 scale-95 opacity-90'
 					: 'scale-100',
 				dropSuccess
 					? 'border-peppermint-500 bg-peppermint-100/90 dark:border-peppermint-400 dark:bg-peppermint-900/90'
@@ -293,9 +293,9 @@ export function FileDropzone({
 	const renderIcon = useCallback(() => {
 		if (dropSuccess) {
 			return (
-				<div className="flex h-16 w-16 items-center justify-center rounded-full bg-peppermint-200 duration-300 animate-in zoom-in dark:bg-peppermint-800">
+				<div className="bg-peppermint-200 animate-in zoom-in dark:bg-peppermint-800 flex h-16 w-16 items-center justify-center rounded-full duration-300">
 					<Check
-						className="h-8 w-8 text-peppermint-700 dark:text-peppermint-300"
+						className="text-peppermint-700 dark:text-peppermint-300 h-8 w-8"
 						aria-hidden="true"
 					/>
 				</div>
@@ -306,11 +306,11 @@ export function FileDropzone({
 			<div className={iconBgClasses}>
 				{isHovering ? (
 					<FileUp
-						className="animate-spin-slow h-8 w-8 text-peppermint-700 dark:text-peppermint-300"
+						className="animate-spin-slow text-peppermint-700 dark:text-peppermint-300 h-8 w-8"
 						aria-hidden="true"
 					/>
 				) : (
-					<Upload className="h-8 w-8 text-foreground/70" aria-hidden="true" />
+					<Upload className="text-foreground/70 h-8 w-8" aria-hidden="true" />
 				)}
 			</div>
 		);
