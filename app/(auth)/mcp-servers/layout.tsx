@@ -1,15 +1,14 @@
 import type React from 'react';
-import './chat.css';
 import AuthenticatedLayout from '@/components/layouts/authenticated-layout';
 import { Metadata } from 'next';
 
 export const metadata: Metadata = {
-	title: 'PerfAgent - Agent insights for web performance',
+	title: 'MCP Servers - PerfAgent',
 	description:
-		"PerfAgent is an AI-powered web performance insights tool that helps you understand your website's performance and identify opportunities for improvement.",
+		'Manage your Model Context Protocol servers for enhanced AI capabilities.',
 };
 
-export default async function AiChatLayout({
+export default async function MCPServersLayout({
 	children,
 }: {
 	children: React.ReactNode;
