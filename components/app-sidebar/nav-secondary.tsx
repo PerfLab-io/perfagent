@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { LucideIcon } from 'lucide-react';
+import { usePathname } from 'next/navigation';
 
 import {
 	SidebarGroup,
@@ -21,13 +22,18 @@ export function NavSecondary({
 		icon: LucideIcon;
 	}[];
 } & React.ComponentPropsWithoutRef<typeof SidebarGroup>) {
+	const pathname = usePathname();
+
 	return (
 		<SidebarGroup {...props}>
 			<SidebarGroupContent>
 				<SidebarMenu>
 					{items.map((item) => (
 						<SidebarMenuItem key={item.title}>
-							<SidebarMenuButton asChild>
+							<SidebarMenuButton
+								asChild
+								variant={pathname === item.url ? 'current' : 'default'}
+							>
 								<a href={item.url}>
 									<item.icon />
 									<span>{item.title}</span>
