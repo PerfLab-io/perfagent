@@ -20,6 +20,7 @@ import {
 	handleOAuthAuthorizationCode,
 	testMcpServerConnection,
 } from '@/lib/ai/mastra/mcpClient';
+import { exchangeOAuthCode } from '@/lib/ai/mastra/oauthExchange';
 import { DEFAULT_MCP_SERVERS } from '@/lib/ai/defaultMCPServers';
 import { createMcpAwareLargeAssistant } from '@/lib/ai/mastra/agents/largeAssistant';
 import { createMcpAwareRouterAgent } from '@/lib/ai/mastra/agents/router';
@@ -296,21 +297,38 @@ chat.get(
 			const serverRecord = matchingServer;
 
 			try {
-				// For now, just mark the server as authorized
-				// TODO: Implement proper OAuth token exchange and storage  
-				console.log(`[OAuth] Processing authorization callback for ${serverRecord.name}`);
+				console.log(
+					`[OAuth] Processing authorization callback for ${serverRecord.name}`,
+				);
 				console.log(`[OAuth] Code: ${code}, State: ${state}`);
-				
-				// Update server status to authorized
+
+				// Exchange authorization code for tokens
+				const tokenData = await exchangeOAuthCode(
+					serverRecord.url,
+					code,
+					state,
+				);
+
+				// Calculate token expiration time
+				const tokenExpiresAt = tokenData.expiresIn
+					? new Date(Date.now() + tokenData.expiresIn * 1000)
+					: undefined;
+
+				// Update server with tokens and mark as authorized
 				await db
 					.update(mcpServers)
 					.set({
 						authStatus: 'authorized',
+						accessToken: tokenData.accessToken,
+						refreshToken: tokenData.refreshToken || null,
+						tokenExpiresAt: tokenExpiresAt?.toISOString() || null,
 						updatedAt: new Date().toISOString(),
 					})
 					.where(eq(mcpServers.id, serverRecord.id));
 
-				console.log(`[OAuth] Successfully authorized ${serverRecord.name}`);
+				console.log(
+					`[OAuth] Successfully authorized ${serverRecord.name} with tokens`,
+				);
 
 				// Redirect to the MCP servers page with success message
 				return c.html(`
@@ -339,7 +357,6 @@ chat.get(
 						updatedAt: new Date().toISOString(),
 					})
 					.where(eq(mcpServers.id, serverRecord.id));
-
 
 				return c.html(`
 					<html>
@@ -428,21 +445,34 @@ chat.post('/mcp/oauth/callback', async (c) => {
 		const serverRecord = matchingServer;
 
 		try {
-			// For now, just mark the server as authorized
-			// TODO: Implement proper OAuth token exchange and storage
-			console.log(`[OAuth] Processing authorization callback for ${serverRecord.name}`);
+			console.log(
+				`[OAuth] Processing authorization callback for ${serverRecord.name}`,
+			);
 			console.log(`[OAuth] Code: ${code}, State: ${state}`);
-			
-			// Update server status to authorized
+
+			// Exchange authorization code for tokens
+			const tokenData = await exchangeOAuthCode(serverRecord.url, code, state);
+
+			// Calculate token expiration time
+			const tokenExpiresAt = tokenData.expiresIn
+				? new Date(Date.now() + tokenData.expiresIn * 1000)
+				: undefined;
+
+			// Update server with tokens and mark as authorized
 			await db
 				.update(mcpServers)
 				.set({
 					authStatus: 'authorized',
+					accessToken: tokenData.accessToken,
+					refreshToken: tokenData.refreshToken || null,
+					tokenExpiresAt: tokenExpiresAt?.toISOString() || null,
 					updatedAt: new Date().toISOString(),
 				})
 				.where(eq(mcpServers.id, serverRecord.id));
 
-			console.log(`[OAuth] Successfully authorized ${serverRecord.name}`);
+			console.log(
+				`[OAuth] Successfully authorized ${serverRecord.name} with tokens`,
+			);
 
 			return c.json({
 				success: true,

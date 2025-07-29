@@ -5,9 +5,10 @@ import {
 import { db } from '@/drizzle/db';
 import { mcpServers } from '@/drizzle/schema';
 import { eq, and } from 'drizzle-orm';
+import { storePKCEVerifier } from './pkceStore';
 
 // OAuth configuration constants
-const OAUTH_CONFIG = {
+export const OAUTH_CONFIG = {
 	redirectUris: [
 		'http://localhost:3000/api/mcp/oauth/callback',
 		'https://agent.perflab.io/api/mcp/oauth/callback',
@@ -196,6 +197,10 @@ async function discoverOAuthAuthorizationUrl(
 		const state = generateState();
 		authUrl.searchParams.set('state', state);
 
+		// Store the code_verifier with the state for later retrieval
+		storePKCEVerifier(state, codeVerifier);
+		console.log('[OAuth] Stored PKCE code_verifier for state:', state);
+
 		console.log('[OAuth] Generated authorization URL:', authUrl.toString());
 		return authUrl.toString();
 	} catch (error) {
@@ -323,7 +328,7 @@ export async function createUserMcpClient(userId: string) {
 	// Create server configuration for Mastra MCPClient with OAuth always enabled
 	const serverConfig = servers.reduce(
 		(acc, server) => {
-			acc[server.name] = {
+			const config: any = {
 				url: new URL(server.url),
 				timeout: 60_000, // 60 second timeout
 				// Always include OAuth configuration with our constants
@@ -335,6 +340,19 @@ export async function createUserMcpClient(userId: string) {
 				},
 			};
 
+			// If server has stored OAuth tokens, include them in requestInit for HTTP transport
+			if (server.authStatus === 'authorized' && server.accessToken) {
+				console.log(
+					`[OAuth] Found stored access token for server: ${server.name}`,
+				);
+				config.requestInit = {
+					headers: {
+						Authorization: `Bearer ${server.accessToken}`,
+					},
+				};
+			}
+
+			acc[server.name] = config;
 			return acc;
 		},
 		{} as Record<string, any>,
@@ -566,30 +584,48 @@ export async function testMcpServerConnection(
 		}
 
 		// If direct fetch didn't work or didn't indicate OAuth, try the MCP client
+		const serverConfig: any = {
+			url: new URL(serverRecord.url),
+			timeout: 30_000, // Shorter timeout for testing
+			authorization: {
+				redirectUris: OAUTH_CONFIG.redirectUris,
+				scopes: OAUTH_CONFIG.scopes,
+				clientName: OAUTH_CONFIG.clientName,
+				onAuthorizationNeeded: async (
+					_serverUrl: string,
+					authUrl: string,
+					_context: any,
+				) => {
+					// Update server auth status and throw special error
+					await db
+						.update(mcpServers)
+						.set({
+							authStatus: 'required',
+							updatedAt: new Date().toISOString(),
+						})
+						.where(eq(mcpServers.id, serverId));
+
+					throw new Error(`OAUTH_REQUIRED:${authUrl}`);
+				},
+			},
+		};
+
+		// If server has stored OAuth tokens, include them in requestInit for HTTP transport
+		if (serverRecord.authStatus === 'authorized' && serverRecord.accessToken) {
+			console.log(
+				`[OAuth] Testing connection with stored access token for server: ${serverRecord.name}`,
+			);
+			serverConfig.requestInit = {
+				headers: {
+					Authorization: `Bearer ${serverRecord.accessToken}`,
+				},
+			};
+		}
+
 		const testClient = new MCPClient({
 			id: `test-${userId}-${Date.now()}`,
 			servers: {
-				[serverRecord.name]: {
-					url: new URL(serverRecord.url),
-					timeout: 30_000, // Shorter timeout for testing
-					authorization: {
-						redirectUris: OAUTH_CONFIG.redirectUris,
-						scopes: OAUTH_CONFIG.scopes,
-						clientName: OAUTH_CONFIG.clientName,
-						onAuthorizationNeeded: async (_serverUrl, authUrl, _context) => {
-							// Update server auth status and throw special error
-							await db
-								.update(mcpServers)
-								.set({
-									authStatus: 'required',
-									updatedAt: new Date().toISOString(),
-								})
-								.where(eq(mcpServers.id, serverId));
-
-							throw new Error(`OAUTH_REQUIRED:${authUrl}`);
-						},
-					},
-				},
+				[serverRecord.name]: serverConfig,
 			},
 		});
 
@@ -644,13 +680,27 @@ export async function getMcpServerInfo(userId: string, serverId: string) {
 	const serverRecord = server[0];
 
 	// Create a temporary client just for this server
+	const serverConfig: any = {
+		url: new URL(serverRecord.url),
+		timeout: 60_000,
+	};
+
+	// If server has stored OAuth tokens, include them in requestInit for HTTP transport
+	if (serverRecord.authStatus === 'authorized' && serverRecord.accessToken) {
+		console.log(
+			`[OAuth] Getting server info with stored access token for server: ${serverRecord.name}`,
+		);
+		serverConfig.requestInit = {
+			headers: {
+				Authorization: `Bearer ${serverRecord.accessToken}`,
+			},
+		};
+	}
+
 	const client = new MCPClient({
 		id: `user-${userId}-${Date.now()}`,
 		servers: {
-			[serverRecord.name]: {
-				url: new URL(serverRecord.url),
-				timeout: 60_000,
-			},
+			[serverRecord.name]: serverConfig,
 		},
 	});
 
