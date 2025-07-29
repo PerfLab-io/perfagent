@@ -1,4 +1,8 @@
-import { preamble } from '@perflab/trace_engine/panels/ai_assistance/standalone';
+import {
+	generateToolAwarePrompt,
+	generateToolSummary,
+} from './mastra/toolAwarePrompts';
+
 export const grounding = `
 **Knowledge Constraints:**
 - **Use Only Provided Information**: You must **only** use information given in this system prompt and from the outputs of your available tools to formulate responses. **Ignore any internal or prior knowledge** not present in these sources. If you have an answer from memory that isn’t supported by the provided info, do **not** use it.
@@ -850,5 +854,82 @@ ${availableTools.join('\n')}
 export function createMcpAwareLargeModelPrompt(
 	toolsets?: Record<string, any>,
 ): string {
+	// First get the tool-aware prompt from the catalog
+	const toolAwareSection = generateToolAwarePrompt({
+		includeUsageInstructions: true,
+		includeSafetyGuidelines: true,
+		includeExamples: false,
+		filterBySafetyLevel: ['safe', 'caution'], // Only include safe and caution tools
+		maxToolsPerCategory: 8, // Allow more tools for comprehensive prompt
+	});
+
+	// If we have tools from the catalog, use the new system
+	if (toolAwareSection) {
+		const toolSummary = generateToolSummary();
+
+		const enhancedPrompt = largeModelSystemPrompt.replace(
+			/## Available Tools and Capabilities\n\nYou may have access to external tools and services through connected MCP \(Model Context Protocol\) servers that can enhance your analysis capabilities\.\nWhen answering questions, consider what tools you have available and whether any of your available external tools could provide additional insights or perform specific tasks that would benefit the user's request\./,
+			`## Available Tools and Capabilities
+
+${toolSummary}
+
+${toolAwareSection}
+
+**Integration with Performance Analysis:**
+- Use external tools to gather additional data that can enhance your web performance insights
+- These tools complement your core web performance analysis capabilities
+- When suggesting optimizations, consider if external tools can provide more specific data or validation
+- Always explain how tool results relate to web performance metrics and improvements`,
+		);
+
+		return enhancedPrompt;
+	}
+
+	// Fallback to the old system if no tools are available from catalog
 	return enhancePromptWithMcpContext(largeModelSystemPrompt, toolsets);
+}
+
+/**
+ * Creates an MCP-aware system prompt for the router
+ * @param toolsets - Available MCP toolsets (optional)
+ * @returns Enhanced router prompt with MCP context
+ */
+export function createMcpAwareRouterPrompt(
+	toolsets?: Record<string, any>,
+): string {
+	// Get tool-aware prompt from the catalog
+	const toolAwareSection = generateToolAwarePrompt({
+		includeUsageInstructions: false, // Router doesn't need detailed usage instructions
+		includeSafetyGuidelines: false,
+		includeExamples: false,
+		filterBySafetyLevel: ['safe', 'caution'],
+		maxToolsPerCategory: 3, // Keep it concise for router
+	});
+
+	// If we have tools from the catalog, enhance the router prompt
+	if (toolAwareSection) {
+		const toolSummary = generateToolSummary();
+
+		const enhancedPrompt = routerSystemPrompt.replace(
+			/\*\*MCP Tool Considerations:\*\*\nWhen external MCP tools are available, consider that:\n- Simple questions can often be answered directly using available tools without needing full workflows\n- Some analysis or even initial research questions might be better handled with those external tools first rather than reaching out to workflows right away\n- If the user's request could be fulfilled with available external tools, lean towards null workflow with higher certainty for direct tool usage\n- Always consider whether MCP tools can provide more specific and immediate value than general research workflows/,
+			`**External Tools Available:**
+${toolSummary}
+
+**Available External Tools:**
+${toolAwareSection}
+
+**MCP Tool Considerations:**
+When external MCP tools are available, consider that:
+- Simple questions can often be answered directly using available tools without needing full workflows
+- Some analysis or research questions might be better handled with external tools first
+- If the user's request could be fulfilled with available external tools, lean towards null workflow with higher certainty for direct tool usage
+- Consider tool categories: external tools may provide specialized analysis that workflows can't match
+- Always prioritize external tools for specific technical analysis over general research workflows`,
+		);
+
+		return enhancedPrompt;
+	}
+
+	// Fallback to the old system if no tools are available from catalog
+	return enhancePromptWithMcpContext(routerSystemPrompt, toolsets);
 }

@@ -31,6 +31,9 @@ import {
 	AlertCircle,
 	CheckCircle,
 	XCircle,
+	ChevronDown,
+	ChevronRight,
+	Wrench,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -43,6 +46,11 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 
 interface MCPServer {
 	id: string;
@@ -73,6 +81,9 @@ export default function MCPServersPage() {
 		Record<string, boolean>
 	>({});
 	const [authUrls, setAuthUrls] = useState<Record<string, string>>({});
+	const [expandedServers, setExpandedServers] = useState<
+		Record<string, boolean>
+	>({});
 
 	useEffect(() => {
 		fetchServers();
@@ -234,10 +245,19 @@ export default function MCPServersPage() {
 		const info = serverInfo[serverId];
 		if (!info) return null;
 
+		// Fix toolsets counting - toolsets are objects where each key is a tool name
 		const toolCount = Object.keys(info.toolsets || {}).reduce(
-			(sum, key) => sum + (info.toolsets[key]?.length || 0),
+			(sum, serverName) => {
+				const serverToolset = info.toolsets[serverName];
+				if (serverToolset && typeof serverToolset === 'object') {
+					// Count the number of tool keys in this server's toolset
+					return sum + Object.keys(serverToolset).length;
+				}
+				return sum;
+			},
 			0,
 		);
+
 		const resourceCount = Object.keys(info.resources || {}).reduce(
 			(sum, key) => sum + (info.resources[key]?.length || 0),
 			0,
@@ -248,6 +268,72 @@ export default function MCPServersPage() {
 		);
 
 		return { toolCount, resourceCount, promptCount };
+	};
+
+	const toggleServerExpansion = (serverId: string) => {
+		setExpandedServers((prev) => ({
+			...prev,
+			[serverId]: !prev[serverId],
+		}));
+	};
+
+	const renderToolDetails = (serverId: string) => {
+		const info = serverInfo[serverId];
+		if (!info?.toolsets) return null;
+
+		const tools: Array<{ name: string; description?: string; server: string }> =
+			[];
+
+		// Extract all tools from all servers in toolsets
+		Object.entries(info.toolsets).forEach(([serverName, serverToolset]) => {
+			if (serverToolset && typeof serverToolset === 'object') {
+				Object.entries(serverToolset).forEach(
+					([toolName, toolConfig]: [string, any]) => {
+						tools.push({
+							name: toolName,
+							description:
+								toolConfig?.description || 'No description available',
+							server: serverName,
+						});
+					},
+				);
+			}
+		});
+
+		if (tools.length === 0) return null;
+
+		return (
+			<div className="mt-4 space-y-2">
+				<h4 className="flex items-center text-sm font-medium">
+					<Wrench className="mr-2 h-4 w-4" />
+					Available Tools
+				</h4>
+				<div className="space-y-2">
+					{tools.map((tool, index) => (
+						<div
+							key={`${tool.server}-${tool.name}-${index}`}
+							className="bg-muted/50 rounded-md p-3"
+						>
+							<div className="flex items-start justify-between">
+								<div className="flex-1">
+									<div className="flex items-center space-x-2">
+										<code className="bg-background rounded px-2 py-1 font-mono text-sm">
+											{tool.name}
+										</code>
+										<Badge variant="outline" className="text-xs">
+											{tool.server}
+										</Badge>
+									</div>
+									<p className="text-muted-foreground mt-2 text-sm">
+										{tool.description}
+									</p>
+								</div>
+							</div>
+						</div>
+					))}
+				</div>
+			</div>
+		);
 	};
 
 	if (loading) {
@@ -467,21 +553,50 @@ export default function MCPServersPage() {
 												<span>Loading capabilities...</span>
 											</div>
 										) : counts ? (
-											<div className="flex space-x-4">
-												<Badge variant="secondary">
-													{counts.toolCount}{' '}
-													{counts.toolCount === 1 ? 'Tool' : 'Tools'}
-												</Badge>
-												<Badge variant="secondary">
-													{counts.resourceCount}{' '}
-													{counts.resourceCount === 1
-														? 'Resource'
-														: 'Resources'}
-												</Badge>
-												<Badge variant="secondary">
-													{counts.promptCount}{' '}
-													{counts.promptCount === 1 ? 'Prompt' : 'Prompts'}
-												</Badge>
+											<div className="space-y-3">
+												<div className="flex space-x-4">
+													<Badge variant="secondary">
+														{counts.toolCount}{' '}
+														{counts.toolCount === 1 ? 'Tool' : 'Tools'}
+													</Badge>
+													<Badge variant="secondary">
+														{counts.resourceCount}{' '}
+														{counts.resourceCount === 1
+															? 'Resource'
+															: 'Resources'}
+													</Badge>
+													<Badge variant="secondary">
+														{counts.promptCount}{' '}
+														{counts.promptCount === 1 ? 'Prompt' : 'Prompts'}
+													</Badge>
+												</div>
+
+												{counts.toolCount > 0 && (
+													<Collapsible
+														open={expandedServers[server.id]}
+														onOpenChange={() =>
+															toggleServerExpansion(server.id)
+														}
+													>
+														<CollapsibleTrigger asChild>
+															<Button
+																variant="ghost"
+																size="sm"
+																className="flex h-auto items-center space-x-2 p-0 text-sm"
+															>
+																{expandedServers[server.id] ? (
+																	<ChevronDown className="h-4 w-4" />
+																) : (
+																	<ChevronRight className="h-4 w-4" />
+																)}
+																<span>View Tool Details</span>
+															</Button>
+														</CollapsibleTrigger>
+														<CollapsibleContent>
+															{renderToolDetails(server.id)}
+														</CollapsibleContent>
+													</Collapsible>
+												)}
 											</div>
 										) : server.authStatus === 'authorized' ? (
 											<p className="text-muted-foreground text-sm">

@@ -6,6 +6,7 @@ import { db } from '@/drizzle/db';
 import { mcpServers } from '@/drizzle/schema';
 import { eq, and } from 'drizzle-orm';
 import { storePKCEVerifier } from './pkceStore';
+import { toolCatalog } from './toolCatalog';
 
 // OAuth configuration constants
 export const OAUTH_CONFIG = {
@@ -364,6 +365,30 @@ export async function createUserMcpClient(userId: string) {
 		servers: serverConfig,
 	});
 
+	// Register tools from all servers in the catalog for discovery
+	try {
+		const toolsets = await client.getToolsets();
+		if (toolsets) {
+			// Register each server's tools in the catalog
+			servers.forEach(server => {
+				try {
+					const catalog = toolCatalog.registerCatalog(
+						server.id,
+						server.name,
+						server.url,
+						toolsets
+					);
+					console.log(`[Tool Catalog] Registered ${catalog.tools.length} tools for server: ${server.name}`);
+				} catch (catalogError) {
+					console.error(`[Tool Catalog] Failed to register tools for server ${server.name}:`, catalogError);
+				}
+			});
+		}
+	} catch (error) {
+		console.warn(`[Tool Catalog] Failed to register tools during client creation:`, error);
+		// Don't fail client creation if catalog registration fails
+	}
+
 	return client;
 }
 
@@ -663,6 +688,34 @@ export async function testMcpServerConnection(
 }
 
 /**
+ * Gets all tools from the tool catalog
+ */
+export function getAllCatalogTools() {
+	return toolCatalog.getAllTools();
+}
+
+/**
+ * Gets tools by server from the catalog
+ */
+export function getCatalogToolsByServer(serverId: string) {
+	return toolCatalog.getToolsByServer(serverId);
+}
+
+/**
+ * Gets catalog statistics
+ */
+export function getCatalogStats() {
+	return toolCatalog.getStats();
+}
+
+/**
+ * Searches tools in the catalog
+ */
+export function searchCatalogTools(query: string) {
+	return toolCatalog.searchTools(query);
+}
+
+/**
  * Gets information about a specific MCP server including its capabilities
  */
 export async function getMcpServerInfo(userId: string, serverId: string) {
@@ -711,6 +764,31 @@ export async function getMcpServerInfo(userId: string, serverId: string) {
 			client.resources.list(),
 			client.prompts.list(),
 		]);
+
+		console.log(`[MCP Debug] Server ${serverRecord.name} toolsets structure:`, JSON.stringify(toolsets, null, 2));
+		console.log(`[MCP Debug] Server ${serverRecord.name} toolsets keys:`, Object.keys(toolsets || {}));
+		
+		// Log each server's toolset structure
+		if (toolsets && typeof toolsets === 'object') {
+			for (const [serverName, serverToolset] of Object.entries(toolsets)) {
+				console.log(`[MCP Debug] Server "${serverName}" toolset:`, typeof serverToolset, Object.keys(serverToolset || {}));
+			}
+		}
+
+		// Register tools with the catalog for better discovery and management
+		if (toolsets) {
+			try {
+				const catalog = toolCatalog.registerCatalog(
+					serverRecord.id,
+					serverRecord.name,
+					serverRecord.url,
+					toolsets
+				);
+				console.log(`[Tool Catalog] Registered ${catalog.tools.length} tools for server: ${serverRecord.name}`);
+			} catch (catalogError) {
+				console.error(`[Tool Catalog] Failed to register tools for server ${serverRecord.name}:`, catalogError);
+			}
+		}
 
 		await client.disconnect();
 

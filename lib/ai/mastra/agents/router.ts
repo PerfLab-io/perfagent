@@ -1,6 +1,6 @@
 import { Agent } from '@mastra/core/agent';
 import { perflab } from '../../modelProvider';
-import { routerSystemPrompt, enhancePromptWithMcpContext } from '../../prompts';
+import { routerSystemPrompt, createMcpAwareRouterPrompt } from '../../prompts';
 import { z } from 'zod';
 
 export const routerAgent = new Agent({
@@ -21,7 +21,7 @@ export function createMcpAwareRouterAgent(
 ): Agent {
 	return new Agent({
 		name: 'PerfAgent router (MCP-enabled)',
-		instructions: enhancePromptWithMcpContext(routerSystemPrompt, toolsets),
+		instructions: createMcpAwareRouterPrompt(toolsets),
 		model: perflab.languageModel('topics_model'),
 		tools: tools || {},
 	});

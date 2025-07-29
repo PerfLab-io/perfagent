@@ -17,11 +17,13 @@ import { eq, and } from 'drizzle-orm';
 import {
 	createUserMcpClient,
 	getMcpServerInfo,
-	handleOAuthAuthorizationCode,
 	testMcpServerConnection,
+	getAllCatalogTools,
+	getCatalogToolsByServer,
+	getCatalogStats,
+	searchCatalogTools,
 } from '@/lib/ai/mastra/mcpClient';
 import { exchangeOAuthCode } from '@/lib/ai/mastra/oauthExchange';
-import { DEFAULT_MCP_SERVERS } from '@/lib/ai/defaultMCPServers';
 import { createMcpAwareLargeAssistant } from '@/lib/ai/mastra/agents/largeAssistant';
 import { createMcpAwareRouterAgent } from '@/lib/ai/mastra/agents/router';
 import { transformMcpToolsetsForMastra } from '@/lib/ai/mastra/toolsetTransformer';
@@ -176,6 +178,76 @@ chat.get('/mcp/server-info/:id', async (c) => {
 	} catch (error) {
 		console.error('Error fetching server info:', error);
 		return c.json({ error: 'Failed to fetch server info' }, 500);
+	}
+});
+
+// GET /api/mcp/catalog/tools - Get all tools from catalog
+chat.get('/mcp/catalog/tools', async (c) => {
+	try {
+		const sessionData = await verifySession();
+		if (!sessionData) {
+			return c.json({ error: 'Authentication required' }, 401);
+		}
+
+		const tools = getAllCatalogTools();
+		return c.json({ tools });
+	} catch (error) {
+		console.error('Error fetching catalog tools:', error);
+		return c.json({ error: 'Failed to fetch catalog tools' }, 500);
+	}
+});
+
+// GET /api/mcp/catalog/tools/:serverId - Get tools for specific server
+chat.get('/mcp/catalog/tools/:serverId', async (c) => {
+	try {
+		const sessionData = await verifySession();
+		if (!sessionData) {
+			return c.json({ error: 'Authentication required' }, 401);
+		}
+
+		const serverId = c.req.param('serverId');
+		const tools = getCatalogToolsByServer(serverId);
+		return c.json({ tools });
+	} catch (error) {
+		console.error('Error fetching server tools:', error);
+		return c.json({ error: 'Failed to fetch server tools' }, 500);
+	}
+});
+
+// GET /api/mcp/catalog/stats - Get catalog statistics
+chat.get('/mcp/catalog/stats', async (c) => {
+	try {
+		const sessionData = await verifySession();
+		if (!sessionData) {
+			return c.json({ error: 'Authentication required' }, 401);
+		}
+
+		const stats = getCatalogStats();
+		return c.json(stats);
+	} catch (error) {
+		console.error('Error fetching catalog stats:', error);
+		return c.json({ error: 'Failed to fetch catalog stats' }, 500);
+	}
+});
+
+// GET /api/mcp/catalog/search - Search tools in catalog
+chat.get('/mcp/catalog/search', async (c) => {
+	try {
+		const sessionData = await verifySession();
+		if (!sessionData) {
+			return c.json({ error: 'Authentication required' }, 401);
+		}
+
+		const query = c.req.query('q');
+		if (!query) {
+			return c.json({ error: 'Query parameter required' }, 400);
+		}
+
+		const tools = searchCatalogTools(query);
+		return c.json({ tools, query });
+	} catch (error) {
+		console.error('Error searching catalog tools:', error);
+		return c.json({ error: 'Failed to search catalog tools' }, 500);
 	}
 });
 
