@@ -365,31 +365,78 @@ export async function createUserMcpClient(userId: string) {
 		servers: serverConfig,
 	});
 
-	// Register tools from all servers in the catalog for discovery
-	try {
-		const toolsets = await client.getToolsets();
-		if (toolsets) {
-			// Register each server's tools in the catalog
-			servers.forEach(server => {
-				try {
-					const catalog = toolCatalog.registerCatalog(
-						server.id,
-						server.name,
-						server.url,
-						toolsets
-					);
-					console.log(`[Tool Catalog] Registered ${catalog.tools.length} tools for server: ${server.name}`);
-				} catch (catalogError) {
-					console.error(`[Tool Catalog] Failed to register tools for server ${server.name}:`, catalogError);
-				}
-			});
-		}
-	} catch (error) {
-		console.warn(`[Tool Catalog] Failed to register tools during client creation:`, error);
-		// Don't fail client creation if catalog registration fails
-	}
+	// Note: Tool catalog registration moved to getMcpServerInfo to avoid interfering with client creation
 
 	return client;
+}
+
+/**
+ * Normalizes date fields in data structures to prevent "toISOString is not a function" errors
+ */
+function normalizeDateFields(data: any): any {
+	if (!data || typeof data !== 'object') {
+		return data;
+	}
+
+	// Handle arrays
+	if (Array.isArray(data)) {
+		return data.map(item => normalizeDateFields(item));
+	}
+
+	// Handle objects
+	const normalized = { ...data };
+	const dateFieldNames = ['createdAt', 'updatedAt', 'expiresAt', 'tokenExpiresAt', 'timestamp', 'date'];
+
+	for (const fieldName of dateFieldNames) {
+		if (fieldName in normalized && normalized[fieldName]) {
+			const value = normalized[fieldName];
+			// If it's already a Date object, leave it as is
+			if (value instanceof Date) {
+				continue;
+			}
+			// If it's a string that looks like a date, convert it to Date
+			if (typeof value === 'string') {
+				try {
+					const dateValue = new Date(value);
+					// Only replace if it's a valid date
+					if (!isNaN(dateValue.getTime())) {
+						normalized[fieldName] = dateValue;
+					}
+				} catch (error) {
+					// If conversion fails, leave the original value
+					console.warn(`[Date Normalization] Failed to convert ${fieldName}:`, error);
+				}
+			}
+		}
+	}
+
+	// Recursively handle nested objects
+	for (const key in normalized) {
+		if (normalized[key] && typeof normalized[key] === 'object' && !Array.isArray(normalized[key]) && !(normalized[key] instanceof Date)) {
+			normalized[key] = normalizeDateFields(normalized[key]);
+		}
+	}
+
+	return normalized;
+}
+
+/**
+ * Filters resource objects to only include MCP spec-compliant fields
+ * This prevents issues with non-standard fields that may cause processing errors
+ */
+function filterToSpecCompliantResource(resource: any) {
+	// According to MCP spec, only these fields are standard
+	const specCompliantResource: any = {
+		uri: resource.uri, // Required field
+	};
+	
+	// Add optional fields if they exist
+	if (resource.name !== undefined) specCompliantResource.name = resource.name;
+	if (resource.title !== undefined) specCompliantResource.title = resource.title;  
+	if (resource.description !== undefined) specCompliantResource.description = resource.description;
+	if (resource.mimeType !== undefined) specCompliantResource.mimeType = resource.mimeType;
+	
+	return specCompliantResource;
 }
 
 /**
@@ -397,7 +444,33 @@ export async function createUserMcpClient(userId: string) {
  */
 export async function listMcpResources(client: MCPClient) {
 	if (!client) return {};
-	return await client.resources.list();
+	try {
+		console.log('[MCP Resources] About to call client.resources.list()');
+		const resources = await client.resources.list();
+		console.log('[MCP Resources] Raw resources received:', JSON.stringify(resources, null, 2));
+		
+		// Filter to spec-compliant fields to avoid processing issues with non-standard fields
+		if (resources && typeof resources === 'object' && Array.isArray(resources.resources)) {
+			const filtered = {
+				...resources,
+				resources: resources.resources.map(filterToSpecCompliantResource)
+			};
+			console.log('[MCP Resources] Filtered to spec-compliant resources:', JSON.stringify(filtered, null, 2));
+			return filtered;
+		}
+		
+		return resources;
+	} catch (error) {
+		console.error('[MCP Resources] Error in listMcpResources:', error);
+		console.error('[MCP Resources] Error stack:', error instanceof Error ? error.stack : 'No stack');
+		if (error instanceof Error && error.message.includes('toISOString is not a function')) {
+			console.error('[MCP Resources] Date field error detected - this suggests the MCP server is returning non-standard date fields:', error.message);
+			console.error('[MCP Resources] The MCP spec does not define date fields in resources. This may be a server implementation issue.');
+			// Return empty result instead of crashing
+			return {};
+		}
+		throw error;
+	}
 }
 
 /**
@@ -417,7 +490,16 @@ export async function readMcpResource(
 	resourceUri: string,
 ) {
 	if (!client) return null;
-	return await client.resources.read(serverName, resourceUri);
+	try {
+		const resource = await client.resources.read(serverName, resourceUri);
+		return normalizeDateFields(resource);
+	} catch (error) {
+		if (error instanceof Error && error.message.includes('toISOString is not a function')) {
+			console.warn('[MCP Resource Read] Date field error detected, attempting to handle gracefully:', error.message);
+			return null;
+		}
+		throw error;
+	}
 }
 
 /**
@@ -758,11 +840,43 @@ export async function getMcpServerInfo(userId: string, serverId: string) {
 	});
 
 	try {
-		// Fetch all capabilities
+		// Fetch all capabilities with error handling for date fields
+		console.log(`[MCP Server Info] About to fetch capabilities for server: ${serverRecord.name}`);
 		const [toolsets, resources, prompts] = await Promise.all([
-			client.getToolsets(),
-			client.resources.list(),
-			client.prompts.list(),
+			client.getToolsets().catch((error) => {
+				console.error('[MCP Server Info] Error in getToolsets:', error);
+				if (error instanceof Error && error.message.includes('toISOString is not a function')) {
+					console.warn('[MCP Server Info] Date field error in toolsets, returning empty:', error.message);
+					return {};
+				}
+				throw error;
+			}),
+			client.resources.list().then((resources) => {
+				// Filter to spec-compliant fields to avoid processing issues
+				if (resources && typeof resources === 'object' && Array.isArray(resources.resources)) {
+					return {
+						...resources,
+						resources: resources.resources.map(filterToSpecCompliantResource)
+					};
+				}
+				return resources;
+			}).catch((error) => {
+				console.error('[MCP Server Info] Error in resources.list:', error);
+				console.error('[MCP Server Info] Error stack:', error instanceof Error ? error.stack : 'No stack');
+				if (error instanceof Error && error.message.includes('toISOString is not a function')) {
+					console.warn('[MCP Server Info] Date field error in resources, returning empty:', error.message);
+					return {};
+				}
+				throw error;
+			}),
+			client.prompts.list().catch((error) => {
+				console.error('[MCP Server Info] Error in prompts.list:', error);
+				if (error instanceof Error && error.message.includes('toISOString is not a function')) {
+					console.warn('[MCP Server Info] Date field error in prompts, returning empty:', error.message);
+					return {};
+				}
+				throw error;
+			}),
 		]);
 
 		console.log(`[MCP Debug] Server ${serverRecord.name} toolsets structure:`, JSON.stringify(toolsets, null, 2));
@@ -795,7 +909,7 @@ export async function getMcpServerInfo(userId: string, serverId: string) {
 		return {
 			server: serverRecord,
 			toolsets,
-			resources,
+			resources, // Already filtered to spec-compliant fields
 			prompts,
 		};
 	} catch (error) {

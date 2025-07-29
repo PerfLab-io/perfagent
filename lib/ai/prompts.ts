@@ -1,6 +1,9 @@
 import {
 	generateToolAwarePrompt,
 	generateToolSummary,
+	generateDynamicContextualPrompt,
+	generateCategoryBasedRecommendations,
+	generateToolExecutionPlan,
 } from './mastra/toolAwarePrompts';
 
 export const grounding = `
@@ -854,32 +857,28 @@ ${availableTools.join('\n')}
 export function createMcpAwareLargeModelPrompt(
 	toolsets?: Record<string, any>,
 ): string {
-	// First get the tool-aware prompt from the catalog
-	const toolAwareSection = generateToolAwarePrompt({
-		includeUsageInstructions: true,
-		includeSafetyGuidelines: true,
-		includeExamples: false,
-		filterBySafetyLevel: ['safe', 'caution'], // Only include safe and caution tools
-		maxToolsPerCategory: 8, // Allow more tools for comprehensive prompt
-	});
+	// Temporarily simplified to debug resource listing issue
+	const toolSummary = generateToolSummary();
 
-	// If we have tools from the catalog, use the new system
-	if (toolAwareSection) {
-		const toolSummary = generateToolSummary();
-
+	// If we have tools from the catalog, use a simplified system
+	if (toolSummary) {
 		const enhancedPrompt = largeModelSystemPrompt.replace(
 			/## Available Tools and Capabilities\n\nYou may have access to external tools and services through connected MCP \(Model Context Protocol\) servers that can enhance your analysis capabilities\.\nWhen answering questions, consider what tools you have available and whether any of your available external tools could provide additional insights or perform specific tasks that would benefit the user's request\./,
 			`## Available Tools and Capabilities
 
 ${toolSummary}
 
-${toolAwareSection}
+**MCP Resource Access Instructions:**
+- When listing files or resources from MCP servers, provide the complete individual resource list
+- Do NOT summarize or group resources by file type
+- List each resource separately with its URI and details
+- Present the actual resource names and paths, not just file type summaries
+- If a user asks for files from a chat or resource list, show the individual file names and URIs
 
 **Integration with Performance Analysis:**
 - Use external tools to gather additional data that can enhance your web performance insights
 - These tools complement your core web performance analysis capabilities
-- When suggesting optimizations, consider if external tools can provide more specific data or validation
-- Always explain how tool results relate to web performance metrics and improvements`,
+- When suggesting optimizations, consider if external tools can provide more specific data or validation`,
 		);
 
 		return enhancedPrompt;
@@ -932,4 +931,80 @@ When external MCP tools are available, consider that:
 
 	// Fallback to the old system if no tools are available from catalog
 	return enhancePromptWithMcpContext(routerSystemPrompt, toolsets);
+}
+
+/**
+ * Creates a context-aware prompt that adapts to user queries (Phase 3.3 implementation)
+ * @param userQuery - The user's query to generate context for
+ * @param basePrompt - The base system prompt to enhance
+ * @returns Enhanced prompt with contextual tool recommendations
+ */
+export function createContextAwarePrompt(userQuery: string, basePrompt: string): string {
+	// Generate dynamic contextual recommendations
+	const contextualPrompt = generateDynamicContextualPrompt(userQuery, false);
+	const categoryRecommendations = generateCategoryBasedRecommendations(userQuery);
+	const executionPlan = generateToolExecutionPlan(userQuery);
+	
+	if (!contextualPrompt && !categoryRecommendations) {
+		return basePrompt;
+	}
+
+	// Construct the enhanced prompt
+	const contextualSection = [];
+	
+	if (contextualPrompt) {
+		contextualSection.push(contextualPrompt);
+	}
+	
+	if (categoryRecommendations) {
+		contextualSection.push('### Query-Specific Tool Recommendations');
+		contextualSection.push('');
+		contextualSection.push(categoryRecommendations);
+	}
+	
+	if (executionPlan.plan.length > 0) {
+		contextualSection.push('### Recommended Execution Plan');
+		contextualSection.push('');
+		contextualSection.push(`**Estimated Duration:** ${executionPlan.estimatedDuration}`);
+		contextualSection.push(`**Risk Level:** ${executionPlan.riskLevel.toUpperCase()}`);
+		contextualSection.push('');
+		contextualSection.push('**Steps:**');
+		executionPlan.plan.forEach(step => {
+			contextualSection.push(`${step.step}. **${step.action}** (${step.toolCategory})`);
+			contextualSection.push(`   Rationale: ${step.rationale}`);
+			if (step.tools.length > 0) {
+				contextualSection.push(`   Suggested tools: ${step.tools.join(', ')}`);
+			}
+		});
+		contextualSection.push('');
+	}
+
+	// Insert the contextual section after the main capabilities section
+	const enhancedPrompt = basePrompt.replace(
+		/(## Available Tools and Capabilities[\s\S]*?)(\n## Main goals)/,
+		`$1\n\n${contextualSection.join('\n')}$2`
+	);
+
+	return enhancedPrompt;
+}
+
+/**
+ * Enhanced MCP-aware prompt with full Phase 3 implementation
+ * @param toolsets - Available MCP toolsets (optional)
+ * @param userQuery - User's current query for context (optional)
+ * @returns Fully enhanced system prompt with Gemini CLI patterns
+ */
+export function createAdvancedMcpAwareLargeModelPrompt(
+	toolsets?: Record<string, any>,
+	userQuery?: string,
+): string {
+	// Start with the enhanced tool-aware prompt
+	let enhancedPrompt = createMcpAwareLargeModelPrompt(toolsets);
+	
+	// If we have a user query, add contextual enhancements
+	if (userQuery) {
+		enhancedPrompt = createContextAwarePrompt(userQuery, enhancedPrompt);
+	}
+	
+	return enhancedPrompt;
 }

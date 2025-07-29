@@ -2,6 +2,57 @@ import { tool } from 'ai';
 import { z } from 'zod';
 
 /**
+ * Normalizes date fields in data structures to prevent "toISOString is not a function" errors
+ * This handles cases where database date fields are stored as strings but tools expect Date objects
+ */
+function normalizeDateFields(data: any): any {
+	if (!data || typeof data !== 'object') {
+		return data;
+	}
+
+	// Handle arrays
+	if (Array.isArray(data)) {
+		return data.map(item => normalizeDateFields(item));
+	}
+
+	// Handle objects
+	const normalized = { ...data };
+	const dateFieldNames = ['createdAt', 'updatedAt', 'expiresAt', 'tokenExpiresAt', 'timestamp', 'date'];
+
+	for (const fieldName of dateFieldNames) {
+		if (fieldName in normalized && normalized[fieldName]) {
+			const value = normalized[fieldName];
+			// If it's already a Date object, leave it as is
+			if (value instanceof Date) {
+				continue;
+			}
+			// If it's a string that looks like a date, convert it to Date
+			if (typeof value === 'string') {
+				try {
+					const dateValue = new Date(value);
+					// Only replace if it's a valid date
+					if (!isNaN(dateValue.getTime())) {
+						normalized[fieldName] = dateValue;
+					}
+				} catch (error) {
+					// If conversion fails, leave the original value
+					console.warn(`[Date Normalization] Failed to convert ${fieldName}:`, error);
+				}
+			}
+		}
+	}
+
+	// Recursively handle nested objects
+	for (const key in normalized) {
+		if (normalized[key] && typeof normalized[key] === 'object' && !Array.isArray(normalized[key]) && !(normalized[key] instanceof Date)) {
+			normalized[key] = normalizeDateFields(normalized[key]);
+		}
+	}
+
+	return normalized;
+}
+
+/**
  * Normalizes tool names to be compatible with Gemini API requirements:
  * - Must start with a letter or underscore
  * - Must be alphanumeric (a-z, A-Z, 0-9), underscores (_), dots (.) or dashes (-)
@@ -140,7 +191,26 @@ export function transformMcpToolsetsForMastra(
 					);
 
 					if (typeof toolObj.execute === 'function') {
-						return await toolObj.execute(args);
+						try {
+							console.log(`[MCP Tool Execute] Starting execution of ${toolName} with args:`, JSON.stringify(args, null, 2));
+							const result = await toolObj.execute(args);
+							console.log(`[MCP Tool Execute] Raw result from ${toolName}:`, JSON.stringify(result, null, 2));
+							// Add defensive handling for common date field issues
+							const normalized = normalizeDateFields(result);
+							console.log(`[MCP Tool Execute] Normalized result from ${toolName}:`, JSON.stringify(normalized, null, 2));
+							return normalized;
+						} catch (error) {
+							console.error(`[MCP Tool Execute] Error in ${toolName}:`, error);
+							console.error(`[MCP Tool Execute] Error stack:`, error instanceof Error ? error.stack : 'No stack');
+							// Handle the specific "createdAt.toISOString is not a function" error
+							if (error instanceof Error && error.message.includes('toISOString is not a function')) {
+								console.warn(`[MCP Tool] Date field error in ${toolName}, attempting to normalize data:`, error.message);
+								// This is a fallback - the error already occurred, so we can't fix the result
+								// But we can provide a more helpful error message
+								throw new Error(`Tool ${toolName} encountered date format issues. This may be due to database date field formatting. Original error: ${error.message}`);
+							}
+							throw error;
+						}
 					} else {
 						console.error(`[MCP Tool] ${toolName} has no execute function`);
 						throw new Error(`Tool ${toolName} is not executable`);
@@ -162,7 +232,19 @@ export function transformMcpToolsetsForMastra(
 						description:
 							toolObj.description || `${toolName} tool from ${serverName}`,
 						parameters: toolObj.inputSchema || z.object({}),
-						execute: wrappedExecute,
+						execute: async (args: any) => {
+							try {
+								const result = await wrappedExecute(args);
+								return normalizeDateFields(result);
+							} catch (error) {
+								// Handle the specific "createdAt.toISOString is not a function" error
+								if (error instanceof Error && error.message.includes('toISOString is not a function')) {
+									console.warn(`[MCP Tool] Date field error in ${toolName}, attempting to normalize data:`, error.message);
+									throw new Error(`Tool ${toolName} encountered date format issues. This may be due to database date field formatting. Original error: ${error.message}`);
+								}
+								throw error;
+							}
+						},
 					});
 
 					aiSDKTools[normalizedName] = aiTool;
