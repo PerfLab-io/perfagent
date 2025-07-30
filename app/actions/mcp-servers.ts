@@ -70,8 +70,7 @@ export async function addMcpServerAction(formData: FormData): Promise<ActionResu
 			})
 			.returning();
 
-		// Revalidate the page to show updated data
-		revalidatePath('/mcp-servers');
+		// Note: No revalidatePath needed - using optimistic updates on frontend
 
 		return {
 			success: true,
@@ -136,8 +135,7 @@ export async function toggleMcpServerAction(serverId: string, enabled: boolean):
 			};
 		}
 
-		// Revalidate the page to show updated data
-		revalidatePath('/mcp-servers');
+		// Note: No revalidatePath needed - using optimistic updates on frontend
 
 		return {
 			success: true,
@@ -181,8 +179,7 @@ export async function deleteMcpServerAction(serverId: string): Promise<ActionRes
 			};
 		}
 
-		// Revalidate the page to show updated data
-		revalidatePath('/mcp-servers');
+		// Note: No revalidatePath needed - using optimistic updates on frontend
 
 		return {
 			success: true,

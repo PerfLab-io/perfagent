@@ -84,16 +84,35 @@ interface ServerInfo {
 	prompts: any;
 }
 
+type OptimisticAction = 
+	| { type: 'toggle'; id: string; enabled: boolean }
+	| { type: 'add'; server: MCPServer }
+	| { type: 'update'; id: string; updates: Partial<MCPServer> };
+
 export default function MCPServersPage() {
 	const [servers, setServers] = useState<MCPServer[]>([]);
 	const [optimisticServers, updateOptimisticServers] = useOptimistic(
 		servers,
-		(currentServers, optimisticUpdate: { id: string; enabled: boolean }) =>
-			currentServers.map((server) =>
-				server.id === optimisticUpdate.id
-					? { ...server, enabled: optimisticUpdate.enabled }
-					: server,
-			),
+		(currentServers, action: OptimisticAction) => {
+			switch (action.type) {
+				case 'toggle':
+					return currentServers.map((server) =>
+						server.id === action.id
+							? { ...server, enabled: action.enabled }
+							: server,
+					);
+				case 'add':
+					return [...currentServers, action.server];
+				case 'update':
+					return currentServers.map((server) =>
+						server.id === action.id
+							? { ...server, ...action.updates }
+							: server,
+					);
+				default:
+					return currentServers;
+			}
+		},
 	);
 	const [loading, setLoading] = useState(true);
 	const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -236,6 +255,14 @@ export default function MCPServersPage() {
 				// Mark this server as requiring auth
 				setServersRequiringAuth((prev) => new Set(prev).add(serverId));
 				// Update server status to 'required' to show the Auth Required badge
+				startTransition(() => {
+					updateOptimisticServers({
+						type: 'update',
+						id: serverId,
+						updates: { authStatus: 'required' },
+					});
+				});
+				// Also update actual state for persistence
 				setServers((prev) =>
 					prev.map((server) =>
 						server.id === serverId
@@ -251,6 +278,14 @@ export default function MCPServersPage() {
 					return newUrls;
 				});
 				// Update server status to 'authorized'
+				startTransition(() => {
+					updateOptimisticServers({
+						type: 'update',
+						id: serverId,
+						updates: { authStatus: 'authorized' },
+					});
+				});
+				// Also update actual state for persistence
 				setServers((prev) =>
 					prev.map((server) =>
 						server.id === serverId
@@ -302,8 +337,33 @@ export default function MCPServersPage() {
 		setIsSubmittingForm(true);
 		setFormError(null); // Clear any previous errors
 
+		const formData = new FormData(event.currentTarget);
+		const name = formData.get('name') as string;
+		const url = formData.get('url') as string;
+
+		// Create optimistic server
+		const optimisticServer: MCPServer = {
+			id: crypto.randomUUID(), // Generate temporary ID
+			name: name.trim(),
+			url: url.trim(),
+			enabled: true,
+			authStatus: 'unknown',
+			accessToken: null,
+			refreshToken: null,
+			tokenExpiresAt: null,
+			createdAt: new Date().toISOString(),
+			updatedAt: new Date().toISOString(),
+		};
+
+		// Optimistic update - add server immediately
+		startTransition(() => {
+			updateOptimisticServers({
+				type: 'add',
+				server: optimisticServer,
+			});
+		});
+
 		try {
-			const formData = new FormData(event.currentTarget);
 			const result = await addMcpServerAction(formData);
 
 			if (result.success) {
@@ -312,14 +372,21 @@ export default function MCPServersPage() {
 				formRef.current?.reset();
 				setFormError(null);
 				toast.success('MCP server added successfully');
-				// Refresh the servers list
-				fetchServers();
+				
+				// Update actual state with real server data from backend
+				setServers((prev) => [...prev, result.data]);
+				
+				// Test the connection for the newly added server (use real ID from backend)
+				testServerConnection(result.data.id);
 			} else {
-				// Error: show in form and as toast
+				// Error: remove optimistic server and show error
+				setServers((prev) => prev.filter((s) => s.id !== optimisticServer.id));
 				setFormError(result.error || 'Failed to add MCP server');
 				toast.error(result.error || 'Failed to add MCP server');
 			}
 		} catch (error) {
+			// Error: remove optimistic server and show error
+			setServers((prev) => prev.filter((s) => s.id !== optimisticServer.id));
 			const errorMessage = 'Failed to add MCP server';
 			setFormError(errorMessage);
 			toast.error(errorMessage);
@@ -334,6 +401,7 @@ export default function MCPServersPage() {
 		startTransition(() => {
 			// Optimistic update
 			updateOptimisticServers({
+				type: 'toggle',
 				id: server.id,
 				enabled: newEnabledState,
 			});
@@ -360,6 +428,7 @@ export default function MCPServersPage() {
 				// Rollback optimistic update
 				startTransition(() => {
 					updateOptimisticServers({
+						type: 'toggle',
 						id: server.id,
 						enabled: server.enabled,
 					});
@@ -370,6 +439,7 @@ export default function MCPServersPage() {
 			// Rollback optimistic update
 			startTransition(() => {
 				updateOptimisticServers({
+					type: 'toggle',
 					id: server.id,
 					enabled: server.enabled,
 				});
