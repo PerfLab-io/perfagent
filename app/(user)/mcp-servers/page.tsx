@@ -235,6 +235,14 @@ export default function MCPServersPage() {
 				}));
 				// Mark this server as requiring auth
 				setServersRequiringAuth((prev) => new Set(prev).add(serverId));
+				// Update server status to 'required' to show the Auth Required badge
+				setServers((prev) =>
+					prev.map((server) =>
+						server.id === serverId
+							? { ...server, authStatus: 'required' }
+							: server,
+					),
+				);
 			} else if (result.status === 'authorized') {
 				// Remove from auth URLs if it was there
 				setAuthUrls((prev) => {
@@ -242,6 +250,14 @@ export default function MCPServersPage() {
 					delete newUrls[serverId];
 					return newUrls;
 				});
+				// Update server status to 'authorized'
+				setServers((prev) =>
+					prev.map((server) =>
+						server.id === serverId
+							? { ...server, authStatus: 'authorized' }
+							: server,
+					),
+				);
 				// Fetch server info since it's now authorized
 				fetchServerInfo(serverId);
 			}

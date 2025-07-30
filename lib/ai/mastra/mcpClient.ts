@@ -88,10 +88,12 @@ async function discoverOAuthAuthorizationUrl(
 
 				// Try common authorization server discovery patterns
 				const discoveryUrls = [
-					// Try the resource URL itself
+					// Try the resource URL itself (spec-compliant)
 					`${resourceUrlObj.origin}/.well-known/oauth-authorization-server`,
-					// Try removing path segments
+					// Try removing path segments (default pattern)
 					`${resourceUrlObj.protocol}//${resourceUrlObj.host}/.well-known/oauth-authorization-server`,
+					// Try full server URL with path (for servers like https://v0.perflab.io/api/mcp)
+					`${resourceUrl}/.well-known/oauth-authorization-server`,
 				];
 
 				for (const discoveryUrl of discoveryUrls) {

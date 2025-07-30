@@ -508,10 +508,15 @@ chat.post('/mcp/oauth/callback', async (c) => {
 		}
 
 		if (!matchingServer) {
-			return c.json(
-				{ error: 'No matching server found for this authorization callback' },
-				404,
-			);
+			return c.html(`
+				<html>
+					<body>
+						<h1>Authorization Error</h1>
+						<p>No matching server found for this authorization callback.</p>
+						<p><a href="/mcp-servers">Return to MCP Servers</a></p>
+					</body>
+				</html>
+			`);
 		}
 
 		const serverRecord = matchingServer;
@@ -546,10 +551,22 @@ chat.post('/mcp/oauth/callback', async (c) => {
 				`[OAuth] Successfully authorized ${serverRecord.name} with tokens`,
 			);
 
-			return c.json({
-				success: true,
-				message: `Successfully authorized ${serverRecord.name}`,
-			});
+			// Redirect to the MCP servers page with success message
+			return c.html(`
+				<html>
+					<body>
+						<h1>Authorization Successful</h1>
+						<p>Successfully authorized access to ${serverRecord.name}!</p>
+						<p><a href="/mcp-servers">Return to MCP Servers</a></p>
+						<script>
+							// Auto-redirect after 3 seconds
+							setTimeout(() => {
+								window.location.href = '/mcp-servers';
+							}, 3000);
+						</script>
+					</body>
+				</html>
+			`);
 		} catch (error) {
 			console.error('OAuth callback error:', error);
 
@@ -562,23 +579,29 @@ chat.post('/mcp/oauth/callback', async (c) => {
 				})
 				.where(eq(mcpServers.id, serverRecord.id));
 
-			return c.json(
-				{
-					error: 'OAuth authorization failed',
-					message: error instanceof Error ? error.message : 'Unknown error',
-				},
-				500,
-			);
+			return c.html(`
+				<html>
+					<body>
+						<h1>Authorization Failed</h1>
+						<p>Failed to authorize access to ${serverRecord.name}.</p>
+						<p>Error: ${error instanceof Error ? error.message : 'Unknown error'}</p>
+						<p><a href="/mcp-servers">Return to MCP Servers</a></p>
+					</body>
+				</html>
+			`);
 		}
 	} catch (error) {
 		console.error('OAuth callback error:', error);
-		return c.json(
-			{
-				error: 'OAuth callback failed',
-				message: error instanceof Error ? error.message : 'Unknown error',
-			},
-			500,
-		);
+		return c.html(`
+			<html>
+				<body>
+					<h1>Authorization Error</h1>
+					<p>An unexpected error occurred during authorization.</p>
+					<p>Error: ${error instanceof Error ? error.message : 'Unknown error'}</p>
+					<p><a href="/mcp-servers">Return to MCP Servers</a></p>
+				</body>
+			</html>
+		`);
 	}
 });
 
