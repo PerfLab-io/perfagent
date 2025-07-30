@@ -1,6 +1,13 @@
 'use client';
 
-import { useState, useEffect, useOptimistic, useRef, FormEvent, useTransition } from 'react';
+import {
+	useState,
+	useEffect,
+	useOptimistic,
+	useRef,
+	FormEvent,
+	useTransition,
+} from 'react';
 import { Button } from '@/components/ui/button';
 import {
 	Card,
@@ -53,7 +60,11 @@ import {
 } from '@/components/ui/collapsible';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
-import { addMcpServerAction, toggleMcpServerAction, deleteMcpServerAction } from '@/app/actions/mcp-servers';
+import {
+	addMcpServerAction,
+	toggleMcpServerAction,
+	deleteMcpServerAction,
+} from '@/app/actions/mcp-servers';
 
 interface MCPServer {
 	id: string;
@@ -61,6 +72,9 @@ interface MCPServer {
 	url: string;
 	enabled: boolean;
 	authStatus?: 'unknown' | 'required' | 'authorized' | 'failed';
+	accessToken?: string | null;
+	refreshToken?: string | null;
+	tokenExpiresAt?: string | null;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -77,11 +91,11 @@ export default function MCPServersPage() {
 	const [optimisticServers, updateOptimisticServers] = useOptimistic(
 		servers,
 		(currentServers, optimisticUpdate: { id: string; enabled: boolean }) =>
-			currentServers.map(server =>
+			currentServers.map((server) =>
 				server.id === optimisticUpdate.id
 					? { ...server, enabled: optimisticUpdate.enabled }
-					: server
-			)
+					: server,
+			),
 	);
 	const [loading, setLoading] = useState(true);
 	const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -93,11 +107,14 @@ export default function MCPServersPage() {
 		Record<string, boolean>
 	>({});
 	const [authUrls, setAuthUrls] = useState<Record<string, string>>({});
+	const [serversRequiringAuth, setServersRequiringAuth] = useState<Set<string>>(
+		new Set(),
+	);
 	const [expandedServers, setExpandedServers] = useState<
 		Record<string, boolean>
 	>({});
 	const formRef = useRef<HTMLFormElement>(null);
-	const [isPending, startTransition] = useTransition();
+	const [, startTransition] = useTransition();
 
 	useEffect(() => {
 		fetchServers();
@@ -109,6 +126,17 @@ export default function MCPServersPage() {
 			if (!response.ok) throw new Error('Failed to fetch servers');
 			const data = await response.json();
 			setServers(data);
+
+			// Initialize serversRequiringAuth for servers that require/required auth
+			// This includes servers currently requiring auth OR servers that have tokens (meaning they required auth before)
+			const serversWithAuthRequired = data
+				.filter(
+					(server: MCPServer) =>
+						server.authStatus === 'required' ||
+						(server.authStatus === 'authorized' && server.accessToken),
+				)
+				.map((server: MCPServer) => server.id);
+			setServersRequiringAuth(new Set(serversWithAuthRequired));
 
 			// Test connection for each server to update auth status
 			data.forEach((server: MCPServer) => {
@@ -157,6 +185,8 @@ export default function MCPServersPage() {
 					...prev,
 					[serverId]: result.authUrl || 'manual_setup',
 				}));
+				// Mark this server as requiring auth
+				setServersRequiringAuth((prev) => new Set(prev).add(serverId));
 			} else if (result.status === 'authorized') {
 				// Remove from auth URLs if it was there
 				setAuthUrls((prev) => {
@@ -205,12 +235,12 @@ export default function MCPServersPage() {
 
 	const handleToggleServer = async (server: MCPServer) => {
 		const newEnabledState = !server.enabled;
-		
+
 		startTransition(() => {
 			// Optimistic update
-			updateOptimisticServers({ 
-				id: server.id, 
-				enabled: newEnabledState 
+			updateOptimisticServers({
+				id: server.id,
+				enabled: newEnabledState,
 			});
 		});
 
@@ -234,9 +264,9 @@ export default function MCPServersPage() {
 			} else {
 				// Rollback optimistic update
 				startTransition(() => {
-					updateOptimisticServers({ 
-						id: server.id, 
-						enabled: server.enabled 
+					updateOptimisticServers({
+						id: server.id,
+						enabled: server.enabled,
 					});
 				});
 				toast.error(result.error || 'Failed to update server');
@@ -244,9 +274,9 @@ export default function MCPServersPage() {
 		} catch (error) {
 			// Rollback optimistic update
 			startTransition(() => {
-				updateOptimisticServers({ 
-					id: server.id, 
-					enabled: server.enabled 
+				updateOptimisticServers({
+					id: server.id,
+					enabled: server.enabled,
 				});
 			});
 			toast.error('Failed to update server');
@@ -419,8 +449,8 @@ export default function MCPServersPage() {
 						Manage your Model Context Protocol servers
 					</p>
 				</div>
-				<Dialog 
-					open={isAddDialogOpen} 
+				<Dialog
+					open={isAddDialogOpen}
 					onOpenChange={(open) => {
 						setIsAddDialogOpen(open);
 						if (open) {
@@ -447,7 +477,11 @@ export default function MCPServersPage() {
 						     - Loading states implemented
 						     - Error handling patterns established
 						     Migration benefits: field-level validation, better TypeScript integration */}
-						<form ref={formRef} onSubmit={handleFormSubmit} className="space-y-4">
+						<form
+							ref={formRef}
+							onSubmit={handleFormSubmit}
+							className="space-y-4"
+						>
 							{formError && (
 								<Alert variant="destructive">
 									<AlertCircle className="h-4 w-4" />
@@ -521,25 +555,15 @@ export default function MCPServersPage() {
 						const isLoadingInfo = loadingServerInfo[server.id];
 						const authUrl = authUrls[server.id];
 
-						const getAuthStatusIcon = () => {
-							switch (server.authStatus) {
-								case 'authorized':
-									return null; // Don't show icon for servers that don't require auth
-								case 'required':
-									return <AlertCircle className="h-4 w-4 text-yellow-500" />;
-								case 'failed':
-									return <XCircle className="h-4 w-4 text-red-500" />;
-								default:
-									return (
-										<Loader2 className="h-4 w-4 animate-spin text-gray-400" />
-									);
-							}
-						};
-
 						const getAuthStatusBadge = () => {
 							switch (server.authStatus) {
 								case 'authorized':
-									return null; // Don't show badge for servers that don't require auth
+									// Only show badge if this server actually required auth
+									return serversRequiringAuth.has(server.id) ? (
+										<Badge variant="outline" className="text-xs text-green-600">
+											Authorized
+										</Badge>
+									) : null;
 								case 'required':
 									return (
 										<Badge
@@ -571,11 +595,6 @@ export default function MCPServersPage() {
 										<div className="flex items-center space-x-4">
 											<div className="relative">
 												<Server className="h-5 w-5" />
-												{getAuthStatusIcon() && (
-													<div className="absolute -top-1 -right-1">
-														{getAuthStatusIcon()}
-													</div>
-												)}
 											</div>
 											<div>
 												<div className="flex items-center space-x-2">
