@@ -394,6 +394,7 @@ chat.get(
 						accessToken: tokenData.accessToken,
 						refreshToken: tokenData.refreshToken || null,
 						tokenExpiresAt: tokenExpiresAt?.toISOString() || null,
+						clientId: tokenData.clientId || null, // Save the successful client_id
 						updatedAt: new Date().toISOString(),
 					})
 					.where(eq(mcpServers.id, serverRecord.id));
@@ -543,6 +544,7 @@ chat.post('/mcp/oauth/callback', async (c) => {
 					accessToken: tokenData.accessToken,
 					refreshToken: tokenData.refreshToken || null,
 					tokenExpiresAt: tokenExpiresAt?.toISOString() || null,
+					clientId: tokenData.clientId || null, // Save the successful client_id
 					updatedAt: new Date().toISOString(),
 				})
 				.where(eq(mcpServers.id, serverRecord.id));

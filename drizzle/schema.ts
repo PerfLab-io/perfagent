@@ -691,6 +691,8 @@ export const mcpServers = pgTable(
 			precision: 3,
 			mode: 'string',
 		}),
+		// OAuth client_id used for this server (for dynamic client registration)
+		clientId: text('client_id'),
 		createdAt: timestamp('created_at', { precision: 3, mode: 'string' })
 			.default(sql`CURRENT_TIMESTAMP`)
 			.notNull(),

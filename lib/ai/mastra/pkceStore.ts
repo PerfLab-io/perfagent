@@ -2,9 +2,11 @@
  * Simple in-memory store for PKCE parameters
  * In production, use Redis or database with TTL
  */
+import { OAUTH_CONFIG } from './mcpClient';
 
 interface PKCEData {
 	codeVerifier: string;
+	clientId: string;
 	createdAt: number;
 }
 
@@ -25,14 +27,15 @@ setInterval(
 	5 * 60 * 1000,
 );
 
-export function storePKCEVerifier(state: string, codeVerifier: string): void {
+export function storePKCEVerifier(state: string, codeVerifier: string, clientId?: string): void {
 	pkceStore.set(state, {
 		codeVerifier,
+		clientId: clientId || OAUTH_CONFIG.clientName,
 		createdAt: Date.now(),
 	});
 }
 
-export function retrievePKCEVerifier(state: string): string | null {
+export function retrievePKCEData(state: string): { codeVerifier: string; clientId: string } | null {
 	const data = pkceStore.get(state);
 	if (!data) {
 		return null;
@@ -46,5 +49,11 @@ export function retrievePKCEVerifier(state: string): string | null {
 
 	// Delete after retrieval for security
 	pkceStore.delete(state);
-	return data.codeVerifier;
+	return { codeVerifier: data.codeVerifier, clientId: data.clientId };
+}
+
+// Backward compatibility
+export function retrievePKCEVerifier(state: string): string | null {
+	const data = retrievePKCEData(state);
+	return data?.codeVerifier || null;
 }

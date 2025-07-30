@@ -1,11 +1,6 @@
 'use client';
 
-import {
-	useState,
-	useEffect,
-	useOptimistic,
-	useRef,
-} from 'react';
+import { useState, useEffect, useOptimistic, useRef } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import {
@@ -106,11 +101,16 @@ export default function MCPServersPage() {
 	const [loadingServerInfo, setLoadingServerInfo] = useState<
 		Record<string, boolean>
 	>({});
+	const [serverInfoErrors, setServerInfoErrors] = useState<
+		Record<string, boolean>
+	>({});
 	const [authUrls, setAuthUrls] = useState<Record<string, string>>({});
 	const [serversRequiringAuth, setServersRequiringAuth] = useState<Set<string>>(
 		new Set(),
 	);
-	const [serverFailureReasons, setServerFailureReasons] = useState<Record<string, string>>({});
+	const [serverFailureReasons, setServerFailureReasons] = useState<
+		Record<string, string>
+	>({});
 	const [expandedServers, setExpandedServers] = useState<
 		Record<string, boolean>
 	>({});
@@ -127,7 +127,8 @@ export default function MCPServersPage() {
 			const data = await response.json();
 			// Ensure offline and failed servers are disabled (data consistency check)
 			const normalizedData = data.map((server: MCPServer) =>
-				(server.authStatus === 'offline' || server.authStatus === 'failed') && server.enabled
+				(server.authStatus === 'offline' || server.authStatus === 'failed') &&
+				server.enabled
 					? { ...server, enabled: false }
 					: server,
 			);
@@ -145,10 +146,21 @@ export default function MCPServersPage() {
 			setServersRequiringAuth(new Set(serversWithAuthRequired));
 
 			// Test connection for each server to update auth status
-			normalizedData.forEach((server: MCPServer) => {
+			normalizedData.forEach((server: MCPServer, index: number) => {
 				if (server.enabled) {
 					if (server.authStatus === 'authorized') {
-						fetchServerInfo(server.id);
+						// Enhanced delay for authorized servers to handle SSE connection establishment on refresh
+						// This helps with both OAuth token race conditions and SSE connection timing issues
+						const refreshDelay = index * 300 + 1000; // Longer staggering (300ms) and base delay (1s) for SSE
+						console.log(
+							`[Server Init] Scheduling server info fetch for ${server.name} in ${refreshDelay}ms`,
+						);
+						setTimeout(() => {
+							console.log(
+								`[Server Init] Starting server info fetch for ${server.name}`,
+							);
+							fetchServerInfo(server.id);
+						}, refreshDelay);
 					} else if (server.authStatus === 'unknown') {
 						testServerConnection(server.id);
 					} else if (server.authStatus === 'required' && !authUrls[server.id]) {
@@ -164,17 +176,90 @@ export default function MCPServersPage() {
 		}
 	};
 
-	const fetchServerInfo = async (serverId: string) => {
+	const fetchServerInfo = async (serverId: string, retryCount = 0) => {
+		const maxRetries = 3;
+		const retryDelay = Math.min(1000 * Math.pow(2, retryCount), 5000); // Exponential backoff, max 5s
+
 		setLoadingServerInfo((prev) => ({ ...prev, [serverId]: true }));
+
+		let shouldRetry = false;
+		let currentError: Error | null = null;
+
 		try {
-			const response = await fetch(`/api/mcp/server-info/${serverId}`);
-			if (!response.ok) throw new Error('Failed to fetch server info');
+			// Add timeout to the fetch request to handle SSE connection issues
+			const controller = new AbortController();
+			const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+			const response = await fetch(`/api/mcp/server-info/${serverId}`, {
+				signal: controller.signal,
+				// Add cache-busting headers to prevent stale responses on refresh
+				headers: {
+					'Cache-Control': 'no-cache',
+					Pragma: 'no-cache',
+				},
+			});
+
+			clearTimeout(timeoutId);
+
+			if (!response.ok) {
+				const errorText = await response.text();
+				throw new Error(
+					`Failed to fetch server info: ${response.status} ${errorText}`,
+				);
+			}
 			const data = await response.json();
 			setServerInfo((prev) => ({ ...prev, [serverId]: data }));
+			setServerInfoErrors((prev) => ({ ...prev, [serverId]: false })); // Clear any previous error
+			console.log(
+				`[Server Info] Successfully fetched info for ${serverId} on attempt ${retryCount + 1}`,
+			);
 		} catch (error) {
-			console.error('Failed to fetch server info:', error);
+			currentError =
+				error instanceof Error ? error : new Error('Unknown error');
+			console.error(
+				`[Server Info] Failed to fetch server info (attempt ${retryCount + 1}):`,
+				currentError,
+			);
+
+			// Enhanced retry logic for SSE and authentication issues
+			const isRetryableError =
+				retryCount < maxRetries &&
+				// Authentication/authorization errors (token issues)
+				(currentError.message.includes('authentication') ||
+					currentError.message.includes('401') ||
+					currentError.message.includes('authorization') ||
+					currentError.message.includes('OAuth') ||
+					// Network/connection errors (SSE issues)
+					currentError.message.includes('fetch') ||
+					currentError.message.includes('network') ||
+					currentError.message.includes('timeout') ||
+					currentError.message.includes('aborted') ||
+					// Server errors that might be temporary
+					currentError.message.includes('500') ||
+					currentError.message.includes('502') ||
+					currentError.message.includes('503') ||
+					currentError.message.includes('504'));
+
+			if (isRetryableError) {
+				shouldRetry = true;
+				console.log(
+					`[Server Info] Retrying server info fetch for ${serverId} in ${retryDelay}ms (attempt ${retryCount + 1}/${maxRetries})`,
+				);
+				setTimeout(() => {
+					fetchServerInfo(serverId, retryCount + 1);
+				}, retryDelay);
+			} else {
+				console.error(
+					`[Server Info] Max retries exceeded or non-retryable error for ${serverId}:`,
+					currentError.message,
+				);
+				setServerInfoErrors((prev) => ({ ...prev, [serverId]: true })); // Mark as having an error
+			}
 		} finally {
-			setLoadingServerInfo((prev) => ({ ...prev, [serverId]: false }));
+			// Only clear loading state if we're not retrying
+			if (!shouldRetry) {
+				setLoadingServerInfo((prev) => ({ ...prev, [serverId]: false }));
+			}
 		}
 	};
 
@@ -203,11 +288,15 @@ export default function MCPServersPage() {
 					return;
 				} else {
 					// Other HTTP errors (4xx) - mark as failed and disable
-					const errorMessage = response.status === 400 ? 'Invalid server configuration' :
-										 response.status === 404 ? 'Server endpoint not found' :
-										 response.status === 403 ? 'Access forbidden' :
-										 `Server error (${response.status})`;
-					
+					const errorMessage =
+						response.status === 400
+							? 'Invalid server configuration'
+							: response.status === 404
+								? 'Server endpoint not found'
+								: response.status === 403
+									? 'Access forbidden'
+									: `Server error (${response.status})`;
+
 					setServers((prev) =>
 						prev.map((server) =>
 							server.id === serverId
@@ -265,9 +354,10 @@ export default function MCPServersPage() {
 		} catch (error) {
 			console.error('Failed to test server connection:', error);
 			// Determine if it's a network error or a server configuration error
-			const isNetworkError = error instanceof TypeError || 
-								   (error instanceof Error && error.message.includes('fetch'));
-			
+			const isNetworkError =
+				error instanceof TypeError ||
+				(error instanceof Error && error.message.includes('fetch'));
+
 			if (isNetworkError) {
 				// Mark server as offline for network/connection errors
 				setServers((prev) =>
@@ -360,7 +450,10 @@ export default function MCPServersPage() {
 			if (result.success) {
 				// Test connection and fetch server info if enabling
 				if (newEnabledState) {
-					testServerConnection(server.id);
+					// Small delay to ensure database transaction is committed
+					setTimeout(() => {
+						testServerConnection(server.id);
+					}, 100);
 				}
 				toast.success(`Server ${newEnabledState ? 'enabled' : 'disabled'}`);
 			} else {
@@ -577,11 +670,7 @@ export default function MCPServersPage() {
 						     - Loading states implemented
 						     - Error handling patterns established
 						     Migration benefits: field-level validation, better TypeScript integration */}
-						<form
-							ref={formRef}
-							action={formAction}
-							className="space-y-4"
-						>
+						<form ref={formRef} action={formAction} className="space-y-4">
 							{formError && (
 								<Alert variant="destructive">
 									<AlertCircle className="h-4 w-4" />
@@ -758,16 +847,17 @@ export default function MCPServersPage() {
 											</div>
 										)}
 
-										{server.authStatus === 'failed' && serverFailureReasons[server.id] && (
-											<div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3">
-												<p className="mb-2 text-sm text-red-800">
-													Server connection failed.
-												</p>
-												<p className="text-xs text-red-700">
-													{serverFailureReasons[server.id]}
-												</p>
-											</div>
-										)}
+										{server.authStatus === 'failed' &&
+											serverFailureReasons[server.id] && (
+												<div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3">
+													<p className="mb-2 text-sm text-red-800">
+														Server connection failed.
+													</p>
+													<p className="text-xs text-red-700">
+														{serverFailureReasons[server.id]}
+													</p>
+												</div>
+											)}
 
 										{isLoadingInfo ? (
 											<div className="text-muted-foreground flex items-center space-x-2 text-sm">
@@ -820,7 +910,7 @@ export default function MCPServersPage() {
 													</Collapsible>
 												)}
 											</div>
-										) : server.authStatus === 'authorized' ? (
+										) : serverInfoErrors[server.id] ? (
 											<p className="text-muted-foreground text-sm">
 												Unable to fetch server capabilities
 											</p>
