@@ -52,6 +52,7 @@ import {
 	CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Skeleton } from '@/components/ui/skeleton';
 import { addMcpServerAction, toggleMcpServerAction, deleteMcpServerAction } from '@/app/actions/mcp-servers';
 
 interface MCPServer {
@@ -367,8 +368,44 @@ export default function MCPServersPage() {
 
 	if (loading) {
 		return (
-			<div className="flex h-full items-center justify-center">
-				<Loader2 className="h-8 w-8 animate-spin" />
+			<div className="mx-auto max-w-4xl space-y-6 px-4 sm:px-6">
+				<div className="flex items-center justify-between">
+					<div>
+						<Skeleton className="h-9 w-48" />
+						<Skeleton className="mt-2 h-5 w-64" />
+					</div>
+					<Skeleton className="h-10 w-32" />
+				</div>
+
+				<div className="space-y-4">
+					{/* Skeleton for server cards */}
+					{[1, 2, 3].map((i) => (
+						<Card key={i}>
+							<CardHeader>
+								<div className="flex items-center justify-between">
+									<div className="flex items-center space-x-4">
+										<Skeleton className="h-10 w-10 rounded-full" />
+										<div>
+											<Skeleton className="h-6 w-32" />
+											<Skeleton className="mt-2 h-4 w-48" />
+										</div>
+									</div>
+									<div className="flex items-center space-x-2">
+										<Skeleton className="h-6 w-11 rounded-full" />
+										<Skeleton className="h-9 w-9" />
+									</div>
+								</div>
+							</CardHeader>
+							<CardContent>
+								<div className="flex space-x-4">
+									<Skeleton className="h-6 w-20" />
+									<Skeleton className="h-6 w-28" />
+									<Skeleton className="h-6 w-24" />
+								</div>
+							</CardContent>
+						</Card>
+					))}
+				</div>
 			</div>
 		);
 	}
