@@ -1,6 +1,7 @@
 /**
  * MCP Error Handler - Standardized error handling with proper MCP error codes
  * Handles retry logic, error classification, and user-friendly error messages
+ * Enhanced with Inspector-style error detection for Fluid Compute resilience
  */
 
 // MCP JSON-RPC error codes (from MCP specification)
@@ -356,6 +357,313 @@ export class ErrorHandler {
 		}
 
 		return false;
+	}
+
+	// =============================================================================
+	// Inspector-Style Error Detection Methods (Phase 3B)
+	// =============================================================================
+
+	/**
+	 * Check if error is a 401 Unauthorized error
+	 * Inspector pattern for specific error type detection
+	 */
+	is401Error(error: unknown): boolean {
+		// Check HTTP 401 errors
+		if (this.isHTTPError(error)) {
+			const status = (error as any).status || (error as any).response?.status;
+			return status === 401;
+		}
+
+		// Check MCP unauthorized errors
+		if (this.isMCPError(error)) {
+			return error.code === MCP_ERROR_CODES.UNAUTHORIZED;
+		}
+
+		// Check error message content
+		if (error instanceof Error) {
+			const message = error.message.toLowerCase();
+			return message.includes('unauthorized') || 
+				   message.includes('authentication') ||
+				   message.includes('invalid token') ||
+				   message.includes('expired token');
+		}
+
+		return false;
+	}
+
+	/**
+	 * Check if error is a proxy authentication error
+	 * Inspector pattern for proxy-specific error detection
+	 */
+	isProxyAuthError(error: unknown): boolean {
+		// Check HTTP 407 Proxy Authentication Required
+		if (this.isHTTPError(error)) {
+			const status = (error as any).status || (error as any).response?.status;
+			return status === 407;
+		}
+
+		// Check error message content for proxy-related issues
+		if (error instanceof Error) {
+			const message = error.message.toLowerCase();
+			return message.includes('proxy') && 
+				   (message.includes('auth') || 
+				    message.includes('credential') ||
+				    message.includes('authentication required'));
+		}
+
+		return false;
+	}
+
+	/**
+	 * Check if error is a MCP protocol-specific error
+	 * Inspector pattern for MCP spec compliance errors
+	 */
+	isMCPProtocolError(error: unknown): boolean {
+		// Direct MCP errors are protocol errors
+		if (this.isMCPError(error)) {
+			return true;
+		}
+
+		// Check for JSON-RPC related errors in message
+		if (error instanceof Error) {
+			const message = error.message.toLowerCase();
+			return message.includes('jsonrpc') ||
+				   message.includes('json-rpc') ||
+				   message.includes('mcp') ||
+				   message.includes('protocol') ||
+				   message.includes('invalid request format');
+		}
+
+		return false;
+	}
+
+	/**
+	 * Check if error is a transport-level error (network, connection, etc.)
+	 * Inspector pattern for transport-agnostic error classification
+	 */
+	isTransportError(error: unknown): boolean {
+		// Network errors are transport errors
+		if (this.isNetworkError(error)) {
+			return true;
+		}
+
+		// Connection-related HTTP errors
+		if (this.isHTTPError(error)) {
+			const status = (error as any).status || (error as any).response?.status;
+			return [408, 502, 503, 504, 522, 523, 524].includes(status);
+		}
+
+		// Check error message for transport issues
+		if (error instanceof Error) {
+			const message = error.message.toLowerCase();
+			return message.includes('connection') ||
+				   message.includes('socket') ||
+				   message.includes('timeout') ||
+				   message.includes('abort') ||
+				   message.includes('disconnect');
+		}
+
+		return false;
+	}
+
+	/**
+	 * Check if error is a rate limiting error
+	 * Inspector pattern for rate limit detection
+	 */
+	isRateLimitError(error: unknown): boolean {
+		// HTTP 429 Too Many Requests
+		if (this.isHTTPError(error)) {
+			const status = (error as any).status || (error as any).response?.status;
+			return status === 429;
+		}
+
+		// Check error message for rate limiting
+		if (error instanceof Error) {
+			const message = error.message.toLowerCase();
+			return message.includes('rate limit') ||
+				   message.includes('too many requests') ||
+				   message.includes('quota exceeded') ||
+				   message.includes('throttle');
+		}
+
+		return false;
+	}
+
+	/**
+	 * Check if error is a server-side error (5xx)
+	 * Inspector pattern for server error classification
+	 */
+	isServerError(error: unknown): boolean {
+		// HTTP 5xx errors
+		if (this.isHTTPError(error)) {
+			const status = (error as any).status || (error as any).response?.status;
+			return status >= 500 && status < 600;
+		}
+
+		// MCP internal errors
+		if (this.isMCPError(error)) {
+			return error.code === MCP_ERROR_CODES.INTERNAL_ERROR;
+		}
+
+		// Check error message for server-side issues
+		if (error instanceof Error) {
+			const message = error.message.toLowerCase();
+			return message.includes('server error') ||
+				   message.includes('internal server error') ||
+				   message.includes('service unavailable');
+		}
+
+		return false;
+	}
+
+	/**
+	 * Check if error is a client-side error (4xx, but not auth-related)
+	 * Inspector pattern for client error classification
+	 */
+	isClientError(error: unknown): boolean {
+		// HTTP 4xx errors (excluding auth errors)
+		if (this.isHTTPError(error)) {
+			const status = (error as any).status || (error as any).response?.status;
+			return status >= 400 && status < 500 && status !== 401 && status !== 407;
+		}
+
+		// MCP client errors
+		if (this.isMCPError(error)) {
+			const clientErrorCodes = [
+				MCP_ERROR_CODES.PARSE_ERROR,
+				MCP_ERROR_CODES.INVALID_REQUEST,
+				MCP_ERROR_CODES.METHOD_NOT_FOUND,
+				MCP_ERROR_CODES.INVALID_PARAMS,
+			];
+			return clientErrorCodes.includes(error.code as MCPErrorCode);
+		}
+
+		return false;
+	}
+
+	/**
+	 * Get error recovery recommendation based on error type
+	 * Inspector pattern for actionable error resolution
+	 */
+	getErrorRecoveryRecommendation(error: unknown, _context: ErrorContext): {
+		action: 'retry' | 'reauth' | 'reconfigure' | 'abort';
+		message: string;
+		automated: boolean;
+		retryAfter?: number;
+	} {
+		// Authentication errors
+		if (this.is401Error(error)) {
+			return {
+				action: 'reauth',
+				message: 'Please reauthorize the server connection',
+				automated: false,
+			};
+		}
+
+		// Proxy authentication errors
+		if (this.isProxyAuthError(error)) {
+			return {
+				action: 'reconfigure',
+				message: 'Please check proxy authentication settings',
+				automated: false,
+			};
+		}
+
+		// Rate limiting errors
+		if (this.isRateLimitError(error)) {
+			const retryAfter = this.extractRetryAfter(error);
+			return {
+				action: 'retry',
+				message: `Rate limited, retrying in ${Math.ceil((retryAfter || 5000) / 1000)} seconds`,
+				automated: true,
+				retryAfter,
+			};
+		}
+
+		// Transport errors
+		if (this.isTransportError(error)) {
+			return {
+				action: 'retry',
+				message: 'Connection issue, retrying...',
+				automated: true,
+				retryAfter: 2000,
+			};
+		}
+
+		// Server errors
+		if (this.isServerError(error)) {
+			return {
+				action: 'retry',
+				message: 'Server error, retrying...',
+				automated: true,
+				retryAfter: 3000,
+			};
+		}
+
+		// Client errors
+		if (this.isClientError(error)) {
+			return {
+				action: 'abort',
+				message: 'Invalid request - please check your configuration',
+				automated: false,
+			};
+		}
+
+		// Default case
+		return {
+			action: 'retry',
+			message: 'Unknown error, retrying...',
+			automated: true,
+			retryAfter: 1500,
+		};
+	}
+
+	/**
+	 * Extract retry-after value from error headers
+	 */
+	private extractRetryAfter(error: unknown): number | undefined {
+		if (this.isHTTPError(error)) {
+			const retryAfter = (error as any).headers?.['retry-after'] || 
+							   (error as any).response?.headers?.['retry-after'];
+			if (retryAfter) {
+				const parsed = parseInt(retryAfter);
+				return !isNaN(parsed) ? parsed * 1000 : undefined; // Convert to milliseconds
+			}
+		}
+		return undefined;
+	}
+
+	/**
+	 * Create context-aware error message with enhanced details
+	 * Inspector pattern for improved error messaging without hard-coded server logic
+	 */
+	getContextAwareErrorMessage(error: unknown, context: ErrorContext): string {
+		// Use the existing error handling logic which already provides good messages
+		const errorResult = this.handleError(error, context);
+		
+		// Enhance with additional context if available
+		const serverInfo = context.serverUrl ? ` (${new URL(context.serverUrl).hostname})` : '';
+		const methodInfo = context.method ? ` while calling ${context.method}` : '';
+		
+		// For authentication errors, provide more actionable guidance
+		if (this.is401Error(error)) {
+			return `Authentication failed${serverInfo}. Please reauthorize the server connection.`;
+		}
+		
+		// For rate limit errors, include retry timing if available
+		if (this.isRateLimitError(error)) {
+			const retryAfter = this.extractRetryAfter(error);
+			const waitTime = retryAfter ? ` Please wait ${Math.ceil(retryAfter / 1000)} seconds.` : ' Please wait before retrying.';
+			return `Rate limit exceeded${serverInfo}.${waitTime}`;
+		}
+		
+		// For transport errors, provide connectivity guidance
+		if (this.isTransportError(error)) {
+			return `Connection failed${serverInfo}${methodInfo}. Please check your network connection and try again.`;
+		}
+		
+		// For other errors, return the standard message with context
+		return `${errorResult.userMessage}${serverInfo}${methodInfo}`;
 	}
 }
 
