@@ -524,7 +524,7 @@ export default function MCPServersPage() {
 						const getAuthStatusIcon = () => {
 							switch (server.authStatus) {
 								case 'authorized':
-									return <CheckCircle className="h-4 w-4 text-green-500" />;
+									return null; // Don't show icon for servers that don't require auth
 								case 'required':
 									return <AlertCircle className="h-4 w-4 text-yellow-500" />;
 								case 'failed':
@@ -539,11 +539,7 @@ export default function MCPServersPage() {
 						const getAuthStatusBadge = () => {
 							switch (server.authStatus) {
 								case 'authorized':
-									return (
-										<Badge variant="outline" className="text-xs text-green-600">
-											Authorized
-										</Badge>
-									);
+									return null; // Don't show badge for servers that don't require auth
 								case 'required':
 									return (
 										<Badge
@@ -575,9 +571,11 @@ export default function MCPServersPage() {
 										<div className="flex items-center space-x-4">
 											<div className="relative">
 												<Server className="h-5 w-5" />
-												<div className="absolute -top-1 -right-1">
-													{getAuthStatusIcon()}
-												</div>
+												{getAuthStatusIcon() && (
+													<div className="absolute -top-1 -right-1">
+														{getAuthStatusIcon()}
+													</div>
+												)}
 											</div>
 											<div>
 												<div className="flex items-center space-x-2">
