@@ -10,7 +10,7 @@ import {
 	bigserial,
 	boolean,
 } from 'drizzle-orm/pg-core';
-import { sql } from 'drizzle-orm';
+import { sql, eq, isNotNull } from 'drizzle-orm';
 import { relations } from 'drizzle-orm';
 
 export const prismaMigrations = pgTable('_prisma_migrations', {
@@ -702,9 +702,33 @@ export const mcpServers = pgTable(
 		}).notNull(),
 	},
 	(table) => [
+		// Original userId index
 		index('mcp_servers_userId_idx').using(
 			'btree',
 			table.userId.asc().nullsLast().op('text_ops'),
+		),
+		// Composite index for user + enabled servers (most frequent query)
+		index('mcp_servers_user_enabled_idx').using(
+			'btree',
+			table.userId.asc().nullsLast().op('text_ops'),
+			table.enabled.asc().nullsLast(),
+		),
+		// Index for auth status filtering
+		index('mcp_servers_auth_status_idx').using(
+			'btree',
+			table.authStatus.asc().nullsLast().op('text_ops'),
+		),
+		// Index for token expiration checks
+		index('mcp_servers_token_expiry_idx').using(
+			'btree',
+			table.tokenExpiresAt.asc().nullsLast(),
+		),
+		// Composite index for auth operations (user + server + auth status)
+		index('mcp_servers_user_auth_idx').using(
+			'btree',
+			table.userId.asc().nullsLast().op('text_ops'),
+			table.id.asc().nullsLast().op('text_ops'),
+			table.authStatus.asc().nullsLast().op('text_ops'),
 		),
 		foreignKey({
 			columns: [table.userId],
@@ -713,7 +737,7 @@ export const mcpServers = pgTable(
 		})
 			.onUpdate('cascade')
 			.onDelete('cascade'),
-	],
+	]
 );
 
 export const mcpServersRelations = relations(mcpServers, ({ one }) => ({
