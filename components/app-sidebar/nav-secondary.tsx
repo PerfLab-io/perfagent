@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { LucideIcon } from 'lucide-react';
 import { usePathname } from 'next/navigation';
+import Link from 'next/link';
 
 import {
 	SidebarGroup,
@@ -34,10 +35,10 @@ export function NavSecondary({
 								asChild
 								variant={pathname === item.url ? 'current' : 'default'}
 							>
-								<a href={item.url}>
+								<Link href={item.url}>
 									<item.icon />
 									<span>{item.title}</span>
-								</a>
+								</Link>
 							</SidebarMenuButton>
 						</SidebarMenuItem>
 					))}

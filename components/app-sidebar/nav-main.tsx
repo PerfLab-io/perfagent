@@ -10,6 +10,7 @@ import {
 	SidebarMenuButton,
 	SidebarMenuItem,
 } from '@/components/ui/sidebar';
+import Link from 'next/link';
 
 export function NavMain({
 	items,
@@ -33,10 +34,10 @@ export function NavMain({
 							variant={pathname === '/chat' ? 'current' : 'default'}
 							className="group flex items-center justify-between"
 						>
-							<a href="/chat">
+							<Link href="/chat">
 								<span>New Agent Insight</span>
 								<MessageSquarePlusIcon />
-							</a>
+							</Link>
 						</SidebarMenuButton>
 					</SidebarMenuItem>
 				</SidebarMenu>
