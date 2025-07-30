@@ -1,8 +1,9 @@
 /**
  * Enhanced Tool Execution - Unified interface for executing MCP tools
  * Uses Connection Manager for robust authentication, error handling, and caching
+ * Features live connection status and optional MCP ping optimization
  */
-import { ConnectionManager } from './connection/ConnectionManager';
+import { ConnectionManager, type LiveConnectionStatus } from './connection/ConnectionManager';
 import { errorHandler } from './connection/ErrorHandler';
 import { mcpToolCache } from './cache/MCPCache';
 import { db } from '@/drizzle/db';
@@ -22,12 +23,14 @@ interface ToolExecutionResult {
 	error?: string;
 	executionTime?: number;
 	fromCache?: boolean;
+	connectionStatus?: LiveConnectionStatus;
 }
 
 interface ToolDiscoveryResult {
 	tools: ToolInfo[];
 	totalServers: number;
 	authorizedServers: number;
+	connectionStates: Record<string, LiveConnectionStatus>;
 }
 
 interface ToolInfo {
@@ -52,12 +55,16 @@ export class ToolExecutionService {
 
 	/**
 	 * Execute a tool on a specific MCP server
+	 * Includes live connection status for better debugging
 	 */
 	async executeTool(request: ToolExecutionRequest): Promise<ToolExecutionResult> {
 		const startTime = Date.now();
 		console.log(`[Tool Execution] Executing tool ${request.toolName} on server ${request.serverId}`);
 
 		try {
+			// Check connection status before execution
+			const connectionStatus = this.connectionManager.getLiveConnectionStatus(request.serverId);
+			
 			// Execute with retry logic and error handling
 			const result = await errorHandler.executeWithRetry(
 				() => this.connectionManager.executeToolCall(
@@ -73,6 +80,9 @@ export class ToolExecutionService {
 				}
 			);
 
+			// Get updated connection status after execution
+			const updatedConnectionStatus = this.connectionManager.getLiveConnectionStatus(request.serverId);
+
 			// Check if we got an error result
 			if ('error' in result) {
 				const errorResult = result.error;
@@ -84,6 +94,7 @@ export class ToolExecutionService {
 					success: false,
 					error: message,
 					executionTime: Date.now() - startTime,
+					connectionStatus: updatedConnectionStatus || undefined,
 				};
 			}
 
@@ -92,20 +103,25 @@ export class ToolExecutionService {
 				success: true,
 				result: result.result || result,
 				executionTime: Date.now() - startTime,
+				connectionStatus: updatedConnectionStatus || undefined,
 			};
 
 		} catch (error) {
 			console.error(`[Tool Execution] Error executing tool ${request.toolName}:`, error);
+			const connectionStatus = this.connectionManager.getLiveConnectionStatus(request.serverId);
+			
 			return {
 				success: false,
 				error: error instanceof Error ? error.message : 'Unknown error',
 				executionTime: Date.now() - startTime,
+				connectionStatus: connectionStatus || undefined,
 			};
 		}
 	}
 
 	/**
 	 * Discover all available tools across user's MCP servers
+	 * Includes live connection status for each server
 	 */
 	async discoverTools(userId: string): Promise<ToolDiscoveryResult> {
 		console.log(`[Tool Discovery] Discovering tools for user ${userId}`);
@@ -117,12 +133,19 @@ export class ToolExecutionService {
 			.where(and(eq(mcpServers.userId, userId), eq(mcpServers.enabled, true)));
 
 		const tools: ToolInfo[] = [];
+		const connectionStates: Record<string, LiveConnectionStatus> = {};
 		let authorizedServers = 0;
 
 		for (const server of servers) {
 			try {
-				// Get server capabilities (with caching)
+				// Get server capabilities (with caching and live status tracking)
 				const capabilities = await this.connectionManager.getServerCapabilities(server.id, userId);
+				
+				// Get live connection status
+				const connectionStatus = this.connectionManager.getLiveConnectionStatus(server.id);
+				if (connectionStatus) {
+					connectionStates[server.id] = connectionStatus;
+				}
 				
 				if ('error' in capabilities) {
 					console.warn(`[Tool Discovery] Failed to get capabilities for server ${server.name}: ${capabilities.error}`);
@@ -147,6 +170,11 @@ export class ToolExecutionService {
 				}
 			} catch (error) {
 				console.error(`[Tool Discovery] Error processing server ${server.name}:`, error);
+				// Still try to get connection status even on error
+				const connectionStatus = this.connectionManager.getLiveConnectionStatus(server.id);
+				if (connectionStatus) {
+					connectionStates[server.id] = connectionStatus;
+				}
 			}
 		}
 
@@ -156,6 +184,7 @@ export class ToolExecutionService {
 			tools,
 			totalServers: servers.length,
 			authorizedServers,
+			connectionStates,
 		};
 	}
 
@@ -280,22 +309,101 @@ export class ToolExecutionService {
 	}
 
 	/**
-	 * Get execution statistics
+	 * Get server health status for all user servers
+	 */
+	async getServerHealthStatus(userId: string): Promise<{
+		serverId: string;
+		serverName: string;
+		connectionStatus: LiveConnectionStatus | null;
+		isHealthy: boolean;
+		lastSuccess?: Date;
+		pingSupported?: boolean;
+	}[]> {
+		console.log(`[Tool Execution] Getting server health status for user ${userId}`);
+
+		const servers = await db
+			.select()
+			.from(mcpServers)
+			.where(and(eq(mcpServers.userId, userId), eq(mcpServers.enabled, true)));
+
+		return servers.map(server => {
+			const connectionStatus = this.connectionManager.getLiveConnectionStatus(server.id);
+			return {
+				serverId: server.id,
+				serverName: server.name,
+				connectionStatus,
+				isHealthy: connectionStatus?.status === 'connected',
+				lastSuccess: connectionStatus?.lastSuccess,
+				pingSupported: connectionStatus?.pingSupported,
+			};
+		});
+	}
+
+	/**
+	 * Test connection to a specific server
+	 */
+	async testServerConnection(serverId: string, userId: string): Promise<{
+		success: boolean;
+		connectionStatus: LiveConnectionStatus | null;
+		error?: string;
+	}> {
+		console.log(`[Tool Execution] Testing connection to server ${serverId}`);
+
+		try {
+			const result = await this.connectionManager.testConnection(serverId, userId);
+			const connectionStatus = this.connectionManager.getLiveConnectionStatus(serverId);
+
+			return {
+				success: result.success,
+				connectionStatus,
+				error: result.error,
+			};
+		} catch (error) {
+			const connectionStatus = this.connectionManager.getLiveConnectionStatus(serverId);
+			return {
+				success: false,
+				connectionStatus,
+				error: error instanceof Error ? error.message : 'Unknown error',
+			};
+		}
+	}
+
+	/**
+	 * Get execution statistics with enhanced connection insights
 	 */
 	async getExecutionStats(userId: string): Promise<{
 		totalServers: number;
 		authorizedServers: number;
 		totalTools: number;
+		healthyServers: number;
+		serversWithPing: number;
 		cacheStats: any;
+		connectionStates: Record<string, LiveConnectionStatus>;
 	}> {
 		const discovery = await this.discoverTools(userId);
 		const cacheStats = await this.connectionManager.getCacheStats();
+
+		// Count healthy servers and ping support
+		let healthyServers = 0;
+		let serversWithPing = 0;
+
+		Object.values(discovery.connectionStates).forEach(status => {
+			if (status.status === 'connected') {
+				healthyServers++;
+			}
+			if (status.pingSupported === true) {
+				serversWithPing++;
+			}
+		});
 
 		return {
 			totalServers: discovery.totalServers,
 			authorizedServers: discovery.authorizedServers,
 			totalTools: discovery.tools.length,
+			healthyServers,
+			serversWithPing,
 			cacheStats,
+			connectionStates: discovery.connectionStates,
 		};
 	}
 }
