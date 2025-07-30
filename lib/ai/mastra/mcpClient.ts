@@ -1633,8 +1633,8 @@ export async function getMcpServerInfo(userId: string, serverId: string) {
 		return {
 			server: server[0],
 			toolsets: cached.capabilities?.tools || {},
-			resources: cached.capabilities?.resources || {},
-			prompts: cached.capabilities?.prompts || {},
+			resources: cached.capabilities?.resources ? { resources: cached.capabilities.resources } : {},
+			prompts: cached.capabilities?.prompts ? { prompts: cached.capabilities.prompts } : {},
 		};
 	}
 
