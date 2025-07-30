@@ -36,9 +36,6 @@ import {
 	Trash2,
 	ExternalLink,
 	AlertCircle,
-	CheckCircle,
-	XCircle,
-	WifiOff,
 	ChevronDown,
 	ChevronRight,
 	Wrench,
@@ -111,6 +108,7 @@ export default function MCPServersPage() {
 	const [serversRequiringAuth, setServersRequiringAuth] = useState<Set<string>>(
 		new Set(),
 	);
+	const [serverFailureReasons, setServerFailureReasons] = useState<Record<string, string>>({});
 	const [expandedServers, setExpandedServers] = useState<
 		Record<string, boolean>
 	>({});
@@ -126,9 +124,9 @@ export default function MCPServersPage() {
 			const response = await fetch('/api/mcp/servers');
 			if (!response.ok) throw new Error('Failed to fetch servers');
 			const data = await response.json();
-			// Ensure offline servers are disabled (data consistency check)
+			// Ensure offline and failed servers are disabled (data consistency check)
 			const normalizedData = data.map((server: MCPServer) =>
-				server.authStatus === 'offline' && server.enabled
+				(server.authStatus === 'offline' || server.authStatus === 'failed') && server.enabled
 					? { ...server, enabled: false }
 					: server,
 			);
@@ -202,6 +200,28 @@ export default function MCPServersPage() {
 						'Server is offline and has been automatically disabled',
 					);
 					return;
+				} else {
+					// Other HTTP errors (4xx) - mark as failed and disable
+					const errorMessage = response.status === 400 ? 'Invalid server configuration' :
+										 response.status === 404 ? 'Server endpoint not found' :
+										 response.status === 403 ? 'Access forbidden' :
+										 `Server error (${response.status})`;
+					
+					setServers((prev) =>
+						prev.map((server) =>
+							server.id === serverId
+								? { ...server, authStatus: 'failed', enabled: false }
+								: server,
+						),
+					);
+					setServerFailureReasons((prev) => ({
+						...prev,
+						[serverId]: errorMessage,
+					}));
+					// Also disable in backend to persist the change
+					await toggleMcpServerAction(serverId, false);
+					toast.error('Server failed and has been automatically disabled');
+					return;
 				}
 			}
 
@@ -227,17 +247,37 @@ export default function MCPServersPage() {
 			}
 		} catch (error) {
 			console.error('Failed to test server connection:', error);
-			// Mark server as offline and disable it for network/connection errors
-			setServers((prev) =>
-				prev.map((server) =>
-					server.id === serverId
-						? { ...server, authStatus: 'offline', enabled: false }
-						: server,
-				),
-			);
+			// Determine if it's a network error or a server configuration error
+			const isNetworkError = error instanceof TypeError || 
+								   (error instanceof Error && error.message.includes('fetch'));
+			
+			if (isNetworkError) {
+				// Mark server as offline for network/connection errors
+				setServers((prev) =>
+					prev.map((server) =>
+						server.id === serverId
+							? { ...server, authStatus: 'offline', enabled: false }
+							: server,
+					),
+				);
+				toast.warning('Server is offline and has been automatically disabled');
+			} else {
+				// Mark server as failed for other errors
+				setServers((prev) =>
+					prev.map((server) =>
+						server.id === serverId
+							? { ...server, authStatus: 'failed', enabled: false }
+							: server,
+					),
+				);
+				setServerFailureReasons((prev) => ({
+					...prev,
+					[serverId]: error instanceof Error ? error.message : 'Unknown error',
+				}));
+				toast.error('Server failed and has been automatically disabled');
+			}
 			// Also disable in backend to persist the change
 			await toggleMcpServerAction(serverId, false);
-			toast.warning('Server is offline and has been automatically disabled');
 		}
 	};
 
@@ -666,7 +706,7 @@ export default function MCPServersPage() {
 										</div>
 									</div>
 								</CardHeader>
-								{server.enabled && (
+								{(server.enabled || server.authStatus === 'failed') && (
 									<CardContent>
 										{server.authStatus === 'required' && authUrl && (
 											<div className="mb-4 rounded-md border border-yellow-200 bg-yellow-50 p-3">
@@ -706,6 +746,17 @@ export default function MCPServersPage() {
 														</Button>
 													</div>
 												)}
+											</div>
+										)}
+
+										{server.authStatus === 'failed' && serverFailureReasons[server.id] && (
+											<div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3">
+												<p className="mb-2 text-sm text-red-800">
+													Server connection failed.
+												</p>
+												<p className="text-xs text-red-700">
+													{serverFailureReasons[server.id]}
+												</p>
 											</div>
 										)}
 
