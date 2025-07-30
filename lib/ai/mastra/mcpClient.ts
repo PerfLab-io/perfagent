@@ -7,6 +7,7 @@ import { mcpServers } from '@/drizzle/schema';
 import { eq, and } from 'drizzle-orm';
 import { storePKCEVerifier } from './pkceStore';
 import { toolCatalog } from './toolCatalog';
+import { mcpToolCache, type ToolCacheEntry } from './cache/MCPCache';
 
 // OAuth configuration constants
 export const OAUTH_CONFIG = {
@@ -1248,6 +1249,7 @@ async function validateAccessToken(
 
 /**
  * Tests connection to an MCP server and detects OAuth requirements
+ * Now uses the new Connection Manager for better error handling
  */
 export async function testMcpServerConnection(
 	userId: string,
@@ -1608,8 +1610,35 @@ export function searchCatalogTools(query: string) {
 
 /**
  * Gets information about a specific MCP server including its capabilities
+ * Now uses the new Connection Manager for better auth handling and caching
  */
 export async function getMcpServerInfo(userId: string, serverId: string) {
+	console.log(`[MCP Server Info] Getting server info for ${serverId} with caching enhancement`);
+	
+	// First check cache
+	const cached = await mcpToolCache.getServerTools(serverId);
+	if (cached) {
+		console.log(`[MCP Server Info] Using cached capabilities for server ${serverId}`);
+		// Still need server record for response format
+		const server = await db
+			.select()
+			.from(mcpServers)
+			.where(and(eq(mcpServers.id, serverId), eq(mcpServers.userId, userId)))
+			.limit(1);
+
+		if (server.length === 0) {
+			return null;
+		}
+
+		return {
+			server: server[0],
+			toolsets: cached.capabilities?.tools || {},
+			resources: cached.capabilities?.resources || {},
+			prompts: cached.capabilities?.prompts || {},
+		};
+	}
+
+	// Cache miss - fetch from server using the proven working logic
 	// Fetch the specific server from the database
 	const server = await db
 		.select()
@@ -1930,6 +1959,27 @@ export async function getMcpServerInfo(userId: string, serverId: string) {
 					`[Tool Catalog] Failed to register tools for server ${serverRecord.name}:`,
 					catalogError,
 				);
+			}
+		}
+
+		// Cache the successful result
+		if (toolsets || resources || prompts) {
+			try {
+				const cacheEntry: ToolCacheEntry = {
+					tools: [], // Will be filled by toolCatalog registration
+					capabilities: {
+						tools: toolsets,
+						resources: resources,
+						prompts: prompts,
+					},
+					cachedAt: new Date().toISOString(),
+					serverUrl: serverRecord.url,
+				};
+
+				await mcpToolCache.cacheServerTools(serverId, cacheEntry);
+				console.log(`[MCP Cache] Cached capabilities for server ${serverRecord.name}`);
+			} catch (cacheError) {
+				console.error(`[MCP Cache] Failed to cache capabilities for server ${serverRecord.name}:`, cacheError);
 			}
 		}
 
