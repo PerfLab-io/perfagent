@@ -128,40 +128,57 @@ async function discoverOAuthAuthorizationUrl(
 		}
 
 		// Fetch authorization server metadata from /.well-known/oauth-authorization-server
-		// Handle cases where the auth server is co-located with the resource server
-		let metadataUrl = `${authServerUrl}/.well-known/oauth-authorization-server`;
-
-		// If the auth server URL is the same as the resource server's origin,
-		// try using the same path structure as the resource
+		// Try multiple locations in order of preference
 		const resourceUrlObj = new URL(resourceUrl);
+		const metadataUrls = [
+			// First: Standard location at auth server root (most common)
+			`${authServerUrl}/.well-known/oauth-authorization-server`,
+		];
+
+		// Second: If auth server is co-located with resource server and has a path,
+		// try the co-located path (for cases like /api/mcp servers)
 		if (
 			authServerUrl === resourceUrlObj.origin &&
 			resourceUrlObj.pathname !== '/'
 		) {
-			// Extract the base path from the resource URL (e.g., /api/mcp from https://v0.perflab.io/api/mcp)
 			const pathSegments = resourceUrlObj.pathname
 				.split('/')
 				.filter((segment) => segment.length > 0);
 			if (pathSegments.length > 0) {
 				const basePath = '/' + pathSegments.join('/');
-				metadataUrl = `${authServerUrl}${basePath}/.well-known/oauth-authorization-server`;
-				console.log('[OAuth] Using co-located auth server path:', metadataUrl);
+				metadataUrls.push(`${authServerUrl}${basePath}/.well-known/oauth-authorization-server`);
 			}
 		}
 
-		console.log(
-			'[OAuth] Fetching authorization server metadata from:',
-			metadataUrl,
-		);
+		let metadataResponse = null;
 
-		const metadataResponse = await fetch(metadataUrl);
-		if (!metadataResponse.ok) {
-			console.log(
-				'[OAuth] Failed to fetch authorization server metadata:',
-				metadataResponse.status,
-				metadataResponse.statusText,
-			);
-			console.log('[OAuth] Tried URL:', metadataUrl);
+		// Try each metadata URL until one works
+		for (const url of metadataUrls) {
+			console.log('[OAuth] Fetching authorization server metadata from:', url);
+			
+			try {
+				const response = await fetch(url);
+				if (response.ok) {
+					metadataResponse = response;
+					console.log('[OAuth] Successfully fetched metadata from:', url);
+					break;
+				} else {
+					console.log(
+						'[OAuth] Failed to fetch from:',
+						url,
+						'Status:',
+						response.status,
+						response.statusText,
+					);
+				}
+			} catch (error) {
+				console.log('[OAuth] Error fetching from:', url, error);
+			}
+		}
+
+		if (!metadataResponse) {
+			console.log('[OAuth] Failed to fetch authorization server metadata from any URL');
+			console.log('[OAuth] Tried URLs:', metadataUrls);
 			return null;
 		}
 

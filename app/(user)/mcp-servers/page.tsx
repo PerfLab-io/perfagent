@@ -5,9 +5,8 @@ import {
 	useEffect,
 	useOptimistic,
 	useRef,
-	FormEvent,
-	useTransition,
 } from 'react';
+import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import {
 	Card,
@@ -64,6 +63,15 @@ import {
 	deleteMcpServerAction,
 } from '@/app/actions/mcp-servers';
 
+function SubmitButton() {
+	const { pending } = useFormStatus();
+	return (
+		<Button type="submit" disabled={pending}>
+			{pending ? 'Adding...' : 'Add Server'}
+		</Button>
+	);
+}
+
 interface MCPServer {
 	id: string;
 	name: string;
@@ -84,39 +92,14 @@ interface ServerInfo {
 	prompts: any;
 }
 
-type OptimisticAction = 
-	| { type: 'toggle'; id: string; enabled: boolean }
-	| { type: 'add'; server: MCPServer }
-	| { type: 'update'; id: string; updates: Partial<MCPServer> };
-
 export default function MCPServersPage() {
 	const [servers, setServers] = useState<MCPServer[]>([]);
-	const [optimisticServers, updateOptimisticServers] = useOptimistic(
+	const [optimisticServers, addOptimisticServer] = useOptimistic(
 		servers,
-		(currentServers, action: OptimisticAction) => {
-			switch (action.type) {
-				case 'toggle':
-					return currentServers.map((server) =>
-						server.id === action.id
-							? { ...server, enabled: action.enabled }
-							: server,
-					);
-				case 'add':
-					return [...currentServers, action.server];
-				case 'update':
-					return currentServers.map((server) =>
-						server.id === action.id
-							? { ...server, ...action.updates }
-							: server,
-					);
-				default:
-					return currentServers;
-			}
-		},
+		(currentServers, newServer: MCPServer) => [...currentServers, newServer],
 	);
 	const [loading, setLoading] = useState(true);
 	const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-	const [isSubmittingForm, setIsSubmittingForm] = useState(false);
 	const [formError, setFormError] = useState<string | null>(null);
 	const [serverToDelete, setServerToDelete] = useState<MCPServer | null>(null);
 	const [serverInfo, setServerInfo] = useState<Record<string, ServerInfo>>({});
@@ -132,7 +115,6 @@ export default function MCPServersPage() {
 		Record<string, boolean>
 	>({});
 	const formRef = useRef<HTMLFormElement>(null);
-	const [, startTransition] = useTransition();
 
 	useEffect(() => {
 		fetchServers();
@@ -255,14 +237,6 @@ export default function MCPServersPage() {
 				// Mark this server as requiring auth
 				setServersRequiringAuth((prev) => new Set(prev).add(serverId));
 				// Update server status to 'required' to show the Auth Required badge
-				startTransition(() => {
-					updateOptimisticServers({
-						type: 'update',
-						id: serverId,
-						updates: { authStatus: 'required' },
-					});
-				});
-				// Also update actual state for persistence
 				setServers((prev) =>
 					prev.map((server) =>
 						server.id === serverId
@@ -278,14 +252,6 @@ export default function MCPServersPage() {
 					return newUrls;
 				});
 				// Update server status to 'authorized'
-				startTransition(() => {
-					updateOptimisticServers({
-						type: 'update',
-						id: serverId,
-						updates: { authStatus: 'authorized' },
-					});
-				});
-				// Also update actual state for persistence
 				setServers((prev) =>
 					prev.map((server) =>
 						server.id === serverId
@@ -332,18 +298,14 @@ export default function MCPServersPage() {
 		}
 	};
 
-	const handleFormSubmit = async (event: FormEvent<HTMLFormElement>) => {
-		event.preventDefault();
-		setIsSubmittingForm(true);
-		setFormError(null); // Clear any previous errors
-
-		const formData = new FormData(event.currentTarget);
+	// Simplified server action with optimistic updates
+	const formAction = async (formData: FormData) => {
 		const name = formData.get('name') as string;
 		const url = formData.get('url') as string;
 
 		// Create optimistic server
 		const optimisticServer: MCPServer = {
-			id: crypto.randomUUID(), // Generate temporary ID
+			id: crypto.randomUUID(),
 			name: name.trim(),
 			url: url.trim(),
 			enabled: true,
@@ -355,95 +317,68 @@ export default function MCPServersPage() {
 			updatedAt: new Date().toISOString(),
 		};
 
-		// Optimistic update - add server immediately
-		startTransition(() => {
-			updateOptimisticServers({
-				type: 'add',
-				server: optimisticServer,
-			});
-		});
+		// Add optimistically
+		addOptimisticServer(optimisticServer);
 
 		try {
 			const result = await addMcpServerAction(formData);
 
 			if (result.success) {
-				// Success: dismiss dialog, reset form, show success message
+				// Success: update actual state and test connection
+				setServers((prev) => [...prev, result.data]);
 				setIsAddDialogOpen(false);
 				formRef.current?.reset();
 				setFormError(null);
 				toast.success('MCP server added successfully');
-				
-				// Update actual state with real server data from backend
-				setServers((prev) => [...prev, result.data]);
-				
-				// Test the connection for the newly added server (use real ID from backend)
 				testServerConnection(result.data.id);
 			} else {
-				// Error: remove optimistic server and show error
-				setServers((prev) => prev.filter((s) => s.id !== optimisticServer.id));
+				// Error: show error (optimistic update will be reverted automatically)
 				setFormError(result.error || 'Failed to add MCP server');
 				toast.error(result.error || 'Failed to add MCP server');
 			}
 		} catch (error) {
-			// Error: remove optimistic server and show error
-			setServers((prev) => prev.filter((s) => s.id !== optimisticServer.id));
+			// Error: show error (optimistic update will be reverted automatically)
 			const errorMessage = 'Failed to add MCP server';
 			setFormError(errorMessage);
 			toast.error(errorMessage);
-		} finally {
-			setIsSubmittingForm(false);
 		}
 	};
 
 	const handleToggleServer = async (server: MCPServer) => {
 		const newEnabledState = !server.enabled;
 
-		startTransition(() => {
-			// Optimistic update
-			updateOptimisticServers({
-				type: 'toggle',
-				id: server.id,
-				enabled: newEnabledState,
-			});
-		});
+		// Optimistic update using regular state
+		setServers((prev) =>
+			prev.map((s) =>
+				s.id === server.id ? { ...s, enabled: newEnabledState } : s,
+			),
+		);
 
 		try {
 			const result = await toggleMcpServerAction(server.id, newEnabledState);
 
 			if (result.success) {
-				// Update the actual servers state
-				setServers(
-					servers.map((s) =>
-						s.id === server.id ? { ...s, enabled: newEnabledState } : s,
-					),
-				);
-
 				// Test connection and fetch server info if enabling
 				if (newEnabledState) {
 					testServerConnection(server.id);
 				}
-
 				toast.success(`Server ${newEnabledState ? 'enabled' : 'disabled'}`);
 			} else {
 				// Rollback optimistic update
-				startTransition(() => {
-					updateOptimisticServers({
-						type: 'toggle',
-						id: server.id,
-						enabled: server.enabled,
-					});
-				});
+				setServers((prev) =>
+					prev.map((s) =>
+						s.id === server.id ? { ...s, enabled: server.enabled } : s,
+					),
+				);
 				toast.error(result.error || 'Failed to update server');
 			}
 		} catch (error) {
 			// Rollback optimistic update
-			startTransition(() => {
-				updateOptimisticServers({
-					type: 'toggle',
-					id: server.id,
-					enabled: server.enabled,
-				});
-			});
+			setServers((prev) =>
+				prev.map((s) =>
+					s.id === server.id ? { ...s, enabled: server.enabled } : s,
+				),
+			);
 			toast.error('Failed to update server');
 		}
 	};
@@ -644,7 +579,7 @@ export default function MCPServersPage() {
 						     Migration benefits: field-level validation, better TypeScript integration */}
 						<form
 							ref={formRef}
-							onSubmit={handleFormSubmit}
+							action={formAction}
 							className="space-y-4"
 						>
 							{formError && (
@@ -660,7 +595,6 @@ export default function MCPServersPage() {
 									name="name"
 									required
 									placeholder="My MCP Server"
-									disabled={isSubmittingForm}
 								/>
 							</div>
 							<div>
@@ -671,7 +605,6 @@ export default function MCPServersPage() {
 									type="url"
 									required
 									placeholder="https://example.com/api/mcp"
-									disabled={isSubmittingForm}
 								/>
 							</div>
 							<p className="text-muted-foreground text-sm">
@@ -683,20 +616,10 @@ export default function MCPServersPage() {
 									type="button"
 									variant="outline"
 									onClick={() => setIsAddDialogOpen(false)}
-									disabled={isSubmittingForm}
 								>
 									Cancel
 								</Button>
-								<Button type="submit" disabled={isSubmittingForm}>
-									{isSubmittingForm ? (
-										<>
-											<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-											Adding...
-										</>
-									) : (
-										'Add Server'
-									)}
-								</Button>
+								<SubmitButton />
 							</DialogFooter>
 						</form>
 					</DialogContent>
