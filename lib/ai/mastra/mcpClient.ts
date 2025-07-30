@@ -20,183 +20,238 @@ export const OAUTH_CONFIG = {
 };
 
 /**
+ * Generate discovery URLs for .well-known endpoints following RFC patterns
+ */
+function generateDiscoveryUrls(resourceUrl: string, endpoint: string): string[] {
+	const u = new URL(resourceUrl);
+	return [
+		// RFC compliant: protocol//hostname/.well-known/endpoint
+		`${u.protocol}//${u.hostname}/.well-known/${endpoint}`,
+		// Fallback: full URL path with .well-known/endpoint
+		`${u.href}/.well-known/${endpoint}`
+	];
+}
+
+/**
+ * Discover protected resource metadata according to RFC 9728
+ */
+async function discoverProtectedResourceMetadata(resourceUrl: string): Promise<{
+	authorization_servers: string[];
+	resource: string;
+	scopes_supported: string[];
+} | null> {
+	console.log('[OAuth] Starting protected resource metadata discovery (RFC 9728)');
+	
+	const endpoints = generateDiscoveryUrls(resourceUrl, 'oauth-protected-resource');
+	
+	for (const endpoint of endpoints) {
+		try {
+			console.log('[OAuth] Fetching protected resource metadata from:', endpoint);
+			const response = await fetch(endpoint);
+			
+			if (response.ok) {
+				const metadata = await response.json();
+				console.log('[OAuth] Protected resource metadata:', JSON.stringify(metadata, null, 2));
+				
+				return {
+					authorization_servers: metadata.authorization_servers || [],
+					resource: metadata.resource || resourceUrl,
+					scopes_supported: metadata.scopes_supported || []
+				};
+			} else {
+				console.log('[OAuth] Failed to fetch protected resource metadata:', response.status, response.statusText);
+			}
+		} catch (error) {
+			console.log('[OAuth] Protected resource discovery failed:', endpoint, error);
+		}
+	}
+	
+	console.log('[OAuth] No protected resource metadata found - server may not be RFC 9728 compliant');
+	return null;
+}
+
+/**
+ * Discover authorization server metadata according to RFC 8414
+ */
+async function discoverAuthorizationServerMetadata(authServerIssuer: string, resourceUrl?: string): Promise<any | null> {
+	console.log('[OAuth] Starting authorization server metadata discovery (RFC 8414)');
+	
+	const u = new URL(authServerIssuer);
+	const metadataUrls = [
+		// RFC 8414 standard location
+		`${u.protocol}//${u.hostname}/.well-known/oauth-authorization-server`
+	];
+	
+	// Add alternative location using the resource URL path if available
+	if (resourceUrl) {
+		const resourceU = new URL(resourceUrl);
+		// Only add if it's different from the standard location
+		if (resourceU.pathname !== '/') {
+			metadataUrls.push(`${resourceUrl}/.well-known/oauth-authorization-server`);
+		}
+	}
+	
+	for (const metadataUrl of metadataUrls) {
+		try {
+			console.log('[OAuth] Fetching authorization server metadata from:', metadataUrl);
+			const response = await fetch(metadataUrl);
+			
+			if (response.ok) {
+				const metadata = await response.json();
+				console.log('[OAuth] Authorization server metadata:', JSON.stringify(metadata, null, 2));
+				
+				// Validate issuer (RFC 8414 security requirement)
+				if (metadata.issuer && metadata.issuer !== authServerIssuer) {
+					console.warn(`[OAuth] Issuer mismatch: expected ${authServerIssuer}, got ${metadata.issuer}`);
+					// Continue anyway for compatibility, but log the warning
+				}
+				
+				return metadata;
+			} else {
+				console.log('[OAuth] Failed to fetch authorization server metadata:', response.status, response.statusText);
+			}
+		} catch (error) {
+			console.log('[OAuth] Authorization server discovery failed:', metadataUrl, error);
+		}
+	}
+	
+	console.log('[OAuth] All authorization server metadata endpoints failed');
+	return null;
+}
+
+/**
+ * Generate fallback assumptions for non-compliant servers
+ */
+function generateFallbackDiscovery(resourceUrl: string): { authServer: string; assumptions: string[] } {
+	const u = new URL(resourceUrl);
+	const assumptions = [];
+	
+	// Assume authorization server is at same origin
+	const authServer = `${u.protocol}//${u.hostname}`;
+	assumptions.push('Authorization server at same origin');
+	assumptions.push('Using default scopes: read, write');
+	
+	console.log('[OAuth] Non-compliant server detected, using assumptions:', assumptions);
+	
+	return { authServer, assumptions };
+}
+
+/**
+ * Generate fallback authorization server metadata for servers without RFC 8414 metadata
+ */
+function generateFallbackAuthServerMetadata(authServerIssuer: string): any {
+	console.log('[OAuth] Generating fallback authorization server metadata for:', authServerIssuer);
+	
+	// Common OAuth 2.0 endpoint patterns
+	const u = new URL(authServerIssuer);
+	const baseUrl = `${u.protocol}//${u.hostname}`;
+	
+	return {
+		issuer: authServerIssuer,
+		authorization_endpoint: `${baseUrl}/oauth/authorize`,
+		token_endpoint: `${baseUrl}/oauth/token`,
+		response_types_supported: ['code'],
+		grant_types_supported: ['authorization_code'],
+		code_challenge_methods_supported: ['S256'],
+		scopes_supported: ['read', 'write'],
+		// Mark as fallback for debugging
+		_fallback: true,
+		_assumptions: [
+			'Standard OAuth 2.0 endpoint paths',
+			'PKCE S256 support',
+			'Authorization code flow'
+		]
+	};
+}
+
+/**
  * Discovers OAuth authorization URL from WWW-Authenticate header according to MCP specification
- * Based on RFC 9728 (Protected Resource Metadata) and RFC 8414 (Authorization Server Metadata)
+ * Implements RFC 9728 (Protected Resource Metadata) and RFC 8414 (Authorization Server Metadata)
  */
 async function discoverOAuthAuthorizationUrl(
 	wwwAuthHeader: string,
 	resourceUrl: string,
 ): Promise<string | null> {
 	try {
-		// Parse WWW-Authenticate header
-		// Format: Bearer realm="example", resource="https://example.com/mcp", as_uri="https://auth.example.com"
+		console.log('[OAuth] Starting OAuth discovery flow');
+		console.log('[OAuth] Resource URL:', resourceUrl);
+		console.log('[OAuth] WWW-Authenticate header:', wwwAuthHeader);
+
+		// Step 1: Parse WWW-Authenticate header
 		const authServer = parseWWWAuthenticateHeader(wwwAuthHeader);
-
-		let authServerUrl = authServer.as_uri;
-
-		// If no as_uri in header, try to discover from resource_metadata or resource URL
-		if (!authServerUrl) {
-			console.log(
-				'[OAuth] No as_uri in WWW-Authenticate header, trying resource metadata or URL discovery',
-			);
-
-			// First try the resource_metadata URL if provided (RFC 9728)
+		let authServerIssuer = authServer.as_uri;
+		
+		// Step 2: If no as_uri, try protected resource metadata discovery (RFC 9728)
+		if (!authServerIssuer) {
+			console.log('[OAuth] No as_uri in WWW-Authenticate header, starting resource discovery');
+			
+			// First: Try resource_metadata URL from WWW-Authenticate header
 			if (authServer.resource_metadata) {
 				try {
-					console.log(
-						'[OAuth] Fetching resource metadata from:',
-						authServer.resource_metadata,
-					);
-					const resourceMetadataResponse = await fetch(
-						authServer.resource_metadata,
-					);
-					if (resourceMetadataResponse.ok) {
-						const resourceMetadata = await resourceMetadataResponse.json();
-						console.log(
-							'[OAuth] Resource metadata:',
-							JSON.stringify(resourceMetadata, null, 2),
-						);
-						if (
-							resourceMetadata.authorization_servers &&
-							resourceMetadata.authorization_servers.length > 0
-						) {
-							authServerUrl = resourceMetadata.authorization_servers[0];
-							console.log(
-								'[OAuth] Found authorization server from resource metadata:',
-								authServerUrl,
-							);
-						} else {
-							console.log(
-								'[OAuth] No authorization_servers found in resource metadata',
-							);
+					console.log('[OAuth] Fetching resource metadata from WWW-Authenticate header:', authServer.resource_metadata);
+					const response = await fetch(authServer.resource_metadata);
+					if (response.ok) {
+						const metadata = await response.json();
+						console.log('[OAuth] Resource metadata from header:', JSON.stringify(metadata, null, 2));
+						if (metadata.authorization_servers?.length > 0) {
+							authServerIssuer = metadata.authorization_servers[0];
+							console.log('[OAuth] Found authorization server from header metadata:', authServerIssuer);
 						}
-					} else {
-						console.log(
-							'[OAuth] Failed to fetch resource metadata:',
-							resourceMetadataResponse.status,
-							resourceMetadataResponse.statusText,
-						);
 					}
 				} catch (error) {
-					console.log('[OAuth] Failed to fetch resource metadata:', error);
+					console.log('[OAuth] Failed to fetch resource metadata from header:', error);
 				}
 			}
-
-			// If still no authServerUrl, try common discovery patterns
-			if (!authServerUrl) {
-				const resourceUrlObj = new URL(resourceUrl);
-
-				// Try common authorization server discovery patterns
-				const discoveryUrls = [
-					// Try the resource URL itself (spec-compliant)
-					`${resourceUrlObj.origin}/.well-known/oauth-authorization-server`,
-					// Try removing path segments (default pattern)
-					`${resourceUrlObj.protocol}//${resourceUrlObj.host}/.well-known/oauth-authorization-server`,
-					// Try full server URL with path (for servers like https://v0.perflab.io/api/mcp)
-					`${resourceUrl}/.well-known/oauth-authorization-server`,
-				];
-
-				for (const discoveryUrl of discoveryUrls) {
-					try {
-						console.log(
-							'[OAuth] Trying authorization server discovery at:',
-							discoveryUrl,
-						);
-						const discoveryResponse = await fetch(discoveryUrl);
-						if (discoveryResponse.ok) {
-							authServerUrl = discoveryUrl.replace(
-								'/.well-known/oauth-authorization-server',
-								'',
-							);
-							console.log(
-								'[OAuth] Found authorization server at:',
-								authServerUrl,
-							);
-							break;
-						}
-					} catch (error) {
-						console.log('[OAuth] Discovery failed for:', discoveryUrl, error);
-						continue;
-					}
+			
+			// Second: Try standard protected resource discovery
+			if (!authServerIssuer) {
+				const resourceMetadata = await discoverProtectedResourceMetadata(resourceUrl);
+				if (resourceMetadata?.authorization_servers && resourceMetadata.authorization_servers.length > 0) {
+					authServerIssuer = resourceMetadata.authorization_servers[0];
+					console.log('[OAuth] Found authorization server from protected resource metadata:', authServerIssuer);
 				}
 			}
+			
+			// Third: Fallback for non-compliant servers
+			if (!authServerIssuer) {
+				const fallback = generateFallbackDiscovery(resourceUrl);
+				authServerIssuer = fallback.authServer;
+				console.log('[OAuth] Using fallback authorization server:', authServerIssuer);
+			}
+		} else {
+			console.log('[OAuth] Found as_uri in WWW-Authenticate header:', authServerIssuer);
+		}
 
-			if (!authServerUrl) {
-				console.log('[OAuth] Could not discover authorization server');
+		if (!authServerIssuer) {
+			console.log('[OAuth] Could not determine authorization server issuer');
+			return null;
+		}
+
+		// Step 3: Discover authorization server metadata (RFC 8414)
+		let serverMetadata = await discoverAuthorizationServerMetadata(authServerIssuer, resourceUrl);
+		
+		// Step 3b: If no RFC 8414 metadata found, generate fallback for known auth server
+		if (!serverMetadata?.authorization_endpoint) {
+			console.log('[OAuth] No RFC 8414 metadata found, attempting fallback for known authorization server');
+			
+			// Only generate fallback if we have a valid authorization server from protected resource metadata
+			// This means the server is partially compliant (has protected resource metadata) but missing auth server metadata
+			if (authServerIssuer && authServerIssuer !== `${new URL(resourceUrl).protocol}//${new URL(resourceUrl).hostname}`) {
+				// We have a specific auth server from protected resource metadata, try fallback
+				serverMetadata = generateFallbackAuthServerMetadata(authServerIssuer);
+				console.log('[OAuth] Using fallback authorization server metadata');
+			} else {
+				console.log('[OAuth] No authorization endpoint found and no specific auth server identified');
 				return null;
 			}
 		}
 
-		// Fetch authorization server metadata from /.well-known/oauth-authorization-server
-		// Try multiple locations in order of preference
-		const resourceUrlObj = new URL(resourceUrl);
-		const metadataUrls = [
-			// First: Standard location at auth server root (most common)
-			`${authServerUrl}/.well-known/oauth-authorization-server`,
-		];
-
-		// Second: If auth server is co-located with resource server and has a path,
-		// try the co-located path (for cases like /api/mcp servers)
-		if (
-			authServerUrl === resourceUrlObj.origin &&
-			resourceUrlObj.pathname !== '/'
-		) {
-			const pathSegments = resourceUrlObj.pathname
-				.split('/')
-				.filter((segment) => segment.length > 0);
-			if (pathSegments.length > 0) {
-				const basePath = '/' + pathSegments.join('/');
-				metadataUrls.push(`${authServerUrl}${basePath}/.well-known/oauth-authorization-server`);
-			}
+		// Step 4: Generate authorization URL
+		console.log('[OAuth] Generating authorization URL');
+		if (serverMetadata._fallback) {
+			console.log('[OAuth] Using fallback metadata with assumptions:', serverMetadata._assumptions);
 		}
-
-		let metadataResponse = null;
-
-		// Try each metadata URL until one works
-		for (const url of metadataUrls) {
-			console.log('[OAuth] Fetching authorization server metadata from:', url);
-			
-			try {
-				const response = await fetch(url);
-				if (response.ok) {
-					metadataResponse = response;
-					console.log('[OAuth] Successfully fetched metadata from:', url);
-					break;
-				} else {
-					console.log(
-						'[OAuth] Failed to fetch from:',
-						url,
-						'Status:',
-						response.status,
-						response.statusText,
-					);
-				}
-			} catch (error) {
-				console.log('[OAuth] Error fetching from:', url, error);
-			}
-		}
-
-		if (!metadataResponse) {
-			console.log('[OAuth] Failed to fetch authorization server metadata from any URL');
-			console.log('[OAuth] Tried URLs:', metadataUrls);
-			return null;
-		}
-
-		const metadata = await metadataResponse.json();
-		console.log(
-			'[OAuth] Authorization server metadata:',
-			JSON.stringify(metadata, null, 2),
-		);
-		const authorizationEndpoint = metadata.authorization_endpoint;
-
-		if (!authorizationEndpoint) {
-			console.log('[OAuth] No authorization_endpoint found in server metadata');
-			console.log('[OAuth] Available metadata keys:', Object.keys(metadata));
-			return null;
-		}
-
-		// Construct authorization URL with proper parameters
-		const authUrl = new URL(authorizationEndpoint);
+		const authUrl = new URL(serverMetadata.authorization_endpoint);
 		authUrl.searchParams.set('response_type', 'code');
 		authUrl.searchParams.set('client_id', OAUTH_CONFIG.clientName);
 		authUrl.searchParams.set('redirect_uri', OAUTH_CONFIG.redirectUris[0]);
@@ -207,7 +262,7 @@ async function discoverOAuthAuthorizationUrl(
 			authUrl.searchParams.set('resource', authServer.resource);
 		}
 
-		// Generate PKCE parameters
+		// Generate PKCE parameters (required by MCP spec)
 		const codeVerifier = generateCodeVerifier();
 		const codeChallenge = await generateCodeChallenge(codeVerifier);
 		authUrl.searchParams.set('code_challenge', codeChallenge);
@@ -221,7 +276,7 @@ async function discoverOAuthAuthorizationUrl(
 		storePKCEVerifier(state, codeVerifier);
 		console.log('[OAuth] Stored PKCE code_verifier for state:', state);
 
-		console.log('[OAuth] Generated authorization URL:', authUrl.toString());
+		console.log('[OAuth] Successfully generated authorization URL:', authUrl.toString());
 		return authUrl.toString();
 	} catch (error) {
 		console.error('[OAuth] Error discovering authorization URL:', error);
