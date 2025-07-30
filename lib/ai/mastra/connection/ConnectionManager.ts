@@ -2,10 +2,17 @@
  * Connection Manager - Unified interface for MCP operations
  * Orchestrates authentication, caching, and server communication
  */
-import { AuthManager, type AuthResult } from '@/lib/ai/mastra/auth/AuthManager';
+import { AuthManager } from '@/lib/ai/mastra/auth/AuthManager';
 // Import the working OAuth functions that handle CF Observability properly
-import { refreshOAuthToken } from '@/lib/ai/mastra/mcpClient';
-import { mcpToolCache, mcpOAuthCache, type ToolCacheEntry } from '@/lib/ai/mastra/cache/MCPCache';
+import {
+	getMcpServerInfo,
+	testMcpServerConnection,
+} from '@/lib/ai/mastra/mcpClient';
+import {
+	mcpToolCache,
+	mcpOAuthCache,
+	type ToolCacheEntry,
+} from '@/lib/ai/mastra/cache/MCPCache';
 import { db } from '@/drizzle/db';
 import { mcpServers } from '@/drizzle/schema';
 import { eq, and } from 'drizzle-orm';
@@ -25,6 +32,24 @@ interface ConnectionResult {
 	error?: string;
 	requiresAuth?: boolean;
 	authUrl?: string;
+	fromCache?: boolean;
+}
+
+// Live connection status - in-memory only (per plan: NOT stored in KV)
+interface LiveConnectionStatus {
+	status: 'connected' | 'disconnected' | 'testing' | 'unknown';
+	lastTested: Date;
+	lastSuccess?: Date;
+	error?: string;
+	pingSupported?: boolean;
+}
+
+// Ping test result for optional MCP ping
+interface PingResult {
+	supported: boolean;
+	success: boolean;
+	error?: string;
+	latency?: number;
 }
 
 interface MCPRequest {
@@ -47,79 +72,122 @@ interface MCPResponse {
 
 /**
  * Manages MCP server connections with authentication, caching, and error handling
+ * Per approved plan:
+ * - Live connection status (in-memory only, NOT in KV)
+ * - KV cache only for capabilities (2h TTL)
+ * - Optional MCP ping with thorough fallback
+ * - Preserves existing OAuth logic for CF Observability
  */
 export class ConnectionManager {
 	private authManager: AuthManager;
-	
+	// Live connection status - in-memory only (per plan: NOT stored in KV)
+	private liveConnectionStatus = new Map<string, LiveConnectionStatus>();
+
 	constructor(authManager?: AuthManager) {
 		this.authManager = authManager || new AuthManager();
 	}
 
 	/**
 	 * Get server capabilities and tools with caching
+	 * Uses existing getMcpServerInfo to preserve CF Observability OAuth logic
 	 */
-	async getServerCapabilities(serverId: string, userId: string): Promise<ConnectionResult> {
-		console.log(`[Connection Manager] Getting capabilities for server ${serverId}`);
+	async getServerCapabilities(
+		serverId: string,
+		userId: string,
+	): Promise<ConnectionResult> {
+		console.log(
+			`[Connection Manager] Getting capabilities for server ${serverId}`,
+		);
 
 		try {
-			// Check cache first
+			// Check KV cache first (capabilities only - 2h TTL per plan)
 			const cached = await mcpToolCache.getServerTools(serverId);
 			if (cached) {
-				console.log(`[Connection Manager] Using cached capabilities for server ${serverId}`);
+				console.log(
+					`[Connection Manager] Using cached capabilities for server ${serverId}`,
+				);
+				// Update live connection status (successful cache hit indicates recent success)
+				this.updateLiveStatus(serverId, {
+					status: 'connected',
+					lastTested: new Date(cached.cachedAt),
+					lastSuccess: new Date(cached.cachedAt),
+				});
 				return {
 					success: true,
 					capabilities: cached.capabilities,
 					tools: cached.tools,
+					fromCache: true,
 				};
 			}
 
-			// Ensure authentication
-			const authResult = await this.authManager.ensureAuthenticated(serverId, userId);
-			if (authResult.status !== 'authenticated') {
+			// Test live connection first
+			const connectionHealthy = await this.testLiveConnection(serverId, userId);
+			if (!connectionHealthy) {
+				const status = this.liveConnectionStatus.get(serverId);
 				return {
 					success: false,
-					requiresAuth: true,
-					authUrl: authResult.authUrl,
-					error: authResult.error || 'Authentication required',
+					error: status?.error || 'Connection test failed',
+					requiresAuth: status?.error?.includes('401') || status?.error?.includes('Authentication'),
 				};
 			}
 
-			// Get server record
-			const server = await this.getServerRecord(serverId, userId);
-			if (!server) {
+			// Use existing getMcpServerInfo - preserves CF Observability logic
+			const result = await getMcpServerInfo(serverId, userId);
+			
+			if (result.success && result.tools) {
+				// Cache capabilities only (NOT connection status per plan)
+				const cacheEntry: ToolCacheEntry = {
+					tools: result.tools,
+					capabilities: {
+						tools: result.tools,
+						// Add other capabilities if available in result
+					},
+					cachedAt: new Date().toISOString(),
+					serverUrl: result.serverUrl || '',
+				};
+
+				await mcpToolCache.cacheServerTools(serverId, cacheEntry);
+				
+				// Update live status on success
+				this.updateLiveStatus(serverId, {
+					status: 'connected',
+					lastTested: new Date(),
+					lastSuccess: new Date(),
+				});
+
+				return {
+					success: true,
+					capabilities: { tools: result.tools },
+					tools: result.tools,
+					fromCache: false,
+				};
+			} else {
+				// Update live status on failure
+				this.updateLiveStatus(serverId, {
+					status: 'disconnected',
+					lastTested: new Date(),
+					error: result.error || 'Failed to get capabilities',
+				});
+
 				return {
 					success: false,
-					error: `Server ${serverId} not found`,
+					error: result.error || 'Failed to get server capabilities',
+					requiresAuth: result.requiresAuth,
+					authUrl: result.authUrl,
 				};
 			}
-
-			// Fetch capabilities from server
-			const capabilities = await this.fetchServerCapabilities(server.url, server.accessToken!);
-			if (!capabilities.success) {
-				return capabilities;
-			}
-
-			// Process and extract tools
-			const tools = this.extractToolsFromCapabilities(capabilities.capabilities!);
-
-			// Cache the results
-			const cacheEntry: ToolCacheEntry = {
-				tools,
-				capabilities: capabilities.capabilities!,
-				cachedAt: new Date().toISOString(),
-				serverUrl: server.url,
-			};
-
-			await mcpToolCache.cacheServerTools(serverId, cacheEntry);
-
-			return {
-				success: true,
-				capabilities: capabilities.capabilities,
-				tools,
-			};
 
 		} catch (error) {
-			console.error(`[Connection Manager] Error getting capabilities for server ${serverId}:`, error);
+			console.error(
+				`[Connection Manager] Error getting capabilities for server ${serverId}:`,
+				error,
+			);
+			// Update live status on error
+			this.updateLiveStatus(serverId, {
+				status: 'disconnected',
+				lastTested: new Date(),
+				error: error instanceof Error ? error.message : 'Unknown error',
+			});
 			return {
 				success: false,
 				error: error instanceof Error ? error.message : 'Unknown error',
@@ -136,11 +204,16 @@ export class ConnectionManager {
 		toolName: string,
 		arguments_: any,
 	): Promise<ConnectionResult> {
-		console.log(`[Connection Manager] Executing tool ${toolName} on server ${serverId}`);
+		console.log(
+			`[Connection Manager] Executing tool ${toolName} on server ${serverId}`,
+		);
 
 		try {
 			// Ensure authentication
-			const authResult = await this.authManager.ensureAuthenticated(serverId, userId);
+			const authResult = await this.authManager.ensureAuthenticated(
+				serverId,
+				userId,
+			);
 			if (authResult.status !== 'authenticated') {
 				return {
 					success: false,
@@ -168,9 +241,11 @@ export class ConnectionManager {
 			);
 
 			return result;
-
 		} catch (error) {
-			console.error(`[Connection Manager] Error executing tool ${toolName} on server ${serverId}:`, error);
+			console.error(
+				`[Connection Manager] Error executing tool ${toolName} on server ${serverId}:`,
+				error,
+			);
 			return {
 				success: false,
 				error: error instanceof Error ? error.message : 'Unknown error',
@@ -179,66 +254,34 @@ export class ConnectionManager {
 	}
 
 	/**
-	 * Test server connection and return status
+	 * Test server connection with optional MCP ping and thorough fallback
+	 * Updates live connection status (in-memory only per plan)
 	 */
-	async testConnection(serverId: string, userId: string): Promise<ConnectionResult> {
-		console.log(`[Connection Manager] Testing connection to server ${serverId}`);
-
-		try {
-			// Get server record
-			const server = await this.getServerRecord(serverId, userId);
-			if (!server) {
-				return {
-					success: false,
-					error: `Server ${serverId} not found`,
-				};
-			}
-
-			// Check authentication status
-			const authResult = await this.authManager.ensureAuthenticated(serverId, userId);
-			if (authResult.status !== 'authenticated') {
-				return {
-					success: false,
-					requiresAuth: true,
-					authUrl: authResult.authUrl,
-					error: authResult.error || 'Authentication required',
-				};
-			}
-
-			// Test with a simple initialize request
-			const testResult = await this.makeRequest(server.url, server.accessToken!, {
-				jsonrpc: '2.0',
-				id: 1,
-				method: 'initialize',
-				params: {
-					protocolVersion: '2024-11-05',
-					capabilities: {},
-					clientInfo: {
-						name: 'PerfAgent',
-						version: '1.0.0',
-					},
-				},
-			});
-
-			return {
-				success: testResult.success,
-				error: testResult.error,
-			};
-
-		} catch (error) {
-			console.error(`[Connection Manager] Error testing connection to server ${serverId}:`, error);
-			return {
-				success: false,
-				error: error instanceof Error ? error.message : 'Unknown error',
-			};
-		}
+	async testConnection(
+		serverId: string,
+		userId: string,
+	): Promise<ConnectionResult> {
+		console.log(
+			`[Connection Manager] Testing connection to server ${serverId}`,
+		);
+		
+		const success = await this.testLiveConnection(serverId, userId);
+		const status = this.liveConnectionStatus.get(serverId);
+		
+		return {
+			success,
+			error: success ? undefined : (status?.error || 'Connection test failed'),
+			requiresAuth: status?.error?.includes('401') || status?.error?.includes('Authentication'),
+		};
 	}
 
 	/**
 	 * Invalidate cache for a specific server
 	 */
 	async invalidateServerCache(serverId: string): Promise<void> {
-		console.log(`[Connection Manager] Invalidating cache for server ${serverId}`);
+		console.log(
+			`[Connection Manager] Invalidating cache for server ${serverId}`,
+		);
 		await Promise.all([
 			mcpToolCache.invalidateServer(serverId),
 			mcpOAuthCache.invalidateToken(serverId),
@@ -261,7 +304,10 @@ export class ConnectionManager {
 		};
 	}
 
-	private async fetchServerCapabilities(serverUrl: string, accessToken: string): Promise<ConnectionResult> {
+	private async fetchServerCapabilities(
+		serverUrl: string,
+		accessToken: string,
+	): Promise<ConnectionResult> {
 		const response = await this.makeRequest(serverUrl, accessToken, {
 			jsonrpc: '2.0',
 			id: 1,
@@ -365,9 +411,11 @@ export class ConnectionManager {
 				success: true,
 				result: mcpResponse.result,
 			};
-
 		} catch (error) {
-			console.error(`[Connection Manager] Network error for ${serverUrl}:`, error);
+			console.error(
+				`[Connection Manager] Network error for ${serverUrl}:`,
+				error,
+			);
 			return {
 				success: false,
 				error: error instanceof Error ? error.message : 'Network error',
@@ -375,7 +423,9 @@ export class ConnectionManager {
 		}
 	}
 
-	private extractToolsFromCapabilities(capabilities: ServerCapabilities): ToolMetadata[] {
+	private extractToolsFromCapabilities(
+		capabilities: ServerCapabilities,
+	): ToolMetadata[] {
 		if (!capabilities.tools) return [];
 
 		return capabilities.tools.map((tool: any) => ({
@@ -395,7 +445,132 @@ export class ConnectionManager {
 
 		return servers[0] || null;
 	}
+
+	/**
+	 * Get live connection status (in-memory only per plan)
+	 */
+	getLiveConnectionStatus(serverId: string): LiveConnectionStatus | null {
+		return this.liveConnectionStatus.get(serverId) || null;
+	}
+
+	/**
+	 * Test live connection with optional ping and thorough fallback
+	 * Updates in-memory status, does NOT store in KV per plan
+	 */
+	private async testLiveConnection(serverId: string, userId: string): Promise<boolean> {
+		// Update status to testing
+		this.updateLiveStatus(serverId, {
+			status: 'testing',
+			lastTested: new Date(),
+		});
+
+		try {
+			// Try optional MCP ping first (fast)
+			const pingResult = await this.tryOptionalPing(serverId, userId);
+			
+			if (pingResult.supported && pingResult.success) {
+				console.log(`[Connection Manager] Ping successful for server ${serverId}`);
+				this.updateLiveStatus(serverId, {
+					status: 'connected',
+					lastTested: new Date(),
+					lastSuccess: new Date(),
+					pingSupported: true,
+				});
+				return true;
+			}
+
+			// Fallback to thorough test (existing testMcpServerConnection)
+			console.log(`[Connection Manager] Ping ${pingResult.supported ? 'failed' : 'not supported'}, using thorough test for server ${serverId}`);
+			const thoroughResult = await testMcpServerConnection(serverId, userId);
+			
+			if (thoroughResult.success) {
+				this.updateLiveStatus(serverId, {
+					status: 'connected',
+					lastTested: new Date(),
+					lastSuccess: new Date(),
+					pingSupported: pingResult.supported,
+				});
+				return true;
+			} else {
+				this.updateLiveStatus(serverId, {
+					status: 'disconnected',
+					lastTested: new Date(),
+					error: thoroughResult.error || 'Connection test failed',
+					pingSupported: pingResult.supported,
+				});
+				return false;
+			}
+
+		} catch (error) {
+			console.error(`[Connection Manager] Error testing connection to server ${serverId}:`, error);
+			this.updateLiveStatus(serverId, {
+				status: 'disconnected',
+				lastTested: new Date(),
+				error: error instanceof Error ? error.message : 'Unknown error',
+			});
+			return false;
+		}
+	}
+
+	/**
+	 * Try optional MCP ping - servers may respond with 404 but still be alive
+	 */
+	private async tryOptionalPing(serverId: string, userId: string): Promise<PingResult> {
+		try {
+			const server = await this.getServerRecord(serverId, userId);
+			if (!server?.accessToken) {
+				return { supported: false, success: false, error: 'No access token' };
+			}
+
+			const startTime = Date.now();
+			const response = await this.makeRequest(server.url, server.accessToken, {
+				jsonrpc: '2.0',
+				id: 1,
+				method: 'ping',
+				params: {},
+			});
+			const latency = Date.now() - startTime;
+
+			if (response.error?.includes('-32601') || response.error?.includes('Method not found')) {
+				// Ping not supported - this is OK, server might still be alive
+				return { supported: false, success: false };
+			}
+
+			return { 
+				supported: true, 
+				success: response.success,
+				error: response.error,
+				latency,
+			};
+		} catch (error) {
+			return { 
+				supported: false, 
+				success: false, 
+				error: error instanceof Error ? error.message : 'Unknown error',
+			};
+		}
+	}
+
+	/**
+	 * Update live connection status (in-memory only - NOT stored in KV per plan)
+	 */
+	private updateLiveStatus(serverId: string, update: Partial<LiveConnectionStatus>): void {
+		const current = this.liveConnectionStatus.get(serverId) || {
+			status: 'unknown',
+			lastTested: new Date(),
+		};
+		
+		this.liveConnectionStatus.set(serverId, {
+			...current,
+			...update,
+		});
+	}
 }
 
 // Export types
-export type { ConnectionResult, ServerCapabilities };
+export type { 
+	ConnectionResult, 
+	ServerCapabilities, 
+	LiveConnectionStatus, 
+	PingResult 
+};
