@@ -1,4 +1,5 @@
 import { ChatPageComponent } from '@/components/pages/chat';
+import './chat.css';
 
 /**
  * AiChatPage - Main chat interface component with file handling, messaging,
