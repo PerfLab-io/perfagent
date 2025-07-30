@@ -38,6 +38,7 @@ import {
 	AlertCircle,
 	CheckCircle,
 	XCircle,
+	WifiOff,
 	ChevronDown,
 	ChevronRight,
 	Wrench,
@@ -71,7 +72,7 @@ interface MCPServer {
 	name: string;
 	url: string;
 	enabled: boolean;
-	authStatus?: 'unknown' | 'required' | 'authorized' | 'failed';
+	authStatus?: 'unknown' | 'required' | 'authorized' | 'failed' | 'offline';
 	accessToken?: string | null;
 	refreshToken?: string | null;
 	tokenExpiresAt?: string | null;
@@ -125,11 +126,17 @@ export default function MCPServersPage() {
 			const response = await fetch('/api/mcp/servers');
 			if (!response.ok) throw new Error('Failed to fetch servers');
 			const data = await response.json();
-			setServers(data);
+			// Ensure offline servers are disabled (data consistency check)
+			const normalizedData = data.map((server: MCPServer) =>
+				server.authStatus === 'offline' && server.enabled
+					? { ...server, enabled: false }
+					: server,
+			);
+			setServers(normalizedData);
 
 			// Initialize serversRequiringAuth for servers that require/required auth
 			// This includes servers currently requiring auth OR servers that have tokens (meaning they required auth before)
-			const serversWithAuthRequired = data
+			const serversWithAuthRequired = normalizedData
 				.filter(
 					(server: MCPServer) =>
 						server.authStatus === 'required' ||
@@ -139,7 +146,7 @@ export default function MCPServersPage() {
 			setServersRequiringAuth(new Set(serversWithAuthRequired));
 
 			// Test connection for each server to update auth status
-			data.forEach((server: MCPServer) => {
+			normalizedData.forEach((server: MCPServer) => {
 				if (server.enabled) {
 					if (server.authStatus === 'authorized') {
 						fetchServerInfo(server.id);
@@ -177,6 +184,27 @@ export default function MCPServersPage() {
 			const response = await fetch(`/api/mcp/servers/${serverId}/test`, {
 				method: 'POST',
 			});
+
+			if (!response.ok) {
+				// If response is not ok, check if it's a connection/network error
+				if (response.status >= 500 || response.status === 0) {
+					// Mark server as offline and disable it for server errors or network failures
+					setServers((prev) =>
+						prev.map((server) =>
+							server.id === serverId
+								? { ...server, authStatus: 'offline', enabled: false }
+								: server,
+						),
+					);
+					// Also disable in backend to persist the change
+					await toggleMcpServerAction(serverId, false);
+					toast.warning(
+						'Server is offline and has been automatically disabled',
+					);
+					return;
+				}
+			}
+
 			const result = await response.json();
 
 			if (result.status === 'auth_required') {
@@ -199,6 +227,17 @@ export default function MCPServersPage() {
 			}
 		} catch (error) {
 			console.error('Failed to test server connection:', error);
+			// Mark server as offline and disable it for network/connection errors
+			setServers((prev) =>
+				prev.map((server) =>
+					server.id === serverId
+						? { ...server, authStatus: 'offline', enabled: false }
+						: server,
+				),
+			);
+			// Also disable in backend to persist the change
+			await toggleMcpServerAction(serverId, false);
+			toast.warning('Server is offline and has been automatically disabled');
 		}
 	};
 
@@ -255,9 +294,9 @@ export default function MCPServersPage() {
 					),
 				);
 
-				// Fetch server info if enabling
+				// Test connection and fetch server info if enabling
 				if (newEnabledState) {
-					fetchServerInfo(server.id);
+					testServerConnection(server.id);
 				}
 
 				toast.success(`Server ${newEnabledState ? 'enabled' : 'disabled'}`);
@@ -577,6 +616,12 @@ export default function MCPServersPage() {
 									return (
 										<Badge variant="outline" className="text-xs text-red-600">
 											Failed
+										</Badge>
+									);
+								case 'offline':
+									return (
+										<Badge variant="outline" className="text-xs text-gray-600">
+											Offline
 										</Badge>
 									);
 								default:
