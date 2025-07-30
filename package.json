@@ -7,7 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "prettier": "prettier --write ."
+    "prettier": "prettier --write .",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:mcp": "vitest run --testNamePattern=\"MCP\"",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@ai-sdk/google": "^1.2.3",
