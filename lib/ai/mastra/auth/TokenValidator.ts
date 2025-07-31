@@ -2,7 +2,7 @@
  * Token validation and refresh functionality extracted from existing OAuth implementation
  * Handles token validation via MCP initialize requests and token refresh flows
  */
-import { refreshOAuthToken } from '@/lib/ai/mastra/oauthExchange';
+import { refreshOAuthToken } from '@/lib/ai/mastra/mcpClient';
 
 interface OAuthTokens {
 	accessToken: string;
@@ -123,7 +123,7 @@ export class TokenValidator {
 				expiresIn: refreshedTokens.expiresAt
 					? Math.floor((refreshedTokens.expiresAt.getTime() - Date.now()) / 1000)
 					: undefined,
-				clientId: refreshedTokens.clientId || serverRecord.clientId || undefined,
+				clientId: serverRecord.clientId || undefined, // Use existing clientId from server record
 			};
 		} catch (error) {
 			console.error(

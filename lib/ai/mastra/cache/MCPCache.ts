@@ -8,14 +8,24 @@ import { kv } from '@/lib/kv';
 import type { ToolMetadata } from '@/lib/ai/mastra/toolCatalog';
 
 interface ServerCapabilities {
-	tools?: any[];
-	resources?: any[];
-	prompts?: any[];
+	tools?: any;
+	resources?: any;
+	prompts?: any;
 	rootListChanged?: boolean;
 }
 
+// Union type to handle both normalized ToolMetadata and raw MCP tool objects
+type CachedTool =
+	| ToolMetadata
+	| {
+			name: string;
+			description?: string;
+			inputSchema?: any;
+			[key: string]: any; // Allow additional properties from MCP servers
+	  };
+
 interface ToolCacheEntry {
-	tools: ToolMetadata[];
+	tools: CachedTool[];
 	capabilities: ServerCapabilities;
 	cachedAt: string;
 	serverVersion?: string;
@@ -36,17 +46,17 @@ interface TokenCacheEntry {
  * Uses 2-hour TTL with automatic compression for large tool data
  */
 export class MCPToolCache {
-	private PREFIX = 'mcp:tools:';
+	private PREFIX = 'perfagent:mcp:tools:';
 	private TTL = 2 * 60 * 60; // 2 hours
 
 	async getServerTools(serverId: string): Promise<ToolCacheEntry | null> {
 		const entry = await kv.get<ToolCacheEntry>(`${this.PREFIX}${serverId}`);
-		
+
 		if (entry) {
 			console.log(`[MCP Tool Cache] Cache hit for server ${serverId}`);
 			return entry;
 		}
-		
+
 		console.log(`[MCP Tool Cache] Cache miss for server ${serverId}`);
 		return null;
 	}
@@ -77,12 +87,14 @@ export class MCPToolCache {
 
 	async invalidateAll(): Promise<void> {
 		const keys = await kv.keys(`${this.PREFIX}*`);
-		
+
 		for (const key of keys) {
 			await kv.delete(key);
 		}
-		
-		console.log(`[MCP Tool Cache] Invalidated ${keys.length} cached tool entries`);
+
+		console.log(
+			`[MCP Tool Cache] Invalidated ${keys.length} cached tool entries`,
+		);
 	}
 
 	async getCacheStats(): Promise<{
@@ -124,7 +136,7 @@ export class MCPToolCache {
  * Uses 30-minute TTL for security - shorter than tool cache
  */
 export class MCPOAuthCache {
-	private PREFIX = 'mcp:oauth:';
+	private PREFIX = 'perfagent:mcp:oauth:';
 	private TTL = 30 * 60; // 30 minutes
 
 	async cacheValidatedToken(
@@ -141,33 +153,41 @@ export class MCPOAuthCache {
 			// Don't compress tokens - they're small and security-sensitive
 		});
 
-		console.log(`[MCP OAuth Cache] Cached validated token for server ${serverId}`);
+		console.log(
+			`[MCP OAuth Cache] Cached validated token for server ${serverId}`,
+		);
 	}
 
 	async getValidatedToken(serverId: string): Promise<TokenCacheEntry | null> {
 		const entry = await kv.get<TokenCacheEntry>(`${this.PREFIX}${serverId}`);
-		
+
 		if (entry) {
-			console.log(`[MCP OAuth Cache] Found cached token for server ${serverId}`);
+			console.log(
+				`[MCP OAuth Cache] Found cached token for server ${serverId}`,
+			);
 			return entry;
 		}
-		
+
 		return null;
 	}
 
 	async invalidateToken(serverId: string): Promise<void> {
 		await kv.delete(`${this.PREFIX}${serverId}`);
-		console.log(`[MCP OAuth Cache] Invalidated token cache for server ${serverId}`);
+		console.log(
+			`[MCP OAuth Cache] Invalidated token cache for server ${serverId}`,
+		);
 	}
 
 	async invalidateAll(): Promise<void> {
 		const keys = await kv.keys(`${this.PREFIX}*`);
-		
+
 		for (const key of keys) {
 			await kv.delete(key);
 		}
-		
-		console.log(`[MCP OAuth Cache] Invalidated ${keys.length} cached token entries`);
+
+		console.log(
+			`[MCP OAuth Cache] Invalidated ${keys.length} cached token entries`,
+		);
 	}
 
 	/**

@@ -16,19 +16,19 @@ import {
 import { db } from '@/drizzle/db';
 import { mcpServers } from '@/drizzle/schema';
 import { eq, and } from 'drizzle-orm';
-import type { ToolMetadata } from '@/lib/ai/mastra/toolCatalog';
+// Import removed - using flexible any[] type for tools to handle different MCP server formats
 
 interface ServerCapabilities {
-	tools?: any[];
-	resources?: any[];
-	prompts?: any[];
+	tools?: any;
+	resources?: any;  
+	prompts?: any;
 	rootListChanged?: boolean;
 }
 
 interface ConnectionResult {
 	success: boolean;
 	capabilities?: ServerCapabilities;
-	tools?: ToolMetadata[];
+	tools?: any[]; // Use flexible array type to handle both ToolMetadata and raw MCP tools
 	error?: string;
 	requiresAuth?: boolean;
 	authUrl?: string;
@@ -132,18 +132,29 @@ export class ConnectionManager {
 			}
 
 			// Use existing getMcpServerInfo - preserves CF Observability logic
-			const result = await getMcpServerInfo(serverId, userId);
+			const result = await getMcpServerInfo(userId, serverId);
 			
-			if (result.success && result.tools) {
+			if (result && result.server) {
+				// Extract tools from toolsets structure
+				const tools: any[] = [];
+				if (result.toolsets && typeof result.toolsets === 'object') {
+					Object.values(result.toolsets).forEach((toolset: any) => {
+						if (Array.isArray(toolset)) {
+							tools.push(...toolset);
+						}
+					});
+				}
+
 				// Cache capabilities only (NOT connection status per plan)
 				const cacheEntry: ToolCacheEntry = {
-					tools: result.tools,
+					tools,
 					capabilities: {
-						tools: result.tools,
-						// Add other capabilities if available in result
+						tools: result.toolsets,
+						resources: result.resources,
+						prompts: result.prompts,
 					},
 					cachedAt: new Date().toISOString(),
-					serverUrl: result.serverUrl || '',
+					serverUrl: result.server.url,
 				};
 
 				await mcpToolCache.cacheServerTools(serverId, cacheEntry);
@@ -157,8 +168,12 @@ export class ConnectionManager {
 
 				return {
 					success: true,
-					capabilities: { tools: result.tools },
-					tools: result.tools,
+					capabilities: {
+						tools: result.toolsets,
+						resources: result.resources,
+						prompts: result.prompts,
+					},
+					tools,
 					fromCache: false,
 				};
 			} else {
@@ -166,14 +181,13 @@ export class ConnectionManager {
 				this.updateLiveStatus(serverId, {
 					status: 'disconnected',
 					lastTested: new Date(),
-					error: result.error || 'Failed to get capabilities',
+					error: 'Failed to get server info',
 				});
 
 				return {
 					success: false,
-					error: result.error || 'Failed to get server capabilities',
-					requiresAuth: result.requiresAuth,
-					authUrl: result.authUrl,
+					error: 'Failed to get server capabilities - server not found or connection failed',
+					requiresAuth: true, // Assume auth required when getMcpServerInfo returns null
 				};
 			}
 
@@ -425,15 +439,33 @@ export class ConnectionManager {
 
 	private extractToolsFromCapabilities(
 		capabilities: ServerCapabilities,
-	): ToolMetadata[] {
+	): any[] {
 		if (!capabilities.tools) return [];
 
-		return capabilities.tools.map((tool: any) => ({
-			name: tool.name,
-			description: tool.description || '',
-			inputSchema: tool.inputSchema || {},
-			// Map other tool properties as needed
-		})) as ToolMetadata[];
+		// Handle different formats of tools structure from MCP servers
+		if (Array.isArray(capabilities.tools)) {
+			return capabilities.tools.map((tool: any) => ({
+				name: tool.name,
+				description: tool.description || '',
+				inputSchema: tool.inputSchema || {},
+				// Map other tool properties as needed
+			}));
+		} else if (typeof capabilities.tools === 'object') {
+			// Handle case where tools is an object with server names as keys
+			const tools: any[] = [];
+			Object.values(capabilities.tools).forEach((toolset: any) => {
+				if (Array.isArray(toolset)) {
+					tools.push(...toolset.map((tool: any) => ({
+						name: tool.name,
+						description: tool.description || '',
+						inputSchema: tool.inputSchema || {},
+					})));
+				}
+			});
+			return tools;
+		}
+
+		return [];
 	}
 
 	private async getServerRecord(serverId: string, userId: string) {
@@ -481,9 +513,9 @@ export class ConnectionManager {
 
 			// Fallback to thorough test (existing testMcpServerConnection)
 			console.log(`[Connection Manager] Ping ${pingResult.supported ? 'failed' : 'not supported'}, using thorough test for server ${serverId}`);
-			const thoroughResult = await testMcpServerConnection(serverId, userId);
+			const thoroughResult = await testMcpServerConnection(userId, serverId);
 			
-			if (thoroughResult.success) {
+			if (thoroughResult.status === 'authorized') {
 				this.updateLiveStatus(serverId, {
 					status: 'connected',
 					lastTested: new Date(),
@@ -492,10 +524,13 @@ export class ConnectionManager {
 				});
 				return true;
 			} else {
+				const error = thoroughResult.status === 'auth_required' 
+					? 'Authentication required' 
+					: `Connection failed with status: ${thoroughResult.status}`;
 				this.updateLiveStatus(serverId, {
 					status: 'disconnected',
 					lastTested: new Date(),
-					error: thoroughResult.error || 'Connection test failed',
+					error,
 					pingSupported: pingResult.supported,
 				});
 				return false;
