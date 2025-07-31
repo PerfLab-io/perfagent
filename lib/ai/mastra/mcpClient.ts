@@ -1013,14 +1013,8 @@ export async function refreshOAuthToken(
 		}
 
 		// Try to get the original client_id used for this server
-		// Use stored client_id first, then fallback to other approaches
+		// Use stored client_id first, then fallback to generic client name
 		let clientIdToUse = storedClientId || OAUTH_CONFIG.clientName;
-
-		// Only use fallback if no stored client_id
-		if (!storedClientId && serverUrl.includes('cloudflare.com')) {
-			// Cloudflare typically uses a more generic client_id
-			clientIdToUse = 'perfagent-mcp-client';
-		}
 
 		console.log(
 			`[OAuth Refresh] Using stored client_id: ${storedClientId ? 'yes' : 'no'}`,
@@ -1207,13 +1201,13 @@ async function validateAccessToken(
 ): Promise<boolean> {
 	try {
 		console.log(`[OAuth Validation] Testing token for: ${serverUrl}`);
-		
+
 		// Make a simple initialize request with the token
 		const response = await fetch(serverUrl, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
-				'Authorization': `Bearer ${accessToken}`,
+				Authorization: `Bearer ${accessToken}`,
 			},
 			body: JSON.stringify({
 				jsonrpc: '2.0',
@@ -1234,15 +1228,22 @@ async function validateAccessToken(
 			console.log(`[OAuth Validation] Token is valid for: ${serverUrl}`);
 			return true;
 		} else if (response.status === 401) {
-			console.log(`[OAuth Validation] Token is invalid/expired for: ${serverUrl}`);
+			console.log(
+				`[OAuth Validation] Token is invalid/expired for: ${serverUrl}`,
+			);
 			return false;
 		} else {
 			// Other errors might not be token-related
-			console.log(`[OAuth Validation] Unexpected response ${response.status} for: ${serverUrl}`);
+			console.log(
+				`[OAuth Validation] Unexpected response ${response.status} for: ${serverUrl}`,
+			);
 			return true; // Assume token is valid, error is elsewhere
 		}
 	} catch (error) {
-		console.log(`[OAuth Validation] Network error testing token for ${serverUrl}:`, error);
+		console.log(
+			`[OAuth Validation] Network error testing token for ${serverUrl}:`,
+			error,
+		);
 		return true; // Assume token is valid, error is network-related
 	}
 }
@@ -1272,17 +1273,17 @@ export async function testMcpServerConnection(
 		console.log(
 			`[OAuth Test] Validating stored token for ${serverRecord.name}`,
 		);
-		
+
 		const isTokenValid = await validateAccessToken(
 			serverRecord.url,
 			serverRecord.accessToken,
 		);
-		
+
 		if (!isTokenValid) {
 			console.log(
 				`[OAuth Test] Stored token is invalid for ${serverRecord.name}, attempting refresh`,
 			);
-			
+
 			// Try to refresh the token
 			if (serverRecord.refreshToken) {
 				try {
@@ -1293,7 +1294,7 @@ export async function testMcpServerConnection(
 						userId,
 						serverRecord.clientId || undefined,
 					);
-					
+
 					if (refreshedTokens) {
 						console.log(
 							`[OAuth Test] Successfully refreshed token for ${serverRecord.name}`,
@@ -1302,16 +1303,17 @@ export async function testMcpServerConnection(
 						const updatedServerRecord = {
 							...serverRecord,
 							accessToken: refreshedTokens.accessToken,
-							refreshToken: refreshedTokens.refreshToken || serverRecord.refreshToken,
+							refreshToken:
+								refreshedTokens.refreshToken || serverRecord.refreshToken,
 							tokenExpiresAt: refreshedTokens.expiresAt?.toISOString() || null,
 						};
-						
+
 						// Validate the new token
 						const isNewTokenValid = await validateAccessToken(
 							updatedServerRecord.url,
 							updatedServerRecord.accessToken!,
 						);
-						
+
 						if (isNewTokenValid) {
 							return { status: 'authorized' };
 						} else {
@@ -1613,12 +1615,16 @@ export function searchCatalogTools(query: string) {
  * Now uses the new Connection Manager for better auth handling and caching
  */
 export async function getMcpServerInfo(userId: string, serverId: string) {
-	console.log(`[MCP Server Info] Getting server info for ${serverId} with caching enhancement`);
-	
+	console.log(
+		`[MCP Server Info] Getting server info for ${serverId} with caching enhancement`,
+	);
+
 	// First check cache
 	const cached = await mcpToolCache.getServerTools(serverId);
 	if (cached) {
-		console.log(`[MCP Server Info] Using cached capabilities for server ${serverId}`);
+		console.log(
+			`[MCP Server Info] Using cached capabilities for server ${serverId}`,
+		);
 		// Still need server record for response format
 		const server = await db
 			.select()
@@ -1633,8 +1639,12 @@ export async function getMcpServerInfo(userId: string, serverId: string) {
 		return {
 			server: server[0],
 			toolsets: cached.capabilities?.tools || {},
-			resources: cached.capabilities?.resources ? { resources: cached.capabilities.resources } : {},
-			prompts: cached.capabilities?.prompts ? { prompts: cached.capabilities.prompts } : {},
+			resources: cached.capabilities?.resources
+				? { resources: cached.capabilities.resources }
+				: {},
+			prompts: cached.capabilities?.prompts
+				? { prompts: cached.capabilities.prompts }
+				: {},
 		};
 	}
 
@@ -1665,8 +1675,15 @@ export async function getMcpServerInfo(userId: string, serverId: string) {
 		const shouldRefresh = expiresAt.getTime() - now.getTime() < 5 * 60 * 1000;
 
 		if (shouldRefresh && serverRecord.refreshToken) {
+			const secondsUntilExpiry = Math.round(
+				(expiresAt.getTime() - now.getTime()) / 1000,
+			);
+			const expiredText =
+				secondsUntilExpiry <= 0
+					? 'already expired'
+					: `expires in ${secondsUntilExpiry}s`;
 			console.log(
-				`[OAuth SSE] Pre-emptively refreshing token for ${serverRecord.name} (expires in ${Math.round((expiresAt.getTime() - now.getTime()) / 1000)}s)`,
+				`[OAuth SSE] Pre-emptively refreshing token for ${serverRecord.name} (${expiredText})`,
 			);
 			try {
 				const refreshedTokens = await refreshOAuthToken(
@@ -1702,32 +1719,24 @@ export async function getMcpServerInfo(userId: string, serverId: string) {
 		}
 	}
 
-	// Create a temporary client just for this server with SSE-optimized configuration
+	// Create server configuration using correct MastraMCPServerDefinition type
 	const serverConfig: any = {
 		url: new URL(serverRecord.url),
-		timeout: 60_000, // HTTP timeout
-		// SSE-specific configuration for better connection handling on refresh
-		connectionTimeout: 30_000, // Connection establishment timeout
-		retryAttempts: 2, // Fewer retries to fail fast on refresh
-		retryDelay: 2000, // 2 second delay between retries
+		timeout: 60_000, // Request timeout in milliseconds
+		enableServerLogs: true,
+		// Use valid reconnectionOptions instead of invalid fields
+		reconnectionOptions: {
+			maxAttempts: 3,
+			backoffMultiplier: 1.5,
+			initialDelayMs: 1000,
+			maxDelayMs: 5000,
+		},
 	};
 
-	// Special handling for Cloudflare servers
-	if (serverRecord.url.includes('cloudflare.com')) {
-		console.log(
-			`[MCP Server Info] Configuring Cloudflare server: ${serverRecord.url}`,
-		);
-		
-		// Add longer timeout for CF servers which might be slower to respond
-		serverConfig.timeout = 120_000; // 2 minutes
-		serverConfig.connectionTimeout = 60_000; // 1 minute for connection
-		
-		// Force specific transport settings for Cloudflare
-		serverConfig.transports = ['sse', 'http']; // Try SSE first, fallback to HTTP
-		
-		console.log(
-			`[MCP Server Info] Applied Cloudflare-specific timeout and transport settings`,
-		);
+	// Configure generic server settings
+	// Use 2-minute timeout for all OAuth servers (may require longer auth handshake)
+	if (serverRecord.authStatus === 'authorized') {
+		serverConfig.timeout = 120_000; // 2 minutes for OAuth servers
 	}
 
 	// Configure authentication according to MCP specification
@@ -1767,8 +1776,7 @@ export async function getMcpServerInfo(userId: string, serverId: string) {
 							accessToken: refreshedTokens.accessToken,
 							refreshToken:
 								refreshedTokens.refreshToken || serverRecord.refreshToken,
-							tokenExpiresAt:
-								refreshedTokens.expiresAt?.toISOString() || null,
+							tokenExpiresAt: refreshedTokens.expiresAt?.toISOString() || null,
 						};
 					} else {
 						throw new Error(
@@ -1829,7 +1837,9 @@ export async function getMcpServerInfo(userId: string, serverId: string) {
 				...serverConfig,
 				// Hide sensitive auth headers from logs
 				requestInit: serverConfig.requestInit ? 'configured' : undefined,
-				eventSourceInit: serverConfig.eventSourceInit ? 'configured' : undefined,
+				eventSourceInit: serverConfig.eventSourceInit
+					? 'configured'
+					: undefined,
 			},
 			null,
 			2,
@@ -1977,9 +1987,14 @@ export async function getMcpServerInfo(userId: string, serverId: string) {
 				};
 
 				await mcpToolCache.cacheServerTools(serverId, cacheEntry);
-				console.log(`[MCP Cache] Cached capabilities for server ${serverRecord.name}`);
+				console.log(
+					`[MCP Cache] Cached capabilities for server ${serverRecord.name}`,
+				);
 			} catch (cacheError) {
-				console.error(`[MCP Cache] Failed to cache capabilities for server ${serverRecord.name}:`, cacheError);
+				console.error(
+					`[MCP Cache] Failed to cache capabilities for server ${serverRecord.name}:`,
+					cacheError,
+				);
 			}
 		}
 

@@ -27,7 +27,11 @@ setInterval(
 	5 * 60 * 1000,
 );
 
-export function storePKCEVerifier(state: string, codeVerifier: string, clientId?: string): void {
+export function storePKCEVerifier(
+	state: string,
+	codeVerifier: string,
+	clientId?: string,
+): void {
 	pkceStore.set(state, {
 		codeVerifier,
 		clientId: clientId || OAUTH_CONFIG.clientName,
@@ -35,7 +39,9 @@ export function storePKCEVerifier(state: string, codeVerifier: string, clientId?
 	});
 }
 
-export function retrievePKCEData(state: string): { codeVerifier: string; clientId: string } | null {
+export function retrievePKCEData(
+	state: string,
+): { codeVerifier: string; clientId: string } | null {
 	const data = pkceStore.get(state);
 	if (!data) {
 		return null;
