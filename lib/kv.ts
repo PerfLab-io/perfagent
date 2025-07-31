@@ -99,9 +99,12 @@ class KVClient {
 		}
 	}
 
-	private async serialize(value: any, shouldCompress?: boolean): Promise<KVData> {
+	private async serialize(
+		value: any,
+		shouldCompress?: boolean,
+	): Promise<KVData> {
 		const jsonString = JSON.stringify(value);
-		
+
 		// Auto-compress large data (>1KB) or when explicitly requested
 		const autoCompress = shouldCompress ?? jsonString.length > 1000;
 

@@ -33,7 +33,7 @@ export class MockMCPToolCache {
 	async isCacheValid(serverId: string) {
 		const entry = this.cache.get(`tools:${serverId}`);
 		if (!entry) return false;
-		
+
 		// Mock cache validity (assume valid if exists)
 		return true;
 	}
@@ -67,7 +67,7 @@ export class MockMCPOAuthCache {
 	async isTokenCacheValid(serverId: string, accessToken: string) {
 		const entry = this.cache.get(`oauth:${serverId}`);
 		if (!entry) return false;
-		
+
 		// Check if token matches
 		return entry.accessToken === accessToken;
 	}

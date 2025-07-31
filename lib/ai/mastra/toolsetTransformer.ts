@@ -12,12 +12,19 @@ function normalizeDateFields(data: any): any {
 
 	// Handle arrays
 	if (Array.isArray(data)) {
-		return data.map(item => normalizeDateFields(item));
+		return data.map((item) => normalizeDateFields(item));
 	}
 
 	// Handle objects
 	const normalized = { ...data };
-	const dateFieldNames = ['createdAt', 'updatedAt', 'expiresAt', 'tokenExpiresAt', 'timestamp', 'date'];
+	const dateFieldNames = [
+		'createdAt',
+		'updatedAt',
+		'expiresAt',
+		'tokenExpiresAt',
+		'timestamp',
+		'date',
+	];
 
 	for (const fieldName of dateFieldNames) {
 		if (fieldName in normalized && normalized[fieldName]) {
@@ -36,7 +43,10 @@ function normalizeDateFields(data: any): any {
 					}
 				} catch (error) {
 					// If conversion fails, leave the original value
-					console.warn(`[Date Normalization] Failed to convert ${fieldName}:`, error);
+					console.warn(
+						`[Date Normalization] Failed to convert ${fieldName}:`,
+						error,
+					);
 				}
 			}
 		}
@@ -44,7 +54,12 @@ function normalizeDateFields(data: any): any {
 
 	// Recursively handle nested objects
 	for (const key in normalized) {
-		if (normalized[key] && typeof normalized[key] === 'object' && !Array.isArray(normalized[key]) && !(normalized[key] instanceof Date)) {
+		if (
+			normalized[key] &&
+			typeof normalized[key] === 'object' &&
+			!Array.isArray(normalized[key]) &&
+			!(normalized[key] instanceof Date)
+		) {
 			normalized[key] = normalizeDateFields(normalized[key]);
 		}
 	}
@@ -192,22 +207,42 @@ export function transformMcpToolsetsForMastra(
 
 					if (typeof toolObj.execute === 'function') {
 						try {
-							console.log(`[MCP Tool Execute] Starting execution of ${toolName} with args:`, JSON.stringify(args, null, 2));
+							console.log(
+								`[MCP Tool Execute] Starting execution of ${toolName} with args:`,
+								JSON.stringify(args, null, 2),
+							);
 							const result = await toolObj.execute(args);
-							console.log(`[MCP Tool Execute] Raw result from ${toolName}:`, JSON.stringify(result, null, 2));
+							console.log(
+								`[MCP Tool Execute] Raw result from ${toolName}:`,
+								JSON.stringify(result, null, 2),
+							);
 							// Add defensive handling for common date field issues
 							const normalized = normalizeDateFields(result);
-							console.log(`[MCP Tool Execute] Normalized result from ${toolName}:`, JSON.stringify(normalized, null, 2));
+							console.log(
+								`[MCP Tool Execute] Normalized result from ${toolName}:`,
+								JSON.stringify(normalized, null, 2),
+							);
 							return normalized;
 						} catch (error) {
 							console.error(`[MCP Tool Execute] Error in ${toolName}:`, error);
-							console.error(`[MCP Tool Execute] Error stack:`, error instanceof Error ? error.stack : 'No stack');
+							console.error(
+								`[MCP Tool Execute] Error stack:`,
+								error instanceof Error ? error.stack : 'No stack',
+							);
 							// Handle the specific "createdAt.toISOString is not a function" error
-							if (error instanceof Error && error.message.includes('toISOString is not a function')) {
-								console.warn(`[MCP Tool] Date field error in ${toolName}, attempting to normalize data:`, error.message);
+							if (
+								error instanceof Error &&
+								error.message.includes('toISOString is not a function')
+							) {
+								console.warn(
+									`[MCP Tool] Date field error in ${toolName}, attempting to normalize data:`,
+									error.message,
+								);
 								// This is a fallback - the error already occurred, so we can't fix the result
 								// But we can provide a more helpful error message
-								throw new Error(`Tool ${toolName} encountered date format issues. This may be due to database date field formatting. Original error: ${error.message}`);
+								throw new Error(
+									`Tool ${toolName} encountered date format issues. This may be due to database date field formatting. Original error: ${error.message}`,
+								);
 							}
 							throw error;
 						}
@@ -238,9 +273,17 @@ export function transformMcpToolsetsForMastra(
 								return normalizeDateFields(result);
 							} catch (error) {
 								// Handle the specific "createdAt.toISOString is not a function" error
-								if (error instanceof Error && error.message.includes('toISOString is not a function')) {
-									console.warn(`[MCP Tool] Date field error in ${toolName}, attempting to normalize data:`, error.message);
-									throw new Error(`Tool ${toolName} encountered date format issues. This may be due to database date field formatting. Original error: ${error.message}`);
+								if (
+									error instanceof Error &&
+									error.message.includes('toISOString is not a function')
+								) {
+									console.warn(
+										`[MCP Tool] Date field error in ${toolName}, attempting to normalize data:`,
+										error.message,
+									);
+									throw new Error(
+										`Tool ${toolName} encountered date format issues. This may be due to database date field formatting. Original error: ${error.message}`,
+									);
 								}
 								throw error;
 							}

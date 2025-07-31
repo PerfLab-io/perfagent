@@ -4,7 +4,11 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mockDb, mockMcpToolCache, mockMcpOAuthCache } from './__mocks__/mockDependencies';
+import {
+	mockDb,
+	mockMcpToolCache,
+	mockMcpOAuthCache,
+} from './__mocks__/mockDependencies';
 
 // Mock problematic imports to avoid database dependencies
 vi.mock('@/drizzle/db', () => ({ db: mockDb }));
@@ -34,9 +38,11 @@ describe('MCP Infrastructure Integration Tests', () => {
 		it('should run protocol initialization tests', async () => {
 			// Create mock server
 			mcpProtocolTest.createMockServer('integration-protocol-test');
-			
-			const result = await mcpProtocolTest.testInitializationSequence('integration-protocol-test');
-			
+
+			const result = await mcpProtocolTest.testInitializationSequence(
+				'integration-protocol-test',
+			);
+
 			expect(result.success).toBe(true);
 			expect(result.errors).toHaveLength(0);
 			expect(result.details.initResponse).toBeDefined();
@@ -45,15 +51,17 @@ describe('MCP Infrastructure Integration Tests', () => {
 
 		it('should run protocol error handling tests', async () => {
 			const result = await mcpProtocolTest.testErrorHandling();
-			
+
 			expect(result.success).toBe(true);
 			expect(result.errors).toHaveLength(0);
 			expect(result.details).toBeDefined();
 		});
 
 		it('should run full protocol test suite', async () => {
-			const result = await mcpProtocolTest.runFullTestSuite('integration-full-test');
-			
+			const result = await mcpProtocolTest.runFullTestSuite(
+				'integration-full-test',
+			);
+
 			expect(result.success).toBe(true);
 			expect(result.summary.totalTests).toBeGreaterThan(0);
 			expect(result.summary.passedTests).toBe(result.summary.totalTests);
@@ -63,8 +71,9 @@ describe('MCP Infrastructure Integration Tests', () => {
 
 	describe('Fluid Compute Integration', () => {
 		it('should test cache resilience', async () => {
-			const result = await fluidComputeTest.testCacheResilienceAcrossInstances();
-			
+			const result =
+				await fluidComputeTest.testCacheResilienceAcrossInstances();
+
 			expect(result.success).toBe(true);
 			expect(result.errors).toHaveLength(0);
 			expect(result.details.cacheHit).toBeDefined();
@@ -72,7 +81,7 @@ describe('MCP Infrastructure Integration Tests', () => {
 
 		it('should test cold start performance', async () => {
 			const result = await fluidComputeTest.testColdStartPerformance();
-			
+
 			expect(result.success).toBe(true);
 			expect(result.errors).toHaveLength(0);
 			expect(result.details.cacheRetrievalTime).toBeLessThan(100);
@@ -80,7 +89,7 @@ describe('MCP Infrastructure Integration Tests', () => {
 
 		it('should run full Fluid Compute test suite', async () => {
 			const result = await fluidComputeTest.runFluidComputeTests();
-			
+
 			expect(result.success).toBe(true);
 			expect(result.summary.totalTests).toBeGreaterThan(0);
 			expect(result.summary.passedTests).toBe(result.summary.totalTests);
@@ -91,20 +100,23 @@ describe('MCP Infrastructure Integration Tests', () => {
 	describe('Connection Manager Integration', () => {
 		it('should integrate with error handler correctly', async () => {
 			const connectionManager = new ConnectionManager();
-			
+
 			// Test that connection manager uses error handler patterns
 			const mockError = new Error('Test connection error');
-			
+
 			// Error handler should classify this correctly
 			const isTransportError = errorHandler.isTransportError(mockError);
 			expect(typeof isTransportError).toBe('boolean');
-			
+
 			// Error handler should provide recovery recommendation
-			const recommendation = errorHandler.getErrorRecoveryRecommendation(mockError, {
-				serverId: 'test-server',
-				userId: 'test-user',
-			});
-			
+			const recommendation = errorHandler.getErrorRecoveryRecommendation(
+				mockError,
+				{
+					serverId: 'test-server',
+					userId: 'test-user',
+				},
+			);
+
 			expect(recommendation.action).toBeDefined();
 			expect(recommendation.message).toBeDefined();
 			expect(typeof recommendation.automated).toBe('boolean');
@@ -112,15 +124,15 @@ describe('MCP Infrastructure Integration Tests', () => {
 
 		it('should handle live connection status properly', () => {
 			const connectionManager = new ConnectionManager();
-			
+
 			// Initially, no connection status should exist
 			const status = connectionManager.getLiveConnectionStatus('new-server');
 			expect(status).toBeNull();
-			
+
 			// Connection status should be isolated per server
 			const status1 = connectionManager.getLiveConnectionStatus('server-1');
 			const status2 = connectionManager.getLiveConnectionStatus('server-2');
-			
+
 			expect(status1).toBeNull();
 			expect(status2).toBeNull();
 			// Both are null but method works correctly for different server IDs
@@ -137,7 +149,7 @@ describe('MCP Infrastructure Integration Tests', () => {
 				toolName: 'test-tool',
 				arguments: { input: 'test' },
 			};
-			
+
 			// Verify the request structure is valid
 			expect(mockToolExecutionRequest.serverId).toBeDefined();
 			expect(mockToolExecutionRequest.userId).toBeDefined();
@@ -155,7 +167,7 @@ describe('MCP Infrastructure Integration Tests', () => {
 				serverUrl: 'mock://test-server',
 				requiresAuth: false,
 			};
-			
+
 			expect(mockToolInfo.name).toBe('test-tool');
 			expect(mockToolInfo.requiresAuth).toBe(false);
 		});
@@ -168,7 +180,7 @@ describe('MCP Infrastructure Integration Tests', () => {
 				executionTime: 100,
 				fromCache: false,
 			};
-			
+
 			expect(mockResult.success).toBe(true);
 			expect(mockResult.executionTime).toBeGreaterThan(0);
 		});
@@ -188,12 +200,15 @@ describe('MCP Infrastructure Integration Tests', () => {
 				method: 'tools/list',
 			};
 
-			const message = errorHandler.getContextAwareErrorMessage(mockError, context);
-			
+			const message = errorHandler.getContextAwareErrorMessage(
+				mockError,
+				context,
+			);
+
 			expect(message).toBeDefined();
 			expect(typeof message).toBe('string');
 			expect(message.length).toBeGreaterThan(0);
-			
+
 			// Should include server info
 			expect(message).toContain('example.com');
 		});
@@ -214,13 +229,18 @@ describe('MCP Infrastructure Integration Tests', () => {
 				},
 				{
 					error: { status: 429, message: 'Too Many Requests' },
-					expected: { is401: false, isMCP: false, isTransport: false, isRateLimit: true },
+					expected: {
+						is401: false,
+						isMCP: false,
+						isTransport: false,
+						isRateLimit: true,
+					},
 				},
 			];
 
 			testCases.forEach((testCase, index) => {
 				const { error, expected } = testCase;
-				
+
 				if (expected.is401 !== undefined) {
 					expect(errorHandler.is401Error(error)).toBe(expected.is401);
 				}
@@ -228,10 +248,14 @@ describe('MCP Infrastructure Integration Tests', () => {
 					expect(errorHandler.isMCPProtocolError(error)).toBe(expected.isMCP);
 				}
 				if (expected.isTransport !== undefined) {
-					expect(errorHandler.isTransportError(error)).toBe(expected.isTransport);
+					expect(errorHandler.isTransportError(error)).toBe(
+						expected.isTransport,
+					);
 				}
 				if (expected.isRateLimit !== undefined) {
-					expect(errorHandler.isRateLimitError(error)).toBe(expected.isRateLimit);
+					expect(errorHandler.isRateLimitError(error)).toBe(
+						expected.isRateLimit,
+					);
 				}
 			});
 		});
@@ -242,11 +266,11 @@ describe('MCP Infrastructure Integration Tests', () => {
 			// This test verifies that caching works across the entire system
 			const serverId = 'integration-cache-test';
 			const userId = 'test-user';
-			
+
 			// Connection manager should be able to use cache stats
 			const connectionManager = new ConnectionManager();
 			const cacheStats = await connectionManager.getCacheStats();
-			
+
 			expect(cacheStats).toBeDefined();
 			expect(cacheStats.tools).toBeDefined();
 			expect(cacheStats.oauth).toBeDefined();
@@ -258,11 +282,12 @@ describe('MCP Infrastructure Integration Tests', () => {
 		it('should handle component failures gracefully', async () => {
 			// Test that system components handle errors without crashing
 			const connectionManager = new ConnectionManager();
-			
+
 			// Should handle invalid server IDs gracefully
-			const status = connectionManager.getLiveConnectionStatus('invalid-server-id');
+			const status =
+				connectionManager.getLiveConnectionStatus('invalid-server-id');
 			expect(status).toBeNull();
-			
+
 			// Should handle error objects gracefully
 			const mockError = new Error('Test error');
 			const isTransportError = errorHandler.isTransportError(mockError);
@@ -272,18 +297,18 @@ describe('MCP Infrastructure Integration Tests', () => {
 		it('should maintain performance under stress', async () => {
 			const startTime = Date.now();
 			const connectionManager = new ConnectionManager();
-			
+
 			// Simulate many concurrent operations
 			const operations = [];
 			for (let i = 0; i < 100; i++) {
 				operations.push(
-					connectionManager.getLiveConnectionStatus(`stress-test-${i}`)
+					connectionManager.getLiveConnectionStatus(`stress-test-${i}`),
 				);
 			}
-			
+
 			const results = await Promise.all(operations);
 			const duration = Date.now() - startTime;
-			
+
 			expect(results).toHaveLength(100);
 			expect(duration).toBeLessThan(1000); // Should complete within 1 second
 		});

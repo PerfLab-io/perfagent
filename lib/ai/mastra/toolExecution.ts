@@ -3,7 +3,10 @@
  * Uses Connection Manager for robust authentication, error handling, and caching
  * Features live connection status and optional MCP ping optimization
  */
-import { ConnectionManager, type LiveConnectionStatus } from './connection/ConnectionManager';
+import {
+	ConnectionManager,
+	type LiveConnectionStatus,
+} from './connection/ConnectionManager';
 import { errorHandler } from './connection/ErrorHandler';
 import { mcpToolCache } from './cache/MCPCache';
 import { db } from '@/drizzle/db';
@@ -48,7 +51,7 @@ interface ToolInfo {
  */
 export class ToolExecutionService {
 	private connectionManager: ConnectionManager;
-	
+
 	constructor() {
 		this.connectionManager = new ConnectionManager();
 	}
@@ -57,39 +60,48 @@ export class ToolExecutionService {
 	 * Execute a tool on a specific MCP server
 	 * Includes live connection status for better debugging
 	 */
-	async executeTool(request: ToolExecutionRequest): Promise<ToolExecutionResult> {
+	async executeTool(
+		request: ToolExecutionRequest,
+	): Promise<ToolExecutionResult> {
 		const startTime = Date.now();
-		console.log(`[Tool Execution] Executing tool ${request.toolName} on server ${request.serverId}`);
+		console.log(
+			`[Tool Execution] Executing tool ${request.toolName} on server ${request.serverId}`,
+		);
 
 		try {
 			// Check connection status before execution
-			const connectionStatus = this.connectionManager.getLiveConnectionStatus(request.serverId);
-			
+			const connectionStatus = this.connectionManager.getLiveConnectionStatus(
+				request.serverId,
+			);
+
 			// Execute with retry logic and error handling
 			const result = await errorHandler.executeWithRetry(
-				() => this.connectionManager.executeToolCall(
-					request.serverId,
-					request.userId,
-					request.toolName,
-					request.arguments
-				),
+				() =>
+					this.connectionManager.executeToolCall(
+						request.serverId,
+						request.userId,
+						request.toolName,
+						request.arguments,
+					),
 				{
 					serverId: request.serverId,
 					userId: request.userId,
 					method: 'executeToolCall',
-				}
+				},
 			);
 
 			// Get updated connection status after execution
-			const updatedConnectionStatus = this.connectionManager.getLiveConnectionStatus(request.serverId);
+			const updatedConnectionStatus =
+				this.connectionManager.getLiveConnectionStatus(request.serverId);
 
 			// Check if we got an error result
 			if ('error' in result) {
 				const errorResult = result.error;
-				const message = typeof errorResult === 'string' 
-					? errorResult 
-					: (errorResult?.userMessage || 'Tool execution failed');
-				
+				const message =
+					typeof errorResult === 'string'
+						? errorResult
+						: errorResult?.userMessage || 'Tool execution failed';
+
 				return {
 					success: false,
 					error: message,
@@ -98,18 +110,24 @@ export class ToolExecutionService {
 				};
 			}
 
-			console.log(`[Tool Execution] Successfully executed tool ${request.toolName}`);
+			console.log(
+				`[Tool Execution] Successfully executed tool ${request.toolName}`,
+			);
 			return {
 				success: true,
 				result: result.result || result,
 				executionTime: Date.now() - startTime,
 				connectionStatus: updatedConnectionStatus || undefined,
 			};
-
 		} catch (error) {
-			console.error(`[Tool Execution] Error executing tool ${request.toolName}:`, error);
-			const connectionStatus = this.connectionManager.getLiveConnectionStatus(request.serverId);
-			
+			console.error(
+				`[Tool Execution] Error executing tool ${request.toolName}:`,
+				error,
+			);
+			const connectionStatus = this.connectionManager.getLiveConnectionStatus(
+				request.serverId,
+			);
+
 			return {
 				success: false,
 				error: error instanceof Error ? error.message : 'Unknown error',
@@ -139,22 +157,29 @@ export class ToolExecutionService {
 		for (const server of servers) {
 			try {
 				// Get server capabilities (with caching and live status tracking)
-				const capabilities = await this.connectionManager.getServerCapabilities(server.id, userId);
-				
+				const capabilities = await this.connectionManager.getServerCapabilities(
+					server.id,
+					userId,
+				);
+
 				// Get live connection status
-				const connectionStatus = this.connectionManager.getLiveConnectionStatus(server.id);
+				const connectionStatus = this.connectionManager.getLiveConnectionStatus(
+					server.id,
+				);
 				if (connectionStatus) {
 					connectionStates[server.id] = connectionStatus;
 				}
-				
+
 				if ('error' in capabilities) {
-					console.warn(`[Tool Discovery] Failed to get capabilities for server ${server.name}: ${capabilities.error}`);
+					console.warn(
+						`[Tool Discovery] Failed to get capabilities for server ${server.name}: ${capabilities.error}`,
+					);
 					continue;
 				}
 
 				if (capabilities.success && capabilities.tools) {
 					authorizedServers++;
-					
+
 					// Add tools from this server
 					for (const tool of capabilities.tools) {
 						tools.push({
@@ -169,17 +194,24 @@ export class ToolExecutionService {
 					}
 				}
 			} catch (error) {
-				console.error(`[Tool Discovery] Error processing server ${server.name}:`, error);
+				console.error(
+					`[Tool Discovery] Error processing server ${server.name}:`,
+					error,
+				);
 				// Still try to get connection status even on error
-				const connectionStatus = this.connectionManager.getLiveConnectionStatus(server.id);
+				const connectionStatus = this.connectionManager.getLiveConnectionStatus(
+					server.id,
+				);
 				if (connectionStatus) {
 					connectionStates[server.id] = connectionStatus;
 				}
 			}
 		}
 
-		console.log(`[Tool Discovery] Discovered ${tools.length} tools from ${authorizedServers}/${servers.length} servers`);
-		
+		console.log(
+			`[Tool Discovery] Discovered ${tools.length} tools from ${authorizedServers}/${servers.length} servers`,
+		);
+
 		return {
 			tools,
 			totalServers: servers.length,
@@ -195,9 +227,10 @@ export class ToolExecutionService {
 		const discovery = await this.discoverTools(userId);
 		const searchTerm = query.toLowerCase();
 
-		return discovery.tools.filter(tool => 
-			tool.name.toLowerCase().includes(searchTerm) ||
-			tool.description.toLowerCase().includes(searchTerm)
+		return discovery.tools.filter(
+			(tool) =>
+				tool.name.toLowerCase().includes(searchTerm) ||
+				tool.description.toLowerCase().includes(searchTerm),
 		);
 	}
 
@@ -222,14 +255,21 @@ export class ToolExecutionService {
 			const serverRecord = server[0];
 
 			// Get server capabilities
-			const capabilities = await this.connectionManager.getServerCapabilities(serverId, userId);
-			
-			if ('error' in capabilities || !capabilities.success || !capabilities.tools) {
+			const capabilities = await this.connectionManager.getServerCapabilities(
+				serverId,
+				userId,
+			);
+
+			if (
+				'error' in capabilities ||
+				!capabilities.success ||
+				!capabilities.tools
+			) {
 				return [];
 			}
 
 			// Convert to ToolInfo format
-			return capabilities.tools.map(tool => ({
+			return capabilities.tools.map((tool) => ({
 				name: tool.name,
 				description: tool.description || '',
 				serverId: serverRecord.id,
@@ -238,9 +278,11 @@ export class ToolExecutionService {
 				inputSchema: tool.inputSchema,
 				requiresAuth: serverRecord.authStatus !== 'authorized',
 			}));
-
 		} catch (error) {
-			console.error(`[Tool Discovery] Error getting tools for server ${serverId}:`, error);
+			console.error(
+				`[Tool Discovery] Error getting tools for server ${serverId}:`,
+				error,
+			);
 			return [];
 		}
 	}
@@ -248,7 +290,10 @@ export class ToolExecutionService {
 	/**
 	 * Validate tool arguments against schema
 	 */
-	validateToolArguments(tool: ToolInfo, arguments_: Record<string, any>): { valid: boolean; errors: string[] } {
+	validateToolArguments(
+		tool: ToolInfo,
+		arguments_: Record<string, any>,
+	): { valid: boolean; errors: string[] } {
 		const errors: string[] = [];
 
 		if (!tool.inputSchema) {
@@ -257,7 +302,7 @@ export class ToolExecutionService {
 
 		// Basic validation - can be enhanced with proper JSON schema validation
 		const schema = tool.inputSchema;
-		
+
 		if (schema.required && Array.isArray(schema.required)) {
 			for (const requiredField of schema.required) {
 				if (!(requiredField in arguments_)) {
@@ -283,10 +328,12 @@ export class ToolExecutionService {
 	/**
 	 * Execute tool with validation
 	 */
-	async executeToolWithValidation(request: ToolExecutionRequest): Promise<ToolExecutionResult> {
+	async executeToolWithValidation(
+		request: ToolExecutionRequest,
+	): Promise<ToolExecutionResult> {
 		// Get tool info for validation
 		const tools = await this.getServerTools(request.serverId, request.userId);
-		const tool = tools.find(t => t.name === request.toolName);
+		const tool = tools.find((t) => t.name === request.toolName);
 
 		if (!tool) {
 			return {
@@ -311,23 +358,29 @@ export class ToolExecutionService {
 	/**
 	 * Get server health status for all user servers
 	 */
-	async getServerHealthStatus(userId: string): Promise<{
-		serverId: string;
-		serverName: string;
-		connectionStatus: LiveConnectionStatus | null;
-		isHealthy: boolean;
-		lastSuccess?: Date;
-		pingSupported?: boolean;
-	}[]> {
-		console.log(`[Tool Execution] Getting server health status for user ${userId}`);
+	async getServerHealthStatus(userId: string): Promise<
+		{
+			serverId: string;
+			serverName: string;
+			connectionStatus: LiveConnectionStatus | null;
+			isHealthy: boolean;
+			lastSuccess?: Date;
+			pingSupported?: boolean;
+		}[]
+	> {
+		console.log(
+			`[Tool Execution] Getting server health status for user ${userId}`,
+		);
 
 		const servers = await db
 			.select()
 			.from(mcpServers)
 			.where(and(eq(mcpServers.userId, userId), eq(mcpServers.enabled, true)));
 
-		return servers.map(server => {
-			const connectionStatus = this.connectionManager.getLiveConnectionStatus(server.id);
+		return servers.map((server) => {
+			const connectionStatus = this.connectionManager.getLiveConnectionStatus(
+				server.id,
+			);
 			return {
 				serverId: server.id,
 				serverName: server.name,
@@ -342,7 +395,10 @@ export class ToolExecutionService {
 	/**
 	 * Test connection to a specific server
 	 */
-	async testServerConnection(serverId: string, userId: string): Promise<{
+	async testServerConnection(
+		serverId: string,
+		userId: string,
+	): Promise<{
 		success: boolean;
 		connectionStatus: LiveConnectionStatus | null;
 		error?: string;
@@ -350,8 +406,12 @@ export class ToolExecutionService {
 		console.log(`[Tool Execution] Testing connection to server ${serverId}`);
 
 		try {
-			const result = await this.connectionManager.testConnection(serverId, userId);
-			const connectionStatus = this.connectionManager.getLiveConnectionStatus(serverId);
+			const result = await this.connectionManager.testConnection(
+				serverId,
+				userId,
+			);
+			const connectionStatus =
+				this.connectionManager.getLiveConnectionStatus(serverId);
 
 			return {
 				success: result.success,
@@ -359,7 +419,8 @@ export class ToolExecutionService {
 				error: result.error,
 			};
 		} catch (error) {
-			const connectionStatus = this.connectionManager.getLiveConnectionStatus(serverId);
+			const connectionStatus =
+				this.connectionManager.getLiveConnectionStatus(serverId);
 			return {
 				success: false,
 				connectionStatus,
@@ -387,7 +448,7 @@ export class ToolExecutionService {
 		let healthyServers = 0;
 		let serversWithPing = 0;
 
-		Object.values(discovery.connectionStates).forEach(status => {
+		Object.values(discovery.connectionStates).forEach((status) => {
 			if (status.status === 'connected') {
 				healthyServers++;
 			}
@@ -412,9 +473,9 @@ export class ToolExecutionService {
 export const toolExecutionService = new ToolExecutionService();
 
 // Export types
-export type { 
-	ToolExecutionRequest, 
-	ToolExecutionResult, 
-	ToolDiscoveryResult, 
-	ToolInfo 
+export type {
+	ToolExecutionRequest,
+	ToolExecutionResult,
+	ToolDiscoveryResult,
+	ToolInfo,
 };

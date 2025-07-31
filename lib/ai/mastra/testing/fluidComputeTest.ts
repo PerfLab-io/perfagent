@@ -70,7 +70,7 @@ export class FluidComputeTestSuite {
 
 			// Simulate instance restart by creating new Connection Manager
 			const newConnectionManager = new ConnectionManager();
-			
+
 			// Test that KV cache persists across "instance restart"
 			const persistedCache = await mcpToolCache.getServerTools(serverId);
 			if (!persistedCache) {
@@ -78,16 +78,20 @@ export class FluidComputeTestSuite {
 			}
 
 			// Test that in-memory connection status is lost (as expected)
-			const connectionStatus = newConnectionManager.getLiveConnectionStatus(serverId);
+			const connectionStatus =
+				newConnectionManager.getLiveConnectionStatus(serverId);
 			if (connectionStatus) {
-				errors.push('In-memory connection status should be lost after instance restart');
+				errors.push(
+					'In-memory connection status should be lost after instance restart',
+				);
 			}
 
 			details.persistedCache = persistedCache;
 			details.connectionStatusAfterRestart = connectionStatus;
-
 		} catch (error) {
-			errors.push(`Cache resilience test failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+			errors.push(
+				`Cache resilience test failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+			);
 		}
 
 		return {
@@ -111,10 +115,10 @@ export class FluidComputeTestSuite {
 		try {
 			// Simulate cold start scenario
 			const startTime = Date.now();
-			
+
 			// Create fresh connection manager (simulates cold start)
 			const coldConnectionManager = new ConnectionManager();
-			
+
 			// Test cache effectiveness for reducing cold start impact
 			const serverId = 'cold-start-test';
 			const userId = 'test-user';
@@ -140,7 +144,9 @@ export class FluidComputeTestSuite {
 
 			// Cache retrieval should be very fast (< 100ms)
 			if (cacheRetrievalTime > 100) {
-				errors.push(`Cache retrieval too slow: ${cacheRetrievalTime}ms (should be < 100ms)`);
+				errors.push(
+					`Cache retrieval too slow: ${cacheRetrievalTime}ms (should be < 100ms)`,
+				);
 			}
 
 			const totalColdStartTime = Date.now() - startTime;
@@ -148,9 +154,10 @@ export class FluidComputeTestSuite {
 			details.cacheRetrievalTime = cacheRetrievalTime;
 			details.totalColdStartTime = totalColdStartTime;
 			details.cachedCapabilities = cachedResult;
-
 		} catch (error) {
-			errors.push(`Cold start test failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+			errors.push(
+				`Cold start test failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+			);
 		}
 
 		return {
@@ -186,7 +193,7 @@ export class FluidComputeTestSuite {
 
 			for (let i = 0; i < concurrentRequests; i++) {
 				promises.push(
-					this.connectionManager.getLiveConnectionStatus(`${serverId}-${i}`)
+					this.connectionManager.getLiveConnectionStatus(`${serverId}-${i}`),
 				);
 			}
 
@@ -203,15 +210,19 @@ export class FluidComputeTestSuite {
 			// (not much slower than single request due to parallelism)
 			const expectedMaxTime = 150; // Reasonable for 5 concurrent requests with 50ms delay
 			if (concurrentExecutionTime > expectedMaxTime) {
-				errors.push(`Concurrent execution too slow: ${concurrentExecutionTime}ms (expected < ${expectedMaxTime}ms)`);
+				errors.push(
+					`Concurrent execution too slow: ${concurrentExecutionTime}ms (expected < ${expectedMaxTime}ms)`,
+				);
 			}
 
 			details.concurrentRequests = concurrentRequests;
 			details.executionTime = concurrentExecutionTime;
-			details.averageTimePerRequest = concurrentExecutionTime / concurrentRequests;
-
+			details.averageTimePerRequest =
+				concurrentExecutionTime / concurrentRequests;
 		} catch (error) {
-			errors.push(`Concurrent request test failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+			errors.push(
+				`Concurrent request test failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+			);
 		}
 
 		return {
@@ -242,7 +253,7 @@ export class FluidComputeTestSuite {
 			for (let i = 0; i < 100; i++) {
 				const serverId = `memory-test-${i}`;
 				testOperations.push(
-					connectionManager.getLiveConnectionStatus(serverId)
+					connectionManager.getLiveConnectionStatus(serverId),
 				);
 			}
 
@@ -254,21 +265,25 @@ export class FluidComputeTestSuite {
 			}
 
 			const finalMemoryUsage = process.memoryUsage();
-			const memoryIncrease = finalMemoryUsage.heapUsed - initialMemoryUsage.heapUsed;
+			const memoryIncrease =
+				finalMemoryUsage.heapUsed - initialMemoryUsage.heapUsed;
 
 			// Memory increase should be reasonable (< 10MB for this test)
 			const maxMemoryIncrease = 10 * 1024 * 1024; // 10MB
 			if (memoryIncrease > maxMemoryIncrease) {
-				errors.push(`Memory usage increased by ${Math.round(memoryIncrease / 1024 / 1024)}MB (should be < 10MB)`);
+				errors.push(
+					`Memory usage increased by ${Math.round(memoryIncrease / 1024 / 1024)}MB (should be < 10MB)`,
+				);
 			}
 
 			details.initialMemory = initialMemoryUsage;
 			details.finalMemory = finalMemoryUsage;
 			details.memoryIncrease = memoryIncrease;
 			details.memoryIncreaseKB = Math.round(memoryIncrease / 1024);
-
 		} catch (error) {
-			errors.push(`Memory cleanup test failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+			errors.push(
+				`Memory cleanup test failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+			);
 		}
 
 		return {
@@ -319,12 +334,18 @@ export class FluidComputeTestSuite {
 
 			// Verify OAuth cache
 			const cachedTokens = await mcpOAuthCache.getValidatedToken(serverId);
-			if (!cachedTokens || cachedTokens.accessToken !== mockTokens.accessToken) {
+			if (
+				!cachedTokens ||
+				cachedTokens.accessToken !== mockTokens.accessToken
+			) {
 				errors.push('OAuth tokens should be cached correctly');
 			}
 
 			// Test cache validity checking
-			const isTokenCacheValid = await mcpOAuthCache.isTokenCacheValid(serverId, mockTokens.accessToken);
+			const isTokenCacheValid = await mcpOAuthCache.isTokenCacheValid(
+				serverId,
+				mockTokens.accessToken,
+			);
 			if (!isTokenCacheValid) {
 				errors.push('Newly cached tokens should be valid');
 			}
@@ -332,9 +353,10 @@ export class FluidComputeTestSuite {
 			details.capabilitiesCacheValid = isValidBefore;
 			details.oauthCacheValid = isTokenCacheValid;
 			details.cachedTokens = cachedTokens;
-
 		} catch (error) {
-			errors.push(`Cache TTL test failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+			errors.push(
+				`Cache TTL test failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+			);
 		}
 
 		return {
@@ -359,7 +381,8 @@ export class FluidComputeTestSuite {
 		const testSuites: FluidComputeTestScenario[] = [
 			{
 				name: 'Cache Resilience Across Instances',
-				description: 'Tests KV cache persistence and in-memory state loss across instance restarts',
+				description:
+					'Tests KV cache persistence and in-memory state loss across instance restarts',
 				test: () => this.testCacheResilienceAcrossInstances(),
 			},
 			{
@@ -369,7 +392,8 @@ export class FluidComputeTestSuite {
 			},
 			{
 				name: 'Concurrent Request Handling',
-				description: 'Tests handling of concurrent requests within single instance',
+				description:
+					'Tests handling of concurrent requests within single instance',
 				test: () => this.testConcurrentRequestHandling(),
 			},
 			{
@@ -379,7 +403,8 @@ export class FluidComputeTestSuite {
 			},
 			{
 				name: 'Cache TTL Behavior',
-				description: 'Tests cache TTL strategies for capabilities and OAuth tokens',
+				description:
+					'Tests cache TTL strategies for capabilities and OAuth tokens',
 				test: () => this.testCacheTTLBehavior(),
 			},
 		];
@@ -407,7 +432,9 @@ export class FluidComputeTestSuite {
 			} catch (error) {
 				results[suite.name] = {
 					success: false,
-					errors: [`Test suite failed: ${error instanceof Error ? error.message : 'Unknown error'}`],
+					errors: [
+						`Test suite failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+					],
 					details: {},
 					description: suite.description,
 				};

@@ -68,30 +68,37 @@ class ToolCatalogManager {
 		serverId: string,
 		serverName: string,
 		serverUrl: string,
-		rawToolsets: Record<string, any>
+		rawToolsets: Record<string, any>,
 	): ToolCatalog {
 		console.log(`[Tool Catalog] Registering catalog for server: ${serverName}`);
-		
+
 		const tools: ToolMetadata[] = [];
-		
+
 		// Process each server's toolset
-		Object.entries(rawToolsets).forEach(([toolsetServerName, serverToolset]) => {
-			if (serverToolset && typeof serverToolset === 'object') {
-				Object.entries(serverToolset).forEach(([toolName, toolConfig]: [string, any]) => {
-					const toolMetadata = this.createToolMetadata(
-						serverId,
-						serverName,
-						toolsetServerName,
-						toolName,
-						toolConfig
+		Object.entries(rawToolsets).forEach(
+			([toolsetServerName, serverToolset]) => {
+				if (serverToolset && typeof serverToolset === 'object') {
+					Object.entries(serverToolset).forEach(
+						([toolName, toolConfig]: [string, any]) => {
+							const toolMetadata = this.createToolMetadata(
+								serverId,
+								serverName,
+								toolsetServerName,
+								toolName,
+								toolConfig,
+							);
+							tools.push(toolMetadata);
+
+							// Index the tool
+							this.registry.toolIndex.set(
+								toolMetadata.normalizedName,
+								toolMetadata,
+							);
+						},
 					);
-					tools.push(toolMetadata);
-					
-					// Index the tool
-					this.registry.toolIndex.set(toolMetadata.normalizedName, toolMetadata);
-				});
-			}
-		});
+				}
+			},
+		);
 
 		const catalog: ToolCatalog = {
 			serverId,
@@ -103,13 +110,13 @@ class ToolCatalogManager {
 
 		// Register in catalogs
 		this.registry.catalogs.set(serverId, catalog);
-		
+
 		// Update server index
-		const toolNames = tools.map(t => t.normalizedName);
+		const toolNames = tools.map((t) => t.normalizedName);
 		this.registry.serverIndex.set(serverId, toolNames);
-		
+
 		// Update category index
-		tools.forEach(tool => {
+		tools.forEach((tool) => {
 			if (tool.category) {
 				const existing = this.registry.categoryIndex.get(tool.category) || [];
 				existing.push(tool.normalizedName);
@@ -117,7 +124,9 @@ class ToolCatalogManager {
 			}
 		});
 
-		console.log(`[Tool Catalog] Registered ${tools.length} tools for ${serverName}`);
+		console.log(
+			`[Tool Catalog] Registered ${tools.length} tools for ${serverName}`,
+		);
 		return catalog;
 	}
 
@@ -129,7 +138,7 @@ class ToolCatalogManager {
 		serverName: string,
 		toolsetServerName: string,
 		toolName: string,
-		toolConfig: any
+		toolConfig: any,
 	): ToolMetadata {
 		// Generate normalized name (consistent with toolsetTransformer)
 		const compositeKey = `${toolsetServerName}_${toolName}`;
@@ -137,24 +146,35 @@ class ToolCatalogManager {
 
 		// Extract parameters from schema
 		const parameters = this.extractParameters(toolConfig.inputSchema || {});
-		
+
 		// Categorize the tool
-		const category = this.categorizeTool(toolName, toolConfig.description || '');
-		
+		const category = this.categorizeTool(
+			toolName,
+			toolConfig.description || '',
+		);
+
 		// Generate usage instructions
-		const usage = this.generateUsageInstructions(toolName, toolConfig.description, parameters);
+		const usage = this.generateUsageInstructions(
+			toolName,
+			toolConfig.description,
+			parameters,
+		);
 
 		return {
 			id: `${serverId}-${toolName}`,
 			name: toolName,
 			normalizedName,
-			description: toolConfig.description || `${toolName} tool from ${toolsetServerName}`,
+			description:
+				toolConfig.description || `${toolName} tool from ${toolsetServerName}`,
 			serverName: toolsetServerName,
 			serverId,
 			parameters,
 			category,
 			usage,
-			safetyLevel: this.assessSafetyLevel(toolName, toolConfig.description || ''),
+			safetyLevel: this.assessSafetyLevel(
+				toolName,
+				toolConfig.description || '',
+			),
 			tags: this.generateTags(toolName, toolConfig.description || ''),
 		};
 	}
@@ -164,15 +184,15 @@ class ToolCatalogManager {
 	 */
 	private normalizeToolName(name: string): string {
 		let validName = name.replace(/[^a-zA-Z0-9_.-]/g, '_');
-		
+
 		if (!/^[a-zA-Z_]/.test(validName)) {
 			validName = '_' + validName;
 		}
-		
+
 		if (validName.length > 63) {
 			validName = validName.slice(0, 28) + '___' + validName.slice(-32);
 		}
-		
+
 		return validName;
 	}
 
@@ -181,10 +201,10 @@ class ToolCatalogManager {
 	 */
 	private extractParameters(schema: any): ToolParameter[] {
 		if (!schema || !schema.properties) return [];
-		
+
 		const required = schema.required || [];
 		const parameters: ToolParameter[] = [];
-		
+
 		Object.entries(schema.properties).forEach(([name, prop]: [string, any]) => {
 			parameters.push({
 				name,
@@ -194,7 +214,7 @@ class ToolCatalogManager {
 				properties: prop,
 			});
 		});
-		
+
 		return parameters;
 	}
 
@@ -204,46 +224,84 @@ class ToolCatalogManager {
 	private categorizeTool(toolName: string, description: string): string {
 		const name = toolName.toLowerCase();
 		const desc = description.toLowerCase();
-		
-		if (name.includes('file') || name.includes('read') || name.includes('write') || desc.includes('file')) {
+
+		if (
+			name.includes('file') ||
+			name.includes('read') ||
+			name.includes('write') ||
+			desc.includes('file')
+		) {
 			return 'file-system';
 		}
-		if (name.includes('web') || name.includes('http') || name.includes('fetch') || desc.includes('web')) {
+		if (
+			name.includes('web') ||
+			name.includes('http') ||
+			name.includes('fetch') ||
+			desc.includes('web')
+		) {
 			return 'web-api';
 		}
-		if (name.includes('data') || name.includes('json') || name.includes('parse') || desc.includes('data')) {
+		if (
+			name.includes('data') ||
+			name.includes('json') ||
+			name.includes('parse') ||
+			desc.includes('data')
+		) {
 			return 'data-processing';
 		}
-		if (name.includes('search') || name.includes('find') || desc.includes('search')) {
+		if (
+			name.includes('search') ||
+			name.includes('find') ||
+			desc.includes('search')
+		) {
 			return 'search';
 		}
-		if (name.includes('code') || name.includes('execute') || desc.includes('code')) {
+		if (
+			name.includes('code') ||
+			name.includes('execute') ||
+			desc.includes('code')
+		) {
 			return 'code-execution';
 		}
-		
+
 		return 'general';
 	}
 
 	/**
 	 * Assess safety level of tools
 	 */
-	private assessSafetyLevel(toolName: string, description: string): 'safe' | 'caution' | 'restricted' {
+	private assessSafetyLevel(
+		toolName: string,
+		description: string,
+	): 'safe' | 'caution' | 'restricted' {
 		const name = toolName.toLowerCase();
 		const desc = description.toLowerCase();
-		
+
 		// Restricted tools
-		if (name.includes('delete') || name.includes('remove') || desc.includes('delete')) {
+		if (
+			name.includes('delete') ||
+			name.includes('remove') ||
+			desc.includes('delete')
+		) {
 			return 'restricted';
 		}
-		if (name.includes('execute') || name.includes('run') || desc.includes('execute')) {
+		if (
+			name.includes('execute') ||
+			name.includes('run') ||
+			desc.includes('execute')
+		) {
 			return 'restricted';
 		}
-		
+
 		// Caution tools
-		if (name.includes('write') || name.includes('modify') || desc.includes('write')) {
+		if (
+			name.includes('write') ||
+			name.includes('modify') ||
+			desc.includes('write')
+		) {
 			return 'caution';
 		}
-		
+
 		return 'safe';
 	}
 
@@ -253,7 +311,7 @@ class ToolCatalogManager {
 	private generateTags(toolName: string, description: string): string[] {
 		const tags: string[] = [];
 		const text = `${toolName} ${description}`.toLowerCase();
-		
+
 		if (text.includes('file')) tags.push('files');
 		if (text.includes('web') || text.includes('http')) tags.push('web');
 		if (text.includes('data')) tags.push('data');
@@ -261,28 +319,32 @@ class ToolCatalogManager {
 		if (text.includes('code')) tags.push('code');
 		if (text.includes('read')) tags.push('read');
 		if (text.includes('write')) tags.push('write');
-		
+
 		return tags;
 	}
 
 	/**
 	 * Generate usage instructions for tools
 	 */
-	private generateUsageInstructions(toolName: string, description: string, parameters: ToolParameter[]): string {
+	private generateUsageInstructions(
+		toolName: string,
+		description: string,
+		parameters: ToolParameter[],
+	): string {
 		let usage = `Use ${toolName} when you need to ${description.toLowerCase()}.`;
-		
+
 		if (parameters.length > 0) {
-			const requiredParams = parameters.filter(p => p.required);
+			const requiredParams = parameters.filter((p) => p.required);
 			if (requiredParams.length > 0) {
-				usage += `\n\nRequired parameters: ${requiredParams.map(p => `${p.name} (${p.type})`).join(', ')}`;
+				usage += `\n\nRequired parameters: ${requiredParams.map((p) => `${p.name} (${p.type})`).join(', ')}`;
 			}
-			
-			const optionalParams = parameters.filter(p => !p.required);
+
+			const optionalParams = parameters.filter((p) => !p.required);
 			if (optionalParams.length > 0) {
-				usage += `\nOptional parameters: ${optionalParams.map(p => `${p.name} (${p.type})`).join(', ')}`;
+				usage += `\nOptional parameters: ${optionalParams.map((p) => `${p.name} (${p.type})`).join(', ')}`;
 			}
 		}
-		
+
 		return usage;
 	}
 
@@ -298,7 +360,9 @@ class ToolCatalogManager {
 	 */
 	getToolsByServer(serverId: string): ToolMetadata[] {
 		const toolNames = this.registry.serverIndex.get(serverId) || [];
-		return toolNames.map(name => this.registry.toolIndex.get(name)!).filter(Boolean);
+		return toolNames
+			.map((name) => this.registry.toolIndex.get(name)!)
+			.filter(Boolean);
 	}
 
 	/**
@@ -306,7 +370,9 @@ class ToolCatalogManager {
 	 */
 	getToolsByCategory(category: string): ToolMetadata[] {
 		const toolNames = this.registry.categoryIndex.get(category) || [];
-		return toolNames.map(name => this.registry.toolIndex.get(name)!).filter(Boolean);
+		return toolNames
+			.map((name) => this.registry.toolIndex.get(name)!)
+			.filter(Boolean);
 	}
 
 	/**
@@ -321,10 +387,11 @@ class ToolCatalogManager {
 	 */
 	searchTools(query: string): ToolMetadata[] {
 		const lowerQuery = query.toLowerCase();
-		return this.getAllTools().filter(tool => 
-			tool.name.toLowerCase().includes(lowerQuery) ||
-			tool.description.toLowerCase().includes(lowerQuery) ||
-			tool.tags?.some(tag => tag.includes(lowerQuery))
+		return this.getAllTools().filter(
+			(tool) =>
+				tool.name.toLowerCase().includes(lowerQuery) ||
+				tool.description.toLowerCase().includes(lowerQuery) ||
+				tool.tags?.some((tag) => tag.includes(lowerQuery)),
 		);
 	}
 
@@ -342,7 +409,7 @@ class ToolCatalogManager {
 
 	private getSafetyLevelCounts() {
 		const counts = { safe: 0, caution: 0, restricted: 0 };
-		this.getAllTools().forEach(tool => {
+		this.getAllTools().forEach((tool) => {
 			if (tool.safetyLevel) {
 				counts[tool.safetyLevel]++;
 			}
@@ -363,4 +430,3 @@ class ToolCatalogManager {
 
 // Export singleton instance
 export const toolCatalog = ToolCatalogManager.getInstance();
-

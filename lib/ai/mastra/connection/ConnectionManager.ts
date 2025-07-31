@@ -20,7 +20,7 @@ import { eq, and } from 'drizzle-orm';
 
 interface ServerCapabilities {
 	tools?: any;
-	resources?: any;  
+	resources?: any;
 	prompts?: any;
 	rootListChanged?: boolean;
 }
@@ -127,13 +127,15 @@ export class ConnectionManager {
 				return {
 					success: false,
 					error: status?.error || 'Connection test failed',
-					requiresAuth: status?.error?.includes('401') || status?.error?.includes('Authentication'),
+					requiresAuth:
+						status?.error?.includes('401') ||
+						status?.error?.includes('Authentication'),
 				};
 			}
 
 			// Use existing getMcpServerInfo - preserves CF Observability logic
 			const result = await getMcpServerInfo(userId, serverId);
-			
+
 			if (result && result.server) {
 				// Extract tools from toolsets structure
 				const tools: any[] = [];
@@ -158,7 +160,7 @@ export class ConnectionManager {
 				};
 
 				await mcpToolCache.cacheServerTools(serverId, cacheEntry);
-				
+
 				// Update live status on success
 				this.updateLiveStatus(serverId, {
 					status: 'connected',
@@ -186,11 +188,11 @@ export class ConnectionManager {
 
 				return {
 					success: false,
-					error: 'Failed to get server capabilities - server not found or connection failed',
+					error:
+						'Failed to get server capabilities - server not found or connection failed',
 					requiresAuth: true, // Assume auth required when getMcpServerInfo returns null
 				};
 			}
-
 		} catch (error) {
 			console.error(
 				`[Connection Manager] Error getting capabilities for server ${serverId}:`,
@@ -278,14 +280,16 @@ export class ConnectionManager {
 		console.log(
 			`[Connection Manager] Testing connection to server ${serverId}`,
 		);
-		
+
 		const success = await this.testLiveConnection(serverId, userId);
 		const status = this.liveConnectionStatus.get(serverId);
-		
+
 		return {
 			success,
-			error: success ? undefined : (status?.error || 'Connection test failed'),
-			requiresAuth: status?.error?.includes('401') || status?.error?.includes('Authentication'),
+			error: success ? undefined : status?.error || 'Connection test failed',
+			requiresAuth:
+				status?.error?.includes('401') ||
+				status?.error?.includes('Authentication'),
 		};
 	}
 
@@ -455,11 +459,13 @@ export class ConnectionManager {
 			const tools: any[] = [];
 			Object.values(capabilities.tools).forEach((toolset: any) => {
 				if (Array.isArray(toolset)) {
-					tools.push(...toolset.map((tool: any) => ({
-						name: tool.name,
-						description: tool.description || '',
-						inputSchema: tool.inputSchema || {},
-					})));
+					tools.push(
+						...toolset.map((tool: any) => ({
+							name: tool.name,
+							description: tool.description || '',
+							inputSchema: tool.inputSchema || {},
+						})),
+					);
 				}
 			});
 			return tools;
@@ -489,7 +495,10 @@ export class ConnectionManager {
 	 * Test live connection with optional ping and thorough fallback
 	 * Updates in-memory status, does NOT store in KV per plan
 	 */
-	private async testLiveConnection(serverId: string, userId: string): Promise<boolean> {
+	private async testLiveConnection(
+		serverId: string,
+		userId: string,
+	): Promise<boolean> {
 		// Update status to testing
 		this.updateLiveStatus(serverId, {
 			status: 'testing',
@@ -499,9 +508,11 @@ export class ConnectionManager {
 		try {
 			// Try optional MCP ping first (fast)
 			const pingResult = await this.tryOptionalPing(serverId, userId);
-			
+
 			if (pingResult.supported && pingResult.success) {
-				console.log(`[Connection Manager] Ping successful for server ${serverId}`);
+				console.log(
+					`[Connection Manager] Ping successful for server ${serverId}`,
+				);
 				this.updateLiveStatus(serverId, {
 					status: 'connected',
 					lastTested: new Date(),
@@ -512,9 +523,11 @@ export class ConnectionManager {
 			}
 
 			// Fallback to thorough test (existing testMcpServerConnection)
-			console.log(`[Connection Manager] Ping ${pingResult.supported ? 'failed' : 'not supported'}, using thorough test for server ${serverId}`);
+			console.log(
+				`[Connection Manager] Ping ${pingResult.supported ? 'failed' : 'not supported'}, using thorough test for server ${serverId}`,
+			);
 			const thoroughResult = await testMcpServerConnection(userId, serverId);
-			
+
 			if (thoroughResult.status === 'authorized') {
 				this.updateLiveStatus(serverId, {
 					status: 'connected',
@@ -524,9 +537,10 @@ export class ConnectionManager {
 				});
 				return true;
 			} else {
-				const error = thoroughResult.status === 'auth_required' 
-					? 'Authentication required' 
-					: `Connection failed with status: ${thoroughResult.status}`;
+				const error =
+					thoroughResult.status === 'auth_required'
+						? 'Authentication required'
+						: `Connection failed with status: ${thoroughResult.status}`;
 				this.updateLiveStatus(serverId, {
 					status: 'disconnected',
 					lastTested: new Date(),
@@ -535,9 +549,11 @@ export class ConnectionManager {
 				});
 				return false;
 			}
-
 		} catch (error) {
-			console.error(`[Connection Manager] Error testing connection to server ${serverId}:`, error);
+			console.error(
+				`[Connection Manager] Error testing connection to server ${serverId}:`,
+				error,
+			);
 			this.updateLiveStatus(serverId, {
 				status: 'disconnected',
 				lastTested: new Date(),
@@ -550,7 +566,10 @@ export class ConnectionManager {
 	/**
 	 * Try optional MCP ping - servers may respond with 404 but still be alive
 	 */
-	private async tryOptionalPing(serverId: string, userId: string): Promise<PingResult> {
+	private async tryOptionalPing(
+		serverId: string,
+		userId: string,
+	): Promise<PingResult> {
 		try {
 			const server = await this.getServerRecord(serverId, userId);
 			if (!server?.accessToken) {
@@ -566,21 +585,24 @@ export class ConnectionManager {
 			});
 			const latency = Date.now() - startTime;
 
-			if (response.error?.includes('-32601') || response.error?.includes('Method not found')) {
+			if (
+				response.error?.includes('-32601') ||
+				response.error?.includes('Method not found')
+			) {
 				// Ping not supported - this is OK, server might still be alive
 				return { supported: false, success: false };
 			}
 
-			return { 
-				supported: true, 
+			return {
+				supported: true,
 				success: response.success,
 				error: response.error,
 				latency,
 			};
 		} catch (error) {
-			return { 
-				supported: false, 
-				success: false, 
+			return {
+				supported: false,
+				success: false,
 				error: error instanceof Error ? error.message : 'Unknown error',
 			};
 		}
@@ -589,12 +611,15 @@ export class ConnectionManager {
 	/**
 	 * Update live connection status (in-memory only - NOT stored in KV per plan)
 	 */
-	private updateLiveStatus(serverId: string, update: Partial<LiveConnectionStatus>): void {
+	private updateLiveStatus(
+		serverId: string,
+		update: Partial<LiveConnectionStatus>,
+	): void {
 		const current = this.liveConnectionStatus.get(serverId) || {
 			status: 'unknown',
 			lastTested: new Date(),
 		};
-		
+
 		this.liveConnectionStatus.set(serverId, {
 			...current,
 			...update,
@@ -603,9 +628,9 @@ export class ConnectionManager {
 }
 
 // Export types
-export type { 
-	ConnectionResult, 
-	ServerCapabilities, 
-	LiveConnectionStatus, 
-	PingResult 
+export type {
+	ConnectionResult,
+	ServerCapabilities,
+	LiveConnectionStatus,
+	PingResult,
 };

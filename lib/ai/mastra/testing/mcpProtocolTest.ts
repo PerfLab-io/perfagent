@@ -22,7 +22,10 @@ interface MockMCPResponse {
 
 interface MockServerConfig {
 	url: string;
-	responses: Record<string, MockMCPResponse | ((params: any) => MockMCPResponse)>;
+	responses: Record<
+		string,
+		MockMCPResponse | ((params: any) => MockMCPResponse)
+	>;
 	delay?: number;
 	failureRate?: number; // 0-1, probability of random failures
 }
@@ -42,7 +45,10 @@ export class MockMCPServer {
 	/**
 	 * Simulate MCP server response based on request method
 	 */
-	async handleRequest(method: string, params: any = {}): Promise<MockMCPResponse> {
+	async handleRequest(
+		method: string,
+		params: any = {},
+	): Promise<MockMCPResponse> {
 		this.requestCount++;
 
 		// Simulate random failures if configured
@@ -59,7 +65,7 @@ export class MockMCPServer {
 
 		// Simulate network delay
 		if (this.config.delay) {
-			await new Promise(resolve => setTimeout(resolve, this.config.delay));
+			await new Promise((resolve) => setTimeout(resolve, this.config.delay));
 		}
 
 		// Get response configuration
@@ -76,9 +82,10 @@ export class MockMCPServer {
 		}
 
 		// Generate response
-		const response = typeof responseConfig === 'function' 
-			? responseConfig(params) 
-			: responseConfig;
+		const response =
+			typeof responseConfig === 'function'
+				? responseConfig(params)
+				: responseConfig;
 
 		return {
 			...response,
@@ -105,7 +112,10 @@ export class MCPProtocolTestSuite {
 	/**
 	 * Create a mock server with spec-compliant responses
 	 */
-	createMockServer(serverId: string, config: Partial<MockServerConfig> = {}): MockMCPServer {
+	createMockServer(
+		serverId: string,
+		config: Partial<MockServerConfig> = {},
+	): MockMCPServer {
 		const defaultConfig: MockServerConfig = {
 			url: `mock://${serverId}`,
 			responses: {
@@ -194,7 +204,7 @@ export class MCPProtocolTestSuite {
 	}> {
 		const errors: string[] = [];
 		const mockServer = this.mockServers.get(serverId);
-		
+
 		if (!mockServer) {
 			return {
 				success: false,
@@ -232,7 +242,7 @@ export class MCPProtocolTestSuite {
 
 			// Test tools/list request after initialization
 			const toolsResponse = await mockServer.handleRequest('tools/list');
-			
+
 			if (!toolsResponse.result) {
 				errors.push('Tools/list response missing result');
 			} else if (!Array.isArray(toolsResponse.result.tools)) {
@@ -248,9 +258,10 @@ export class MCPProtocolTestSuite {
 					requestCount: mockServer.getRequestCount(),
 				},
 			};
-
 		} catch (error) {
-			errors.push(`Initialization test failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+			errors.push(
+				`Initialization test failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+			);
 			return {
 				success: false,
 				errors,
@@ -322,7 +333,9 @@ export class MCPProtocolTestSuite {
 				}
 
 				if (!isMCPError) {
-					errors.push(`${scenario.name}: Should be detected as MCP protocol error`);
+					errors.push(
+						`${scenario.name}: Should be detected as MCP protocol error`,
+					);
 				}
 
 				details[scenario.name] = {
@@ -334,9 +347,10 @@ export class MCPProtocolTestSuite {
 						isServerError,
 					},
 				};
-
 			} catch (error) {
-				errors.push(`${scenario.name}: Error testing - ${error instanceof Error ? error.message : 'Unknown error'}`);
+				errors.push(
+					`${scenario.name}: Error testing - ${error instanceof Error ? error.message : 'Unknown error'}`,
+				);
 			}
 		}
 
@@ -357,7 +371,7 @@ export class MCPProtocolTestSuite {
 	}> {
 		const errors: string[] = [];
 		const mockServer = this.mockServers.get(serverId);
-		
+
 		if (!mockServer) {
 			return {
 				success: false,
@@ -369,14 +383,16 @@ export class MCPProtocolTestSuite {
 		try {
 			// Test ping support
 			const pingResponse = await mockServer.handleRequest('ping');
-			
+
 			// Ping is optional, so either success or method not found is valid
-			const isValidPingResponse = 
-				(pingResponse.result !== undefined) || 
-				(pingResponse.error?.code === MCP_ERROR_CODES.METHOD_NOT_FOUND);
+			const isValidPingResponse =
+				pingResponse.result !== undefined ||
+				pingResponse.error?.code === MCP_ERROR_CODES.METHOD_NOT_FOUND;
 
 			if (!isValidPingResponse) {
-				errors.push('Invalid ping response - should return result or method not found');
+				errors.push(
+					'Invalid ping response - should return result or method not found',
+				);
 			}
 
 			return {
@@ -387,9 +403,10 @@ export class MCPProtocolTestSuite {
 					pingSupported: pingResponse.result !== undefined,
 				},
 			};
-
 		} catch (error) {
-			errors.push(`Ping test failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+			errors.push(
+				`Ping test failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+			);
 			return {
 				success: false,
 				errors,
@@ -408,7 +425,7 @@ export class MCPProtocolTestSuite {
 	}> {
 		const errors: string[] = [];
 		const mockServer = this.mockServers.get(serverId);
-		
+
 		if (!mockServer) {
 			return {
 				success: false,
@@ -453,9 +470,10 @@ export class MCPProtocolTestSuite {
 					invalidToolResponse,
 				},
 			};
-
 		} catch (error) {
-			errors.push(`Tool execution test failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+			errors.push(
+				`Tool execution test failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+			);
 			return {
 				success: false,
 				errors,
@@ -483,7 +501,10 @@ export class MCPProtocolTestSuite {
 
 		// Run all test suites
 		const testSuites = [
-			{ name: 'Initialization Sequence', test: () => this.testInitializationSequence(serverId) },
+			{
+				name: 'Initialization Sequence',
+				test: () => this.testInitializationSequence(serverId),
+			},
 			{ name: 'Error Handling', test: () => this.testErrorHandling() },
 			{ name: 'Optional Ping', test: () => this.testOptionalPing(serverId) },
 			{ name: 'Tool Execution', test: () => this.testToolExecution(serverId) },
@@ -496,7 +517,7 @@ export class MCPProtocolTestSuite {
 			try {
 				const result = await suite.test();
 				results[suite.name] = result;
-				
+
 				if (result.success) {
 					passedTests++;
 				} else {
@@ -505,7 +526,9 @@ export class MCPProtocolTestSuite {
 			} catch (error) {
 				results[suite.name] = {
 					success: false,
-					errors: [`Test suite failed: ${error instanceof Error ? error.message : 'Unknown error'}`],
+					errors: [
+						`Test suite failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+					],
 					details: {},
 				};
 				failedTests++;

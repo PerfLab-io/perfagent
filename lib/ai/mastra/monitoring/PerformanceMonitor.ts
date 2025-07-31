@@ -61,19 +61,19 @@ export class PerformanceMonitor {
 		// Connection operations
 		this.setThreshold('connection.test', 1000, 3000);
 		this.setThreshold('connection.ping', 100, 500);
-		
+
 		// Cache operations
 		this.setThreshold('cache.get', 50, 200);
 		this.setThreshold('cache.set', 100, 500);
-		
+
 		// Tool operations
 		this.setThreshold('tool.discovery', 500, 2000);
 		this.setThreshold('tool.execution', 2000, 5000);
-		
+
 		// Auth operations
 		this.setThreshold('auth.validate', 100, 500);
 		this.setThreshold('auth.refresh', 1000, 3000);
-		
+
 		// SSE operations
 		this.setThreshold('sse.connect', 500, 2000);
 		this.setThreshold('sse.message', 100, 500);
@@ -93,7 +93,10 @@ export class PerformanceMonitor {
 	/**
 	 * Start timing an operation
 	 */
-	startOperation(operation: string, metadata?: Record<string, any>): () => void {
+	startOperation(
+		operation: string,
+		metadata?: Record<string, any>,
+	): () => void {
 		const startTime = Date.now();
 
 		return () => {
@@ -108,7 +111,7 @@ export class PerformanceMonitor {
 	async timeOperation<T>(
 		operation: string,
 		fn: () => Promise<T>,
-		metadata?: Record<string, any>
+		metadata?: Record<string, any>,
 	): Promise<T> {
 		const startTime = Date.now();
 
@@ -119,9 +122,9 @@ export class PerformanceMonitor {
 			return result;
 		} catch (error) {
 			const duration = Date.now() - startTime;
-			this.recordMetric(operation, duration, false, { 
-				...metadata, 
-				error: error instanceof Error ? error.message : 'Unknown error'
+			this.recordMetric(operation, duration, false, {
+				...metadata,
+				error: error instanceof Error ? error.message : 'Unknown error',
 			});
 			throw error;
 		}
@@ -134,7 +137,7 @@ export class PerformanceMonitor {
 		operation: string,
 		duration: number,
 		success: boolean,
-		metadata?: Record<string, any>
+		metadata?: Record<string, any>,
 	): void {
 		const metric: PerformanceMetric = {
 			operation,
@@ -161,7 +164,7 @@ export class PerformanceMonitor {
 	 */
 	private sendToAnalytics(metric: PerformanceMetric): void {
 		const threshold = this.thresholds.get(metric.operation);
-		
+
 		// Strategy: Use 2 properties wisely
 		// Property 1: operation (what)
 		// Property 2: duration_bucket or status (how)
@@ -170,7 +173,7 @@ export class PerformanceMonitor {
 			// Track errors
 			track(ANALYTICS_EVENTS.MCP_ERROR, {
 				operation: metric.operation,
-				error_type: this.classifyError(metric.metadata?.error)
+				error_type: this.classifyError(metric.metadata?.error),
 			});
 			return;
 		}
@@ -179,20 +182,20 @@ export class PerformanceMonitor {
 		if (threshold && metric.duration >= threshold.criticalMs) {
 			track(ANALYTICS_EVENTS.MCP_SLOW, {
 				operation: metric.operation,
-				duration_bucket: this.getDurationBucket(metric.duration)
+				duration_bucket: this.getDurationBucket(metric.duration),
 			});
 			return;
 		}
 
 		// For cache operations, track hit/miss
 		if (metric.operation.startsWith('cache.get')) {
-			const event = metric.metadata?.hit 
-				? ANALYTICS_EVENTS.CACHE_HIT 
+			const event = metric.metadata?.hit
+				? ANALYTICS_EVENTS.CACHE_HIT
 				: ANALYTICS_EVENTS.CACHE_MISS;
-			
+
 			track(event, {
 				cache_type: this.getCacheType(metric.operation),
-				duration_bucket: this.getDurationBucket(metric.duration)
+				duration_bucket: this.getDurationBucket(metric.duration),
 			});
 			return;
 		}
@@ -202,7 +205,7 @@ export class PerformanceMonitor {
 		if (Math.random() < 0.1) {
 			track(ANALYTICS_EVENTS.MCP_OPERATION, {
 				operation: metric.operation,
-				duration_bucket: this.getDurationBucket(metric.duration)
+				duration_bucket: this.getDurationBucket(metric.duration),
 			});
 		}
 	}
@@ -212,13 +215,15 @@ export class PerformanceMonitor {
 	 */
 	private classifyError(error?: string): string {
 		if (!error) return 'unknown';
-		
+
 		if (error.includes('UNAUTHORIZED') || error.includes('401')) return 'auth';
-		if (error.includes('timeout') || error.includes('TIMEOUT')) return 'timeout';
-		if (error.includes('network') || error.includes('ECONNREFUSED')) return 'network';
+		if (error.includes('timeout') || error.includes('TIMEOUT'))
+			return 'timeout';
+		if (error.includes('network') || error.includes('ECONNREFUSED'))
+			return 'network';
 		if (error.includes('SSE') || error.includes('EventSource')) return 'sse';
 		if (error.includes('rate limit')) return 'rate_limit';
-		
+
 		return 'other';
 	}
 
@@ -227,7 +232,8 @@ export class PerformanceMonitor {
 	 */
 	private getCacheType(operation: string): string {
 		if (operation.includes('tool')) return 'tools';
-		if (operation.includes('oauth') || operation.includes('auth')) return 'auth';
+		if (operation.includes('oauth') || operation.includes('auth'))
+			return 'auth';
 		if (operation.includes('capability')) return 'capabilities';
 		return 'other';
 	}
@@ -250,19 +256,21 @@ export class PerformanceMonitor {
 	 * Get performance statistics for an operation (local only)
 	 */
 	getStats(operation: string, timeWindowMs?: number): PerformanceStats | null {
-		const cutoffTime = timeWindowMs 
+		const cutoffTime = timeWindowMs
 			? new Date(Date.now() - timeWindowMs)
 			: new Date(0);
 
 		const relevantMetrics = this.metrics.filter(
-			m => m.operation === operation && m.timestamp >= cutoffTime
+			(m) => m.operation === operation && m.timestamp >= cutoffTime,
 		);
 
 		if (relevantMetrics.length === 0) {
 			return null;
 		}
 
-		const durations = relevantMetrics.map(m => m.duration).sort((a, b) => a - b);
+		const durations = relevantMetrics
+			.map((m) => m.duration)
+			.sort((a, b) => a - b);
 		const count = durations.length;
 		const totalDuration = durations.reduce((sum, d) => sum + d, 0);
 
@@ -290,7 +298,12 @@ export class PerformanceMonitor {
 	/**
 	 * Track tool execution
 	 */
-	trackToolExecution(toolName: string, serverId: string, duration: number, success: boolean): void {
+	trackToolExecution(
+		toolName: string,
+		serverId: string,
+		duration: number,
+		success: boolean,
+	): void {
 		const operation = 'tool.execution';
 		this.recordMetric(operation, duration, success, { toolName, serverId });
 
@@ -298,7 +311,7 @@ export class PerformanceMonitor {
 		if (this.isProduction && success) {
 			track(ANALYTICS_EVENTS.MCP_OPERATION, {
 				operation: 'tool_execution',
-				server_type: this.getServerType(serverId)
+				server_type: this.getServerType(serverId),
 			});
 		}
 	}
@@ -334,7 +347,7 @@ export class PerformanceMonitor {
 		errors: number;
 	} {
 		const cutoffTime = new Date(Date.now() - timeWindowMs);
-		const recentMetrics = this.metrics.filter(m => m.timestamp >= cutoffTime);
+		const recentMetrics = this.metrics.filter((m) => m.timestamp >= cutoffTime);
 
 		if (recentMetrics.length === 0) {
 			return {
@@ -346,10 +359,10 @@ export class PerformanceMonitor {
 			};
 		}
 
-		const successful = recentMetrics.filter(m => m.success);
+		const successful = recentMetrics.filter((m) => m.success);
 		const totalDuration = recentMetrics.reduce((sum, m) => sum + m.duration, 0);
-		
-		const slowCount = recentMetrics.filter(m => {
+
+		const slowCount = recentMetrics.filter((m) => {
 			const threshold = this.thresholds.get(m.operation);
 			return threshold && m.duration >= threshold.warningMs;
 		}).length;

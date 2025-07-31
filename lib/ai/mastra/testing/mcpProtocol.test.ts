@@ -22,8 +22,9 @@ describe('MCP Protocol Compliance Tests', () => {
 
 	describe('MCP Initialization Sequence', () => {
 		it('should handle standard MCP initialization flow', async () => {
-			const result = await mcpProtocolTest.testInitializationSequence(testServerId);
-			
+			const result =
+				await mcpProtocolTest.testInitializationSequence(testServerId);
+
 			expect(result.success).toBe(true);
 			expect(result.errors).toHaveLength(0);
 			expect(result.details.initResponse).toBeDefined();
@@ -32,10 +33,11 @@ describe('MCP Protocol Compliance Tests', () => {
 		});
 
 		it('should validate initialize response structure', async () => {
-			const result = await mcpProtocolTest.testInitializationSequence(testServerId);
-			
+			const result =
+				await mcpProtocolTest.testInitializationSequence(testServerId);
+
 			expect(result.success).toBe(true);
-			
+
 			const initResponse = result.details.initResponse;
 			expect(initResponse.result.protocolVersion).toBeDefined();
 			expect(initResponse.result.capabilities).toBeDefined();
@@ -43,10 +45,11 @@ describe('MCP Protocol Compliance Tests', () => {
 		});
 
 		it('should validate tools/list response structure', async () => {
-			const result = await mcpProtocolTest.testInitializationSequence(testServerId);
-			
+			const result =
+				await mcpProtocolTest.testInitializationSequence(testServerId);
+
 			expect(result.success).toBe(true);
-			
+
 			const toolsResponse = result.details.toolsResponse;
 			expect(toolsResponse.result.tools).toBeDefined();
 			expect(Array.isArray(toolsResponse.result.tools)).toBe(true);
@@ -57,7 +60,7 @@ describe('MCP Protocol Compliance Tests', () => {
 	describe('MCP Error Handling', () => {
 		it('should correctly classify MCP error codes', async () => {
 			const result = await mcpProtocolTest.testErrorHandling();
-			
+
 			expect(result.success).toBe(true);
 			expect(result.errors).toHaveLength(0);
 			expect(result.details).toBeDefined();
@@ -101,7 +104,7 @@ describe('MCP Protocol Compliance Tests', () => {
 
 			const recommendation = errorHandler.getErrorRecoveryRecommendation(
 				unauthorizedError,
-				{ serverId: 'test', userId: 'test' }
+				{ serverId: 'test', userId: 'test' },
 			);
 
 			expect(recommendation.action).toBe('reauth');
@@ -112,7 +115,7 @@ describe('MCP Protocol Compliance Tests', () => {
 	describe('Optional MCP Ping', () => {
 		it('should handle ping support correctly', async () => {
 			const result = await mcpProtocolTest.testOptionalPing(testServerId);
-			
+
 			expect(result.success).toBe(true);
 			expect(result.errors).toHaveLength(0);
 			expect(result.details.pingSupported).toBeDefined();
@@ -135,7 +138,7 @@ describe('MCP Protocol Compliance Tests', () => {
 			});
 
 			const result = await mcpProtocolTest.testOptionalPing(noPingServerId);
-			
+
 			expect(result.success).toBe(true);
 			expect(result.details.pingSupported).toBe(false);
 		});
@@ -144,7 +147,7 @@ describe('MCP Protocol Compliance Tests', () => {
 	describe('Tool Execution Protocol', () => {
 		it('should handle tool execution correctly', async () => {
 			const result = await mcpProtocolTest.testToolExecution(testServerId);
-			
+
 			expect(result.success).toBe(true);
 			expect(result.errors).toHaveLength(0);
 			expect(result.details.toolCallResponse).toBeDefined();
@@ -152,9 +155,9 @@ describe('MCP Protocol Compliance Tests', () => {
 
 		it('should validate tool execution response format', async () => {
 			const result = await mcpProtocolTest.testToolExecution(testServerId);
-			
+
 			expect(result.success).toBe(true);
-			
+
 			const toolResponse = result.details.toolCallResponse;
 			expect(toolResponse.result.content).toBeDefined();
 			expect(Array.isArray(toolResponse.result.content)).toBe(true);
@@ -162,7 +165,7 @@ describe('MCP Protocol Compliance Tests', () => {
 
 		it('should handle invalid tool calls gracefully', async () => {
 			const result = await mcpProtocolTest.testToolExecution(testServerId);
-			
+
 			expect(result.success).toBe(true);
 			expect(result.details.invalidToolResponse).toBeDefined();
 		});
@@ -200,7 +203,7 @@ describe('MCP Protocol Compliance Tests', () => {
 	describe('Full Protocol Test Suite', () => {
 		it('should run complete test suite successfully', async () => {
 			const result = await mcpProtocolTest.runFullTestSuite('full-suite-test');
-			
+
 			expect(result.success).toBe(true);
 			expect(result.summary.totalTests).toBeGreaterThan(0);
 			expect(result.summary.passedTests).toBe(result.summary.totalTests);
@@ -209,7 +212,7 @@ describe('MCP Protocol Compliance Tests', () => {
 
 		it('should provide detailed test results', async () => {
 			const result = await mcpProtocolTest.runFullTestSuite('detailed-test');
-			
+
 			expect(result.results).toBeDefined();
 			expect(Object.keys(result.results)).toContain('Initialization Sequence');
 			expect(Object.keys(result.results)).toContain('Error Handling');

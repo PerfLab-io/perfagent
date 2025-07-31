@@ -12,7 +12,7 @@ export const MCP_ERROR_CODES = {
 	METHOD_NOT_FOUND: -32601,
 	INVALID_PARAMS: -32602,
 	INTERNAL_ERROR: -32603,
-	
+
 	// MCP-specific errors
 	UNAUTHORIZED: -32002,
 	FORBIDDEN: -32003,
@@ -22,7 +22,8 @@ export const MCP_ERROR_CODES = {
 	CANCELLED: -32009,
 } as const;
 
-export type MCPErrorCode = typeof MCP_ERROR_CODES[keyof typeof MCP_ERROR_CODES];
+export type MCPErrorCode =
+	(typeof MCP_ERROR_CODES)[keyof typeof MCP_ERROR_CODES];
 
 interface MCPError {
 	code: number;
@@ -53,12 +54,15 @@ interface ErrorResult {
 export class ErrorHandler {
 	private maxRetries = 2;
 	private baseRetryDelay = 1000; // 1 second
-	
+
 	/**
 	 * Process an MCP error and determine appropriate action
 	 */
 	handleError(error: unknown, context: ErrorContext): ErrorResult {
-		console.log(`[Error Handler] Processing error for server ${context.serverId}:`, error);
+		console.log(
+			`[Error Handler] Processing error for server ${context.serverId}:`,
+			error,
+		);
 
 		// Handle different error types
 		if (this.isMCPError(error)) {
@@ -91,7 +95,9 @@ export class ErrorHandler {
 			try {
 				const result = await operation();
 				if (attempt > 1) {
-					console.log(`[Error Handler] Operation succeeded on attempt ${attempt} for server ${context.serverId}`);
+					console.log(
+						`[Error Handler] Operation succeeded on attempt ${attempt} for server ${context.serverId}`,
+					);
 				}
 				return result;
 			} catch (error) {
@@ -99,14 +105,23 @@ export class ErrorHandler {
 				const errorResult = this.handleError(error, { ...context, attempt });
 
 				// If it's a fatal error or we shouldn't retry, fail immediately
-				if (errorResult.isFatal || !errorResult.shouldRetry || attempt > maxRetries) {
-					console.log(`[Error Handler] Operation failed permanently for server ${context.serverId}`);
+				if (
+					errorResult.isFatal ||
+					!errorResult.shouldRetry ||
+					attempt > maxRetries
+				) {
+					console.log(
+						`[Error Handler] Operation failed permanently for server ${context.serverId}`,
+					);
 					return { error: errorResult };
 				}
 
 				// Wait before retrying
-				const delay = errorResult.retryAfter || this.calculateRetryDelay(attempt);
-				console.log(`[Error Handler] Retrying operation for server ${context.serverId} in ${delay}ms (attempt ${attempt + 1}/${maxRetries + 1})`);
+				const delay =
+					errorResult.retryAfter || this.calculateRetryDelay(attempt);
+				console.log(
+					`[Error Handler] Retrying operation for server ${context.serverId} in ${delay}ms (attempt ${attempt + 1}/${maxRetries + 1})`,
+				);
 				await this.delay(delay);
 			}
 		}
@@ -124,14 +139,16 @@ export class ErrorHandler {
 					shouldRetry: false,
 					requiresAuth: true,
 					isFatal: false,
-					userMessage: 'Authentication required. Please authorize the server connection.',
+					userMessage:
+						'Authentication required. Please authorize the server connection.',
 				};
 
 			case MCP_ERROR_CODES.FORBIDDEN:
 				return {
 					shouldRetry: false,
 					isFatal: true,
-					userMessage: 'Access forbidden. Please check your permissions for this server.',
+					userMessage:
+						'Access forbidden. Please check your permissions for this server.',
 				};
 
 			case MCP_ERROR_CODES.METHOD_NOT_FOUND:
@@ -208,7 +225,8 @@ export class ErrorHandler {
 			return {
 				shouldRetry: false,
 				isFatal: true,
-				userMessage: 'Cross-origin request blocked. Please check server CORS configuration.',
+				userMessage:
+					'Cross-origin request blocked. Please check server CORS configuration.',
 			};
 		}
 
@@ -226,21 +244,24 @@ export class ErrorHandler {
 				return {
 					shouldRetry: false,
 					requiresAuth: true,
-					userMessage: 'Authentication failed. Please reauthorize the server connection.',
+					userMessage:
+						'Authentication failed. Please reauthorize the server connection.',
 				};
 
 			case 403:
 				return {
 					shouldRetry: false,
 					isFatal: true,
-					userMessage: 'Access forbidden. Please check your server permissions.',
+					userMessage:
+						'Access forbidden. Please check your server permissions.',
 				};
 
 			case 404:
 				return {
 					shouldRetry: false,
 					isFatal: true,
-					userMessage: 'Server endpoint not found. Please check the server URL.',
+					userMessage:
+						'Server endpoint not found. Please check the server URL.',
 				};
 
 			case 429:
@@ -269,10 +290,17 @@ export class ErrorHandler {
 		}
 	}
 
-	private handleGenericError(error: unknown, context: ErrorContext): ErrorResult {
-		const message = error instanceof Error ? error.message : 'Unknown error occurred';
-		
-		console.error(`[Error Handler] Generic error for server ${context.serverId}:`, error);
+	private handleGenericError(
+		error: unknown,
+		context: ErrorContext,
+	): ErrorResult {
+		const message =
+			error instanceof Error ? error.message : 'Unknown error occurred';
+
+		console.error(
+			`[Error Handler] Generic error for server ${context.serverId}:`,
+			error,
+		);
 
 		return {
 			shouldRetry: true,
@@ -292,7 +320,7 @@ export class ErrorHandler {
 
 	private isNetworkError(error: unknown): boolean {
 		if (!(error instanceof Error)) return false;
-		
+
 		const message = error.message.toLowerCase();
 		return (
 			message.includes('network') ||
@@ -308,7 +336,8 @@ export class ErrorHandler {
 		return (
 			typeof error === 'object' &&
 			error !== null &&
-			('status' in error || ('response' in error && (error as any).response?.status))
+			('status' in error ||
+				('response' in error && (error as any).response?.status))
 		);
 	}
 
@@ -318,7 +347,7 @@ export class ErrorHandler {
 	}
 
 	private delay(ms: number): Promise<void> {
-		return new Promise(resolve => setTimeout(resolve, ms));
+		return new Promise((resolve) => setTimeout(resolve, ms));
 	}
 
 	/**
@@ -327,15 +356,15 @@ export class ErrorHandler {
 	formatErrorForLogging(error: unknown, context: ErrorContext): string {
 		const timestamp = new Date().toISOString();
 		const contextStr = `Server: ${context.serverId}, User: ${context.userId}, Method: ${context.method || 'unknown'}`;
-		
+
 		if (this.isMCPError(error)) {
 			return `[${timestamp}] MCP Error ${error.code}: ${error.message} | ${contextStr}`;
 		}
-		
+
 		if (error instanceof Error) {
 			return `[${timestamp}] ${error.name}: ${error.message} | ${contextStr}`;
 		}
-		
+
 		return `[${timestamp}] Unknown error: ${JSON.stringify(error)} | ${contextStr}`;
 	}
 
@@ -382,10 +411,12 @@ export class ErrorHandler {
 		// Check error message content
 		if (error instanceof Error) {
 			const message = error.message.toLowerCase();
-			return message.includes('unauthorized') || 
-				   message.includes('authentication') ||
-				   message.includes('invalid token') ||
-				   message.includes('expired token');
+			return (
+				message.includes('unauthorized') ||
+				message.includes('authentication') ||
+				message.includes('invalid token') ||
+				message.includes('expired token')
+			);
 		}
 
 		return false;
@@ -405,10 +436,12 @@ export class ErrorHandler {
 		// Check error message content for proxy-related issues
 		if (error instanceof Error) {
 			const message = error.message.toLowerCase();
-			return message.includes('proxy') && 
-				   (message.includes('auth') || 
-				    message.includes('credential') ||
-				    message.includes('authentication required'));
+			return (
+				message.includes('proxy') &&
+				(message.includes('auth') ||
+					message.includes('credential') ||
+					message.includes('authentication required'))
+			);
 		}
 
 		return false;
@@ -427,11 +460,13 @@ export class ErrorHandler {
 		// Check for JSON-RPC related errors in message
 		if (error instanceof Error) {
 			const message = error.message.toLowerCase();
-			return message.includes('jsonrpc') ||
-				   message.includes('json-rpc') ||
-				   message.includes('mcp') ||
-				   message.includes('protocol') ||
-				   message.includes('invalid request format');
+			return (
+				message.includes('jsonrpc') ||
+				message.includes('json-rpc') ||
+				message.includes('mcp') ||
+				message.includes('protocol') ||
+				message.includes('invalid request format')
+			);
 		}
 
 		return false;
@@ -456,11 +491,13 @@ export class ErrorHandler {
 		// Check error message for transport issues
 		if (error instanceof Error) {
 			const message = error.message.toLowerCase();
-			return message.includes('connection') ||
-				   message.includes('socket') ||
-				   message.includes('timeout') ||
-				   message.includes('abort') ||
-				   message.includes('disconnect');
+			return (
+				message.includes('connection') ||
+				message.includes('socket') ||
+				message.includes('timeout') ||
+				message.includes('abort') ||
+				message.includes('disconnect')
+			);
 		}
 
 		return false;
@@ -480,10 +517,12 @@ export class ErrorHandler {
 		// Check error message for rate limiting
 		if (error instanceof Error) {
 			const message = error.message.toLowerCase();
-			return message.includes('rate limit') ||
-				   message.includes('too many requests') ||
-				   message.includes('quota exceeded') ||
-				   message.includes('throttle');
+			return (
+				message.includes('rate limit') ||
+				message.includes('too many requests') ||
+				message.includes('quota exceeded') ||
+				message.includes('throttle')
+			);
 		}
 
 		return false;
@@ -508,9 +547,11 @@ export class ErrorHandler {
 		// Check error message for server-side issues
 		if (error instanceof Error) {
 			const message = error.message.toLowerCase();
-			return message.includes('server error') ||
-				   message.includes('internal server error') ||
-				   message.includes('service unavailable');
+			return (
+				message.includes('server error') ||
+				message.includes('internal server error') ||
+				message.includes('service unavailable')
+			);
 		}
 
 		return false;
@@ -545,7 +586,10 @@ export class ErrorHandler {
 	 * Get error recovery recommendation based on error type
 	 * Inspector pattern for actionable error resolution
 	 */
-	getErrorRecoveryRecommendation(error: unknown, _context: ErrorContext): {
+	getErrorRecoveryRecommendation(
+		error: unknown,
+		_context: ErrorContext,
+	): {
 		action: 'retry' | 'reauth' | 'reconfigure' | 'abort';
 		message: string;
 		automated: boolean;
@@ -623,8 +667,9 @@ export class ErrorHandler {
 	 */
 	private extractRetryAfter(error: unknown): number | undefined {
 		if (this.isHTTPError(error)) {
-			const retryAfter = (error as any).headers?.['retry-after'] || 
-							   (error as any).response?.headers?.['retry-after'];
+			const retryAfter =
+				(error as any).headers?.['retry-after'] ||
+				(error as any).response?.headers?.['retry-after'];
 			if (retryAfter) {
 				const parsed = parseInt(retryAfter);
 				return !isNaN(parsed) ? parsed * 1000 : undefined; // Convert to milliseconds
@@ -640,28 +685,32 @@ export class ErrorHandler {
 	getContextAwareErrorMessage(error: unknown, context: ErrorContext): string {
 		// Use the existing error handling logic which already provides good messages
 		const errorResult = this.handleError(error, context);
-		
+
 		// Enhance with additional context if available
-		const serverInfo = context.serverUrl ? ` (${new URL(context.serverUrl).hostname})` : '';
+		const serverInfo = context.serverUrl
+			? ` (${new URL(context.serverUrl).hostname})`
+			: '';
 		const methodInfo = context.method ? ` while calling ${context.method}` : '';
-		
+
 		// For authentication errors, provide more actionable guidance
 		if (this.is401Error(error)) {
 			return `Authentication failed${serverInfo}. Please reauthorize the server connection.`;
 		}
-		
+
 		// For rate limit errors, include retry timing if available
 		if (this.isRateLimitError(error)) {
 			const retryAfter = this.extractRetryAfter(error);
-			const waitTime = retryAfter ? ` Please wait ${Math.ceil(retryAfter / 1000)} seconds.` : ' Please wait before retrying.';
+			const waitTime = retryAfter
+				? ` Please wait ${Math.ceil(retryAfter / 1000)} seconds.`
+				: ' Please wait before retrying.';
 			return `Rate limit exceeded${serverInfo}.${waitTime}`;
 		}
-		
+
 		// For transport errors, provide connectivity guidance
 		if (this.isTransportError(error)) {
 			return `Connection failed${serverInfo}${methodInfo}. Please check your network connection and try again.`;
 		}
-		
+
 		// For other errors, return the standard message with context
 		return `${errorResult.userMessage}${serverInfo}${methodInfo}`;
 	}

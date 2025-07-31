@@ -737,7 +737,7 @@ export const mcpServers = pgTable(
 		})
 			.onUpdate('cascade')
 			.onDelete('cascade'),
-	]
+	],
 );
 
 export const mcpServersRelations = relations(mcpServers, ({ one }) => ({

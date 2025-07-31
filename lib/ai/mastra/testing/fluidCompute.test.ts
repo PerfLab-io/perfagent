@@ -4,7 +4,10 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mockMcpToolCache, mockMcpOAuthCache } from './__mocks__/mockDependencies';
+import {
+	mockMcpToolCache,
+	mockMcpOAuthCache,
+} from './__mocks__/mockDependencies';
 
 // Mock the actual cache imports to avoid database dependencies
 vi.mock('../cache/MCPCache', () => ({
@@ -28,8 +31,9 @@ describe('Fluid Compute Scenario Tests', () => {
 
 	describe('Cache Resilience Across Instances', () => {
 		it('should persist KV cache across simulated instance restarts', async () => {
-			const result = await fluidComputeTest.testCacheResilienceAcrossInstances();
-			
+			const result =
+				await fluidComputeTest.testCacheResilienceAcrossInstances();
+
 			expect(result.success).toBe(true);
 			expect(result.errors).toHaveLength(0);
 			expect(result.details.cacheHit).toBeDefined();
@@ -37,8 +41,9 @@ describe('Fluid Compute Scenario Tests', () => {
 		});
 
 		it('should lose in-memory connection status after instance restart', async () => {
-			const result = await fluidComputeTest.testCacheResilienceAcrossInstances();
-			
+			const result =
+				await fluidComputeTest.testCacheResilienceAcrossInstances();
+
 			expect(result.success).toBe(true);
 			expect(result.details.connectionStatusAfterRestart).toBeNull();
 		});
@@ -48,7 +53,9 @@ describe('Fluid Compute Scenario Tests', () => {
 			const userId = 'test-user';
 
 			const mockCapabilities = {
-				tools: [{ name: 'integrity_tool', description: 'Test tool for integrity' }],
+				tools: [
+					{ name: 'integrity_tool', description: 'Test tool for integrity' },
+				],
 				capabilities: { tools: {} },
 				cachedAt: new Date().toISOString(),
 				serverUrl: 'mock://integrity-test',
@@ -58,7 +65,7 @@ describe('Fluid Compute Scenario Tests', () => {
 
 			// Simulate instance restart by creating new Connection Manager
 			const newConnectionManager = new ConnectionManager();
-			
+
 			// Cache should still be available
 			const cachedResult = await mockMcpToolCache.getServerTools(serverId);
 			expect(cachedResult).toBeDefined();
@@ -70,7 +77,7 @@ describe('Fluid Compute Scenario Tests', () => {
 	describe('Cold Start Performance', () => {
 		it('should demonstrate cache effectiveness for cold starts', async () => {
 			const result = await fluidComputeTest.testColdStartPerformance();
-			
+
 			expect(result.success).toBe(true);
 			expect(result.errors).toHaveLength(0);
 			expect(result.details.cacheRetrievalTime).toBeLessThan(100);
@@ -79,7 +86,7 @@ describe('Fluid Compute Scenario Tests', () => {
 
 		it('should measure cache retrieval performance', async () => {
 			const serverId = 'perf-test-server';
-			
+
 			const mockCapabilities = {
 				tools: [{ name: 'perf_tool', description: 'Performance test tool' }],
 				capabilities: { tools: {} },
@@ -101,7 +108,7 @@ describe('Fluid Compute Scenario Tests', () => {
 	describe('Concurrent Request Handling', () => {
 		it('should handle concurrent requests efficiently', async () => {
 			const result = await fluidComputeTest.testConcurrentRequestHandling();
-			
+
 			expect(result.success).toBe(true);
 			expect(result.errors).toHaveLength(0);
 			expect(result.details.concurrentRequests).toBeGreaterThan(1);
@@ -114,10 +121,10 @@ describe('Fluid Compute Scenario Tests', () => {
 			const promises = [];
 
 			const startTime = Date.now();
-			
+
 			for (let i = 0; i < concurrentOperations; i++) {
 				promises.push(
-					connectionManager.getLiveConnectionStatus(`concurrent-test-${i}`)
+					connectionManager.getLiveConnectionStatus(`concurrent-test-${i}`),
 				);
 			}
 
@@ -132,7 +139,7 @@ describe('Fluid Compute Scenario Tests', () => {
 	describe('Memory Cleanup', () => {
 		it('should manage memory efficiently', async () => {
 			const result = await fluidComputeTest.testMemoryCleanup();
-			
+
 			expect(result.success).toBe(true);
 			expect(result.errors).toHaveLength(0);
 			expect(result.details.memoryIncrease).toBeDefined();
@@ -141,7 +148,7 @@ describe('Fluid Compute Scenario Tests', () => {
 
 		it('should not leak memory with repeated operations', async () => {
 			const initialMemory = process.memoryUsage();
-			
+
 			// Perform many operations
 			const connectionManager = new ConnectionManager();
 			for (let i = 0; i < 50; i++) {
@@ -164,7 +171,7 @@ describe('Fluid Compute Scenario Tests', () => {
 	describe('Cache TTL Behavior', () => {
 		it('should respect cache TTL strategies', async () => {
 			const result = await fluidComputeTest.testCacheTTLBehavior();
-			
+
 			expect(result.success).toBe(true);
 			expect(result.errors).toHaveLength(0);
 			expect(result.details.capabilitiesCacheValid).toBe(true);
@@ -173,7 +180,7 @@ describe('Fluid Compute Scenario Tests', () => {
 
 		it('should validate capabilities cache (2h TTL)', async () => {
 			const serverId = 'ttl-capabilities-test';
-			
+
 			const mockCapabilities = {
 				tools: [{ name: 'ttl_tool', description: 'TTL test tool' }],
 				capabilities: { tools: {} },
@@ -195,7 +202,7 @@ describe('Fluid Compute Scenario Tests', () => {
 
 		it('should validate OAuth cache (30min TTL)', async () => {
 			const serverId = 'ttl-oauth-test';
-			
+
 			const mockTokens = {
 				accessToken: 'test-access-token-ttl',
 				refreshToken: 'test-refresh-token-ttl',
@@ -205,7 +212,10 @@ describe('Fluid Compute Scenario Tests', () => {
 			await mockMcpOAuthCache.cacheValidatedToken(serverId, mockTokens);
 
 			// Verify cache validity
-			const isValid = await mockMcpOAuthCache.isTokenCacheValid(serverId, mockTokens.accessToken);
+			const isValid = await mockMcpOAuthCache.isTokenCacheValid(
+				serverId,
+				mockTokens.accessToken,
+			);
 			expect(isValid).toBe(true);
 
 			// Get cached tokens
@@ -219,32 +229,32 @@ describe('Fluid Compute Scenario Tests', () => {
 		it('should simulate multiple requests on same instance', async () => {
 			const connectionManager = new ConnectionManager();
 			const serverIds = ['shared-1', 'shared-2', 'shared-3'];
-			
+
 			// Simulate requests from different users on same instance
-			const promises = serverIds.map(serverId => 
-				connectionManager.getLiveConnectionStatus(serverId)
+			const promises = serverIds.map((serverId) =>
+				connectionManager.getLiveConnectionStatus(serverId),
 			);
 
 			const results = await Promise.all(promises);
 			expect(results).toHaveLength(serverIds.length);
-			
+
 			// All requests should complete (even if returning null for new servers)
-			results.forEach(result => {
+			results.forEach((result) => {
 				expect(result).toBeNull(); // New servers have no status yet
 			});
 		});
 
 		it('should maintain separate connection states per server', async () => {
 			const connectionManager = new ConnectionManager();
-			
+
 			// This would normally be set by actual connection attempts
 			// Here we're just testing the state isolation works
 			const status1 = connectionManager.getLiveConnectionStatus('server-1');
 			const status2 = connectionManager.getLiveConnectionStatus('server-2');
-			
+
 			expect(status1).toBeNull();
 			expect(status2).toBeNull();
-			
+
 			// Both are null but they're independent null values (different calls)
 			// Test that the method works correctly for different server IDs
 			expect(typeof status1).toBe(typeof status2);
@@ -256,7 +266,7 @@ describe('Fluid Compute Scenario Tests', () => {
 	describe('Full Fluid Compute Test Suite', () => {
 		it('should run complete Fluid Compute test suite', async () => {
 			const result = await fluidComputeTest.runFluidComputeTests();
-			
+
 			expect(result.success).toBe(true);
 			expect(result.summary.totalTests).toBeGreaterThan(0);
 			expect(result.summary.passedTests).toBe(result.summary.totalTests);
@@ -265,11 +275,15 @@ describe('Fluid Compute Scenario Tests', () => {
 
 		it('should provide detailed performance metrics', async () => {
 			const result = await fluidComputeTest.runFluidComputeTests();
-			
+
 			expect(result.results).toBeDefined();
-			expect(Object.keys(result.results)).toContain('Cache Resilience Across Instances');
+			expect(Object.keys(result.results)).toContain(
+				'Cache Resilience Across Instances',
+			);
 			expect(Object.keys(result.results)).toContain('Cold Start Performance');
-			expect(Object.keys(result.results)).toContain('Concurrent Request Handling');
+			expect(Object.keys(result.results)).toContain(
+				'Concurrent Request Handling',
+			);
 			expect(Object.keys(result.results)).toContain('Memory Cleanup');
 			expect(Object.keys(result.results)).toContain('Cache TTL Behavior');
 		});

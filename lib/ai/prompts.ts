@@ -939,38 +939,48 @@ When external MCP tools are available, consider that:
  * @param basePrompt - The base system prompt to enhance
  * @returns Enhanced prompt with contextual tool recommendations
  */
-export function createContextAwarePrompt(userQuery: string, basePrompt: string): string {
+export function createContextAwarePrompt(
+	userQuery: string,
+	basePrompt: string,
+): string {
 	// Generate dynamic contextual recommendations
 	const contextualPrompt = generateDynamicContextualPrompt(userQuery, false);
-	const categoryRecommendations = generateCategoryBasedRecommendations(userQuery);
+	const categoryRecommendations =
+		generateCategoryBasedRecommendations(userQuery);
 	const executionPlan = generateToolExecutionPlan(userQuery);
-	
+
 	if (!contextualPrompt && !categoryRecommendations) {
 		return basePrompt;
 	}
 
 	// Construct the enhanced prompt
 	const contextualSection = [];
-	
+
 	if (contextualPrompt) {
 		contextualSection.push(contextualPrompt);
 	}
-	
+
 	if (categoryRecommendations) {
 		contextualSection.push('### Query-Specific Tool Recommendations');
 		contextualSection.push('');
 		contextualSection.push(categoryRecommendations);
 	}
-	
+
 	if (executionPlan.plan.length > 0) {
 		contextualSection.push('### Recommended Execution Plan');
 		contextualSection.push('');
-		contextualSection.push(`**Estimated Duration:** ${executionPlan.estimatedDuration}`);
-		contextualSection.push(`**Risk Level:** ${executionPlan.riskLevel.toUpperCase()}`);
+		contextualSection.push(
+			`**Estimated Duration:** ${executionPlan.estimatedDuration}`,
+		);
+		contextualSection.push(
+			`**Risk Level:** ${executionPlan.riskLevel.toUpperCase()}`,
+		);
 		contextualSection.push('');
 		contextualSection.push('**Steps:**');
-		executionPlan.plan.forEach(step => {
-			contextualSection.push(`${step.step}. **${step.action}** (${step.toolCategory})`);
+		executionPlan.plan.forEach((step) => {
+			contextualSection.push(
+				`${step.step}. **${step.action}** (${step.toolCategory})`,
+			);
 			contextualSection.push(`   Rationale: ${step.rationale}`);
 			if (step.tools.length > 0) {
 				contextualSection.push(`   Suggested tools: ${step.tools.join(', ')}`);
@@ -982,7 +992,7 @@ export function createContextAwarePrompt(userQuery: string, basePrompt: string):
 	// Insert the contextual section after the main capabilities section
 	const enhancedPrompt = basePrompt.replace(
 		/(## Available Tools and Capabilities[\s\S]*?)(\n## Main goals)/,
-		`$1\n\n${contextualSection.join('\n')}$2`
+		`$1\n\n${contextualSection.join('\n')}$2`,
 	);
 
 	return enhancedPrompt;
@@ -1000,11 +1010,11 @@ export function createAdvancedMcpAwareLargeModelPrompt(
 ): string {
 	// Start with the enhanced tool-aware prompt
 	let enhancedPrompt = createMcpAwareLargeModelPrompt(toolsets);
-	
+
 	// If we have a user query, add contextual enhancements
 	if (userQuery) {
 		enhancedPrompt = createContextAwarePrompt(userQuery, enhancedPrompt);
 	}
-	
+
 	return enhancedPrompt;
 }

@@ -59,7 +59,9 @@ export class TokenValidator {
 				console.log(`[Token Validator] Token is valid for ${serverUrl}`);
 				return true;
 			} else if (response.status === 401) {
-				console.log(`[Token Validator] Token is invalid/expired for ${serverUrl}`);
+				console.log(
+					`[Token Validator] Token is invalid/expired for ${serverUrl}`,
+				);
 				return false;
 			} else {
 				// Other errors might not be token-related, log but assume token is valid
@@ -121,7 +123,9 @@ export class TokenValidator {
 				accessToken: refreshedTokens.accessToken,
 				refreshToken: refreshedTokens.refreshToken,
 				expiresIn: refreshedTokens.expiresAt
-					? Math.floor((refreshedTokens.expiresAt.getTime() - Date.now()) / 1000)
+					? Math.floor(
+							(refreshedTokens.expiresAt.getTime() - Date.now()) / 1000,
+						)
 					: undefined,
 				clientId: serverRecord.clientId || undefined, // Use existing clientId from server record
 			};

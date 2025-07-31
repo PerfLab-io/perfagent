@@ -13,7 +13,9 @@ interface ActionResult {
 	data?: any;
 }
 
-export async function addMcpServerAction(formData: FormData): Promise<ActionResult> {
+export async function addMcpServerAction(
+	formData: FormData,
+): Promise<ActionResult> {
 	try {
 		// Verify authentication
 		const sessionData = await verifySession();
@@ -78,23 +80,25 @@ export async function addMcpServerAction(formData: FormData): Promise<ActionResu
 		};
 	} catch (error) {
 		console.error('Failed to add MCP server:', error);
-		
+
 		// Handle specific database constraint errors
 		if (error && typeof error === 'object' && 'code' in error) {
-			if (error.code === '23505') { // unique constraint violation
+			if (error.code === '23505') {
+				// unique constraint violation
 				return {
 					success: false,
 					error: 'A server with this name or URL already exists.',
 				};
 			}
-			if (error.code === '23502') { // not null constraint violation
+			if (error.code === '23502') {
+				// not null constraint violation
 				return {
 					success: false,
 					error: 'Required server information is missing.',
 				};
 			}
 		}
-		
+
 		return {
 			success: false,
 			error: 'Failed to add MCP server. Please try again.',
@@ -102,7 +106,10 @@ export async function addMcpServerAction(formData: FormData): Promise<ActionResu
 	}
 }
 
-export async function toggleMcpServerAction(serverId: string, enabled: boolean): Promise<ActionResult> {
+export async function toggleMcpServerAction(
+	serverId: string,
+	enabled: boolean,
+): Promise<ActionResult> {
 	try {
 		// Verify authentication
 		const sessionData = await verifySession();
@@ -116,15 +123,15 @@ export async function toggleMcpServerAction(serverId: string, enabled: boolean):
 		// Verify ownership and update server
 		const [updatedServer] = await db
 			.update(mcpServers)
-			.set({ 
+			.set({
 				enabled,
 				updatedAt: new Date().toISOString(),
 			})
 			.where(
 				and(
 					eq(mcpServers.id, serverId),
-					eq(mcpServers.userId, sessionData.userId)
-				)
+					eq(mcpServers.userId, sessionData.userId),
+				),
 			)
 			.returning();
 
@@ -150,7 +157,9 @@ export async function toggleMcpServerAction(serverId: string, enabled: boolean):
 	}
 }
 
-export async function deleteMcpServerAction(serverId: string): Promise<ActionResult> {
+export async function deleteMcpServerAction(
+	serverId: string,
+): Promise<ActionResult> {
 	try {
 		// Verify authentication
 		const sessionData = await verifySession();
@@ -167,8 +176,8 @@ export async function deleteMcpServerAction(serverId: string): Promise<ActionRes
 			.where(
 				and(
 					eq(mcpServers.id, serverId),
-					eq(mcpServers.userId, sessionData.userId)
-				)
+					eq(mcpServers.userId, sessionData.userId),
+				),
 			)
 			.returning();
 

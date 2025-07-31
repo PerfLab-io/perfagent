@@ -5,8 +5,15 @@
 import { db } from '@/drizzle/db';
 import { mcpServers } from '@/drizzle/schema';
 import { eq, and } from 'drizzle-orm';
-import { TokenValidator, type OAuthTokens, type ServerRecord } from './TokenValidator';
-import { mcpOAuthCache, type TokenCacheEntry } from '@/lib/ai/mastra/cache/MCPCache';
+import {
+	TokenValidator,
+	type OAuthTokens,
+	type ServerRecord,
+} from './TokenValidator';
+import {
+	mcpOAuthCache,
+	type TokenCacheEntry,
+} from '@/lib/ai/mastra/cache/MCPCache';
 
 type AuthState = 'unknown' | 'required' | 'authorized' | 'failed';
 
@@ -31,15 +38,18 @@ export class AuthManager {
 	private authCache = new Map<string, AuthCacheEntry>();
 	private cacheTimeout = 5 * 60 * 1000; // 5 minutes
 
-	constructor(
-		private tokenValidator: TokenValidator = new TokenValidator(),
-	) {}
+	constructor(private tokenValidator: TokenValidator = new TokenValidator()) {}
 
 	/**
 	 * Ensure a server is authenticated and ready for operations
 	 */
-	async ensureAuthenticated(serverId: string, userId: string): Promise<AuthResult> {
-		console.log(`[Auth Manager] Ensuring authentication for server ${serverId}`);
+	async ensureAuthenticated(
+		serverId: string,
+		userId: string,
+	): Promise<AuthResult> {
+		console.log(
+			`[Auth Manager] Ensuring authentication for server ${serverId}`,
+		);
 
 		// Get current state from database (source of truth)
 		const server = await this.getServerRecord(serverId, userId);
@@ -50,7 +60,9 @@ export class AuthManager {
 		// Check instance cache first (Fluid Compute optimization)
 		const cached = this.getInstanceCache(serverId, server.accessToken);
 		if (cached?.state === 'authorized') {
-			console.log(`[Auth Manager] Using cached auth state for server ${serverId}`);
+			console.log(
+				`[Auth Manager] Using cached auth state for server ${serverId}`,
+			);
 			return { status: 'authenticated' };
 		}
 
@@ -60,20 +72,23 @@ export class AuthManager {
 
 	private async executeAuthFlow(server: ServerRecord): Promise<AuthResult> {
 		const authState = server.authStatus as AuthState;
-		console.log(`[Auth Manager] Executing auth flow for server ${server.id}, current state: ${authState}`);
+		console.log(
+			`[Auth Manager] Executing auth flow for server ${server.id}, current state: ${authState}`,
+		);
 
 		switch (authState) {
 			case 'authorized':
 				return await this.validateAndRefreshIfNeeded(server);
 			case 'required':
-				return { 
-					status: 'requires_auth', 
-					error: 'OAuth authorization required. Please complete the authentication flow.' 
+				return {
+					status: 'requires_auth',
+					error:
+						'OAuth authorization required. Please complete the authentication flow.',
 				};
 			case 'failed':
-				return { 
-					status: 'failed', 
-					error: 'Previous authentication failed. Please retry authorization.' 
+				return {
+					status: 'failed',
+					error: 'Previous authentication failed. Please retry authorization.',
 				};
 			default:
 				// 'unknown' state or any other state - detect requirements
@@ -81,34 +96,49 @@ export class AuthManager {
 		}
 	}
 
-	private async validateAndRefreshIfNeeded(server: ServerRecord): Promise<AuthResult> {
+	private async validateAndRefreshIfNeeded(
+		server: ServerRecord,
+	): Promise<AuthResult> {
 		if (!server.accessToken) {
-			console.log(`[Auth Manager] Server ${server.id} marked as authorized but no access token found`);
+			console.log(
+				`[Auth Manager] Server ${server.id} marked as authorized but no access token found`,
+			);
 			await this.transitionToRequired(server.id, server.userId);
 			return { status: 'requires_auth' };
 		}
 
 		// Check if token is cached as valid in Redis
-		const isTokenCacheValid = await mcpOAuthCache.isTokenCacheValid(server.id, server.accessToken);
+		const isTokenCacheValid = await mcpOAuthCache.isTokenCacheValid(
+			server.id,
+			server.accessToken,
+		);
 		if (isTokenCacheValid) {
-			console.log(`[Auth Manager] Token validation cached for server ${server.id}`);
+			console.log(
+				`[Auth Manager] Token validation cached for server ${server.id}`,
+			);
 			this.updateInstanceCache(server.id, 'authorized', server.accessToken);
 			return { status: 'authenticated' };
 		}
 
 		// Check if token should be refreshed proactively
 		if (this.tokenValidator.shouldRefreshToken(server.tokenExpiresAt, 10)) {
-			console.log(`[Auth Manager] Token near expiration for server ${server.id}, attempting refresh`);
-			
+			console.log(
+				`[Auth Manager] Token near expiration for server ${server.id}, attempting refresh`,
+			);
+
 			if (server.refreshToken) {
 				const refreshedTokens = await this.tokenValidator.refresh(
 					server.id,
 					server.userId,
-					server
+					server,
 				);
 
 				if (refreshedTokens) {
-					await this.transitionToAuthorized(server.id, server.userId, refreshedTokens);
+					await this.transitionToAuthorized(
+						server.id,
+						server.userId,
+						refreshedTokens,
+					);
 					return { status: 'authenticated' };
 				}
 			}
@@ -116,8 +146,11 @@ export class AuthManager {
 
 		// Validate token with actual server request
 		console.log(`[Auth Manager] Validating token for server ${server.id}`);
-		const isValid = await this.tokenValidator.validate(server.url, server.accessToken);
-		
+		const isValid = await this.tokenValidator.validate(
+			server.url,
+			server.accessToken,
+		);
+
 		if (isValid) {
 			// Cache the validated token in Redis
 			await mcpOAuthCache.cacheValidatedToken(server.id, {
@@ -134,31 +167,43 @@ export class AuthManager {
 
 		// Token is invalid - try to refresh
 		if (server.refreshToken) {
-			console.log(`[Auth Manager] Token invalid for server ${server.id}, attempting refresh`);
-			
+			console.log(
+				`[Auth Manager] Token invalid for server ${server.id}, attempting refresh`,
+			);
+
 			const refreshedTokens = await this.tokenValidator.refresh(
 				server.id,
 				server.userId,
-				server
+				server,
 			);
 
 			if (refreshedTokens) {
-				await this.transitionToAuthorized(server.id, server.userId, refreshedTokens);
+				await this.transitionToAuthorized(
+					server.id,
+					server.userId,
+					refreshedTokens,
+				);
 				return { status: 'authenticated' };
 			}
 		}
 
 		// Token invalid and can't refresh
-		console.log(`[Auth Manager] Cannot validate or refresh token for server ${server.id}`);
+		console.log(
+			`[Auth Manager] Cannot validate or refresh token for server ${server.id}`,
+		);
 		await this.transitionToRequired(server.id, server.userId);
 		return { status: 'requires_auth' };
 	}
 
-	private async detectAuthRequirements(server: ServerRecord): Promise<AuthResult> {
+	private async detectAuthRequirements(
+		server: ServerRecord,
+	): Promise<AuthResult> {
 		// For servers in 'unknown' state, we need to test if they require OAuth
 		// This would involve making a test request to see if we get a 401 with WWW-Authenticate
-		console.log(`[Auth Manager] Detecting auth requirements for server ${server.id}`);
-		
+		console.log(
+			`[Auth Manager] Detecting auth requirements for server ${server.id}`,
+		);
+
 		// For now, if a server is in unknown state and has no tokens, mark as requiring auth
 		// A more sophisticated implementation could test the server's response
 		await this.transitionToRequired(server.id, server.userId);
@@ -169,7 +214,9 @@ export class AuthManager {
 	 * Transition server to 'required' state - needs OAuth authorization
 	 */
 	async transitionToRequired(serverId: string, userId: string): Promise<void> {
-		console.log(`[Auth Manager] Transitioning server ${serverId} to 'required' state`);
+		console.log(
+			`[Auth Manager] Transitioning server ${serverId} to 'required' state`,
+		);
 
 		await this.updateServerAuth(serverId, userId, {
 			authStatus: 'required',
@@ -192,7 +239,9 @@ export class AuthManager {
 		userId: string,
 		tokens: OAuthTokens,
 	): Promise<void> {
-		console.log(`[Auth Manager] Transitioning server ${serverId} to 'authorized' state`);
+		console.log(
+			`[Auth Manager] Transitioning server ${serverId} to 'authorized' state`,
+		);
 
 		const expiresAt = tokens.expiresIn
 			? new Date(Date.now() + tokens.expiresIn * 1000)
@@ -221,8 +270,14 @@ export class AuthManager {
 	/**
 	 * Transition server to 'failed' state - authentication failed
 	 */
-	async transitionToFailed(serverId: string, userId: string, error?: string): Promise<void> {
-		console.log(`[Auth Manager] Transitioning server ${serverId} to 'failed' state: ${error || 'Unknown error'}`);
+	async transitionToFailed(
+		serverId: string,
+		userId: string,
+		error?: string,
+	): Promise<void> {
+		console.log(
+			`[Auth Manager] Transitioning server ${serverId} to 'failed' state: ${error || 'Unknown error'}`,
+		);
 
 		await this.updateServerAuth(serverId, userId, {
 			authStatus: 'failed',
@@ -240,7 +295,10 @@ export class AuthManager {
 	/**
 	 * Get current authentication state for a server
 	 */
-	async getAuthState(serverId: string, userId: string): Promise<AuthState | null> {
+	async getAuthState(
+		serverId: string,
+		userId: string,
+	): Promise<AuthState | null> {
 		const server = await this.getServerRecord(serverId, userId);
 		return server ? (server.authStatus as AuthState) : null;
 	}
@@ -267,7 +325,10 @@ export class AuthManager {
 			.where(and(eq(mcpServers.id, serverId), eq(mcpServers.userId, userId)));
 	}
 
-	private async getServerRecord(serverId: string, userId: string): Promise<ServerRecord | null> {
+	private async getServerRecord(
+		serverId: string,
+		userId: string,
+	): Promise<ServerRecord | null> {
 		const servers = await db
 			.select()
 			.from(mcpServers)
@@ -277,7 +338,10 @@ export class AuthManager {
 		return servers[0] || null;
 	}
 
-	private getInstanceCache(serverId: string, currentAccessToken?: string | null): AuthCacheEntry | null {
+	private getInstanceCache(
+		serverId: string,
+		currentAccessToken?: string | null,
+	): AuthCacheEntry | null {
 		const cached = this.authCache.get(serverId);
 		if (!cached) return null;
 
@@ -296,7 +360,11 @@ export class AuthManager {
 		return cached;
 	}
 
-	private updateInstanceCache(serverId: string, state: AuthState, accessToken?: string): void {
+	private updateInstanceCache(
+		serverId: string,
+		state: AuthState,
+		accessToken?: string,
+	): void {
 		this.authCache.set(serverId, {
 			state,
 			timestamp: Date.now(),
@@ -321,7 +389,7 @@ export class AuthManager {
 	getCacheStats() {
 		const now = Date.now();
 		const validEntries = Array.from(this.authCache.values()).filter(
-			entry => now - entry.timestamp <= this.cacheTimeout
+			(entry) => now - entry.timestamp <= this.cacheTimeout,
 		);
 
 		return {
