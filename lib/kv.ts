@@ -159,7 +159,9 @@ class KVClient {
 	 */
 	async info(): Promise<string | null> {
 		try {
-			return await this.redis.info();
+			// Simple connection test - try to get a non-existent key
+			await this.redis.get('__connection_test__');
+			return 'Redis connection: OK';
 		} catch (error) {
 			console.warn('[KV] Info failed:', error);
 			return null;
