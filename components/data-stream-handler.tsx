@@ -100,13 +100,17 @@ export function DataStreamHandler({
 			}
 
 			const deltaType = delta.type as string;
+			console.log('DataStreamHandler - Processing delta:', { deltaType, delta });
 
 			// Find the artifact definition for this type
 			const artifactDefinition = artifactDefinitions.find(
 				(definition) => definition.kind === deltaType,
 			);
 
+			console.log('DataStreamHandler - Found artifact definition:', !!artifactDefinition, artifactDefinition?.kind);
+
 			if (!artifactDefinition) {
+				console.log('DataStreamHandler - No artifact definition found for type:', deltaType);
 				continue;
 			}
 
@@ -135,6 +139,7 @@ export function DataStreamHandler({
 			}
 
 			if (artifactDefinition.onStreamPart) {
+				console.log('DataStreamHandler - Calling onStreamPart for:', artifactDefinition.kind);
 				// Call the onStreamPart method of the artifact definition
 				artifactDefinition.onStreamPart({
 					streamPart: delta as DataStreamDelta,
@@ -185,7 +190,11 @@ function PureArtifactComponent(props: ArtifactProps) {
 			<div className="mb-1 flex w-full items-center justify-between">
 				<div className="text-merino-400 dark:text-merino-800 text-xs">
 					<span>
-						{artifactDefinition.kind === 'text' ? 'Text' : 'Research'}
+						{artifactDefinition.kind === 'text' 
+							? 'Text' 
+							: artifactDefinition.kind === 'tool-call-approval'
+							? 'Tool Call Approval'
+							: 'Research'}
 					</span>
 				</div>
 				<button

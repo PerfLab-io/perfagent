@@ -44,25 +44,42 @@ export const toolCallApprovalArtifact = new Artifact<
 		});
 	},
 	onStreamPart: ({ streamPart, setArtifact, setMetadata }) => {
+		console.log('Tool Call Approval - Received streamPart:', streamPart);
+		console.log('Tool Call Approval - Content type:', streamPart.content?.type);
+		console.log('Tool Call Approval - Content data:', streamPart.content?.data);
+		
 		if (
 			streamPart.content.type === 'tool-call-approval' &&
 			streamPart.content.data
 		) {
+			console.log('Tool Call Approval - Processing data:', streamPart.content.data);
+			console.log('Tool Call Approval - Tool call:', streamPart.content.data.toolCall);
+			
 			setMetadata((metadata) => {
-				return {
+				const newMetadata = {
 					...metadata,
 					toolCall: streamPart.content.data.toolCall,
 					status: streamPart.content.data.status || 'pending',
 					title: streamPart.content.data.title || 'Tool Call Approval',
 					timestamp: new Date(streamPart.content.data.timestamp || Date.now()),
 				};
+				console.log('Tool Call Approval - Setting metadata:', newMetadata);
+				return newMetadata;
+			});
+		} else {
+			console.log('Tool Call Approval - Condition not met:', {
+				contentType: streamPart.content?.type,
+				hasData: !!streamPart.content?.data
 			});
 		}
 	},
 	content: ({ metadata }) => {
 		const [showDetails, setShowDetails] = useState(false);
 
+		console.log('Tool Call Approval - Rendering with metadata:', metadata);
+
 		if (!metadata || !metadata.toolCall) {
+			console.log('Tool Call Approval - No metadata or toolCall, returning null');
 			return null;
 		}
 

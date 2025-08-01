@@ -262,8 +262,17 @@ chat.post(
 				const workflow = mastra.getWorkflow('mcpWorkflow');
 				const run = workflow.createRun();
 
+				// Create a simple data stream for execution feedback
+				const executionDataStream = {
+					writeData: (data: any) => {
+						console.log('MCP Execution:', data);
+						// In a real implementation, this would stream back to the client
+						// For now, we just log the execution progress
+					},
+				};
+
 				// Start the workflow with execution action
-				await run.start({
+				const result = await run.start({
 					inputData: {
 						messages: [
 							{
@@ -274,21 +283,20 @@ chat.post(
 						userId: sessionData.userId,
 						action: 'execute',
 						toolCallRequest: toolCall,
-						dataStream: {
-							writeData: () => {}, // Placeholder - will be replaced by actual stream
-						},
+						dataStream: executionDataStream,
 					},
 				});
 
 				return c.json({
 					success: true,
-					message: 'Tool call approved and executing',
+					message: 'Tool call approved and executed successfully',
 					runId: run.runId,
+					result: result,
 				});
 			} else {
 				return c.json({
-					success: true,
-					message: 'Tool call denied',
+					success: false,
+					message: 'Tool call denied by user',
 					reason: reason || 'User denied the tool call',
 				});
 			}
