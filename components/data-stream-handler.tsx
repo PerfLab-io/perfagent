@@ -6,6 +6,7 @@ import { initialArtifactData, useArtifact } from '@/lib/hooks/use-artifact';
 import { JSONValue, UIMessage } from 'ai';
 import { researchUpdateArtifact } from '@/artifacts/research_update/client';
 import { textArtifact } from '@/artifacts/text/client';
+import { toolCallApprovalArtifact } from '@/artifacts/tool_call_approval/client';
 import { Artifact, UIArtifact } from '@/components/artifact';
 import { ChevronDown, ChevronUp, ExternalLink, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -24,7 +25,11 @@ export type DataStreamDelta<T extends JSONValue = NonNullable<JSONValue>> = {
 
 // We'll populate this from outside to avoid circular dependencies
 export const artifactDefinitions: Array<Artifact<any, any, any>> = [];
-artifactDefinitions.push(textArtifact, researchUpdateArtifact);
+artifactDefinitions.push(
+	textArtifact,
+	researchUpdateArtifact,
+	toolCallApprovalArtifact,
+);
 
 export function DataStreamHandler({
 	chatId,

@@ -18,10 +18,6 @@ import {
 	createUserMcpClient,
 	getMcpServerInfo,
 	testMcpServerConnection,
-	getAllCatalogTools,
-	getCatalogToolsByServer,
-	getCatalogStats,
-	searchCatalogTools,
 } from '@/lib/ai/mastra/mcpClient';
 import { exchangeOAuthCode } from '@/lib/ai/mastra/oauthExchange';
 import { createMcpAwareLargeAssistant } from '@/lib/ai/mastra/agents/largeAssistant';
@@ -181,76 +177,6 @@ chat.get('/mcp/server-info/:id', async (c) => {
 	}
 });
 
-// GET /api/mcp/catalog/tools - Get all tools from catalog
-chat.get('/mcp/catalog/tools', async (c) => {
-	try {
-		const sessionData = await verifySession();
-		if (!sessionData) {
-			return c.json({ error: 'Authentication required' }, 401);
-		}
-
-		const tools = getAllCatalogTools();
-		return c.json({ tools });
-	} catch (error) {
-		console.error('Error fetching catalog tools:', error);
-		return c.json({ error: 'Failed to fetch catalog tools' }, 500);
-	}
-});
-
-// GET /api/mcp/catalog/tools/:serverId - Get tools for specific server
-chat.get('/mcp/catalog/tools/:serverId', async (c) => {
-	try {
-		const sessionData = await verifySession();
-		if (!sessionData) {
-			return c.json({ error: 'Authentication required' }, 401);
-		}
-
-		const serverId = c.req.param('serverId');
-		const tools = getCatalogToolsByServer(serverId);
-		return c.json({ tools });
-	} catch (error) {
-		console.error('Error fetching server tools:', error);
-		return c.json({ error: 'Failed to fetch server tools' }, 500);
-	}
-});
-
-// GET /api/mcp/catalog/stats - Get catalog statistics
-chat.get('/mcp/catalog/stats', async (c) => {
-	try {
-		const sessionData = await verifySession();
-		if (!sessionData) {
-			return c.json({ error: 'Authentication required' }, 401);
-		}
-
-		const stats = getCatalogStats();
-		return c.json(stats);
-	} catch (error) {
-		console.error('Error fetching catalog stats:', error);
-		return c.json({ error: 'Failed to fetch catalog stats' }, 500);
-	}
-});
-
-// GET /api/mcp/catalog/search - Search tools in catalog
-chat.get('/mcp/catalog/search', async (c) => {
-	try {
-		const sessionData = await verifySession();
-		if (!sessionData) {
-			return c.json({ error: 'Authentication required' }, 401);
-		}
-
-		const query = c.req.query('q');
-		if (!query) {
-			return c.json({ error: 'Query parameter required' }, 400);
-		}
-
-		const tools = searchCatalogTools(query);
-		return c.json({ tools, query });
-	} catch (error) {
-		console.error('Error searching catalog tools:', error);
-		return c.json({ error: 'Failed to search catalog tools' }, 500);
-	}
-});
-
 // DELETE /api/mcp/servers/:id - Delete a server
 chat.delete('/mcp/servers/:id', async (c) => {
 	try {
@@ -309,6 +235,78 @@ chat.post('/mcp/servers/:id/test', async (c) => {
 		);
 	}
 });
+
+// POST /api/mcp/approve-tool-call - Handle tool call approval/denial
+const toolCallApprovalSchema = z.object({
+	toolCall: z.object({
+		toolName: z.string(),
+		arguments: z.record(z.any()),
+		serverName: z.string(),
+		reason: z.string(),
+	}),
+	approved: z.boolean(),
+	reason: z.string().optional(),
+});
+
+chat.post(
+	'/mcp/approve-tool-call',
+	zValidator('json', toolCallApprovalSchema),
+	async (c) => {
+		try {
+			const sessionData = await verifySession();
+			if (!sessionData) {
+				return c.json({ error: 'Authentication required' }, 401);
+			}
+
+			const { toolCall, approved, reason } = c.req.valid('json');
+
+			if (approved) {
+				// Execute the MCP workflow with the approved tool call
+				const workflow = mastra.getWorkflow('mcpWorkflow');
+				const run = workflow.createRun();
+
+				// Start the workflow with execution action
+				await run.start({
+					inputData: {
+						messages: [
+							{
+								role: 'user',
+								content: `Execute approved tool call: ${toolCall.toolName}`,
+							},
+						],
+						userId: sessionData.userId,
+						action: 'execute',
+						toolCallRequest: toolCall,
+						dataStream: {
+							writeData: () => {}, // Placeholder - will be replaced by actual stream
+						},
+					},
+				});
+
+				return c.json({
+					success: true,
+					message: 'Tool call approved and executing',
+					runId: run.runId,
+				});
+			} else {
+				return c.json({
+					success: true,
+					message: 'Tool call denied',
+					reason: reason || 'User denied the tool call',
+				});
+			}
+		} catch (error) {
+			console.error('Error handling tool call approval:', error);
+			return c.json(
+				{
+					error: 'Failed to handle tool call approval',
+					message: error instanceof Error ? error.message : 'Unknown error',
+				},
+				500,
+			);
+		}
+	},
+);
 
 // OAuth callback endpoints
 

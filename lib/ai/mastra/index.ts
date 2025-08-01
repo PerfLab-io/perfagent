@@ -1,6 +1,7 @@
 import { Mastra } from '@mastra/core/mastra';
 import { createLogger } from '@mastra/core/logger';
 import { cwvInsightsWorkflow } from './workflows/cwvInsights';
+import { mcpWorkflow } from './workflows/mcpWorkflow';
 import { routerAgent } from './agents/router';
 import { LangfuseExporter } from 'langfuse-vercel';
 import { serverEnv } from '@/lib/env/server';
@@ -14,9 +15,10 @@ import { reportAssistant } from './agents/reportAssistant';
 import { traceAssistant } from './agents/traceAssistant';
 import { suggestionsAssistant } from './agents/suggestionsAssistant';
 import { networkAssistant } from './agents/networkAssistant';
+import { mcpAgent } from './agents/mcpAgent';
 
 export const mastra = new Mastra({
-	workflows: { cwvInsightsWorkflow, researchWorkflow },
+	workflows: { cwvInsightsWorkflow, researchWorkflow, mcpWorkflow },
 	agents: {
 		smallAssistant,
 		largeAssistant,
@@ -28,6 +30,7 @@ export const mastra = new Mastra({
 		traceAssistant,
 		networkAssistant,
 		suggestionsAssistant,
+		mcpAgent,
 	},
 	logger: createLogger({
 		name: 'Mastra',
