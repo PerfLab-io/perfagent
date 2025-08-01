@@ -29,10 +29,10 @@ export function createMcpAwareRouterAgent(
 
 export const routerOutputSchema = z.object({
 	workflow: z
-		.enum(['cwvInsightsWorkflow', 'researchWorkflow'])
+		.enum(['cwvInsightsWorkflow', 'researchWorkflow', 'mcpWorkflow'])
 		.nullable()
 		.describe(
-			'The workflow to use in case the user message requires any form of deeper analysis. Null if a simple response is sufficient.',
+			'The workflow to use in case the user message requires any form of deeper analysis. Null if a simple response is sufficient. Use mcpWorkflow for external tool integrations.',
 		),
 	certainty: z
 		.number()

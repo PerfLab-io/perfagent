@@ -20,9 +20,6 @@ import {
 	testMcpServerConnection,
 } from '@/lib/ai/mastra/mcpClient';
 import { exchangeOAuthCode } from '@/lib/ai/mastra/oauthExchange';
-import { createMcpAwareLargeAssistant } from '@/lib/ai/mastra/agents/largeAssistant';
-import { createMcpAwareRouterAgent } from '@/lib/ai/mastra/agents/router';
-import { transformMcpToolsetsForMastra } from '@/lib/ai/mastra/toolsetTransformer';
 
 export const runtime = 'nodejs';
 
@@ -607,14 +604,6 @@ chat.post('/mcp/oauth/callback', async (c) => {
 
 // POST endpoint for chat
 chat.post('/chat', zValidator('json', requestSchema), async (c) => {
-	// Initialize variables in outer scope for proper cleanup
-	let mcpContext: {
-		client: any;
-		toolsets: Record<string, any>;
-		tools: Record<string, any>;
-		userId?: string;
-	} | null = null;
-
 	try {
 		const body = c.req.valid('json');
 		const messages = convertToCoreMessages(body.messages);
@@ -630,61 +619,33 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 			return c.json({ error: 'No messages provided' }, 400);
 		}
 
-		// Get MCP toolsets if user is authenticated
-		let rawToolsets = {};
-		let transformedMcp = { toolsets: {}, tools: {} };
-		let mcpClient = null;
+		// Get session data for user context
 		const sessionData = await verifySession();
-		if (sessionData) {
-			mcpClient = await createUserMcpClient(sessionData.userId);
-			if (mcpClient) {
-				try {
-					rawToolsets = await mcpClient.getToolsets();
-					transformedMcp = transformMcpToolsetsForMastra(rawToolsets);
-				} catch (error) {
-					console.error('Error fetching MCP toolsets:', error);
-				}
-			}
-		}
-
-		// Create request-scoped MCP context
-		mcpContext = {
-			client: mcpClient,
-			toolsets: transformedMcp.toolsets,
-			tools: transformedMcp.tools,
-			userId: sessionData?.userId,
-		};
 
 		const dataStream = createDataStream({
 			execute: async (dataStreamWriter) => {
 				dataStreamWriter.writeData('initialized call');
 
-				// Use MCP-aware router if toolsets are available
-				const routerAgent =
-					mcpContext?.toolsets && Object.keys(mcpContext.toolsets).length > 0
-						? createMcpAwareRouterAgent(mcpContext.toolsets, mcpContext.tools)
-						: mastra.getAgent('routerAgent');
+				// Use standard router agent
+				const routerAgent = mastra.getAgent('routerAgent');
 
 				const { object } = await routerAgent.generate(messages, {
 					output: routerOutputSchema,
 				});
 
+				console.log('========== object', object);
+
 				const smallAssistant = mastra.getAgent('smallAssistant');
 
-				if (object.certainty < 0.5) {
-					const stream = await smallAssistant.stream(
-						[
-							...messages,
-							{
-								role: 'assistant',
-								content:
-									'Unclear user request, I should kindly ask for clarification and steer the conversation back on track.',
-							},
-						],
+				if (object.certainty < 0.5 && object.workflow !== 'mcpWorkflow') {
+					const stream = await smallAssistant.stream([
+						...messages,
 						{
-							toolsets: mcpContext?.toolsets || {},
+							role: 'assistant',
+							content:
+								'Unclear user request, I should kindly ask for clarification and steer the conversation back on track.',
 						},
-					);
+					]);
 					stream.mergeIntoDataStream(dataStreamWriter, {
 						sendReasoning: true,
 						sendSources: true,
@@ -715,19 +676,14 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 
 								unsubscribe();
 							} else {
-								const stream = await smallAssistant.stream(
-									[
-										...messages,
-										{
-											role: 'assistant',
-											content:
-												'User request is missing required data for analysis, I should kindly prompt the user to attach the trace json file containing the data to process the request. I should remind the user that I only process Google Chrome trace files and refer to the official blog post: https://developer.chrome.com/blog/devtools-tips-39?hl=en.',
-										},
-									],
+								const stream = await smallAssistant.stream([
+									...messages,
 									{
-										toolsets: mcpContext?.toolsets || {},
+										role: 'assistant',
+										content:
+											'User request is missing required data for analysis, I should kindly prompt the user to attach the trace json file containing the data to process the request. I should remind the user that I only process Google Chrome trace files and refer to the official blog post: https://developer.chrome.com/blog/devtools-tips-39?hl=en.',
 									},
-								);
+								]);
 								stream.mergeIntoDataStream(dataStreamWriter);
 							}
 							break;
@@ -748,20 +704,43 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 
 							unsubscribe();
 							break;
-						default:
-							// Use MCP-aware agent if toolsets are available
-							const agent =
-								mcpContext?.toolsets &&
-								Object.keys(mcpContext.toolsets).length > 0
-									? createMcpAwareLargeAssistant(
-											mcpContext.toolsets,
-											mcpContext.tools,
-										)
-									: mastra.getAgent('largeAssistant');
+						case 'mcpWorkflow':
+							if (sessionData) {
+								const mcpWorkflow = mastra.getWorkflow('mcpWorkflow');
+								const run = mcpWorkflow.createRun();
 
-							const stream = await agent.stream(messages, {
-								toolsets: mcpContext?.toolsets || {},
-							});
+								const unsubscribe = run.watch((event) => {
+									console.log('========== MCP workflow event', event);
+								});
+
+								const _run = await run.start({
+									inputData: {
+										messages,
+										userId: sessionData.userId,
+										action: 'discover',
+										dataStream: dataStreamWriter,
+									},
+								});
+
+								unsubscribe();
+							} else {
+								// If no session, use regular assistant
+								const stream = await mastra.getAgent('largeAssistant').stream([
+									...messages,
+									{
+										role: 'assistant',
+										content:
+											'External tool integration requires authentication. Please log in to access MCP tools.',
+									},
+								]);
+								stream.mergeIntoDataStream(dataStreamWriter);
+							}
+							break;
+						default:
+							// Use standard large assistant for general queries
+							const stream = await mastra
+								.getAgent('largeAssistant')
+								.stream(messages);
 							stream.mergeIntoDataStream(dataStreamWriter, {
 								sendReasoning: true,
 								sendSources: true,
@@ -793,32 +772,11 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 					throw error;
 				})
 				.finally(async () => {
-					// Disconnect MCP client after streaming completes
-					if (mcpContext?.client) {
-						try {
-							await mcpContext.client.disconnect();
-							console.log('MCP client disconnected successfully');
-						} catch (error) {
-							console.error('Error disconnecting MCP client:', error);
-						}
-					}
+					// Cleanup completed
 				}),
 		);
 	} catch (error) {
 		console.error('Error in chat API:', error);
-
-		// Disconnect MCP client on any error during initialization
-		if (mcpContext?.client) {
-			try {
-				await mcpContext.client.disconnect();
-				console.log('MCP client disconnected due to error');
-			} catch (disconnectError) {
-				console.error(
-					'Error disconnecting MCP client on error:',
-					disconnectError,
-				);
-			}
-		}
 
 		if (error instanceof Error && error.name === 'AbortError') {
 			// Return a specific status code for aborted requests
