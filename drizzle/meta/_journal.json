@@ -50,6 +50,20 @@
       "when": 1753914256414,
       "tag": "0006_long_adam_destine",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1754000354182,
+      "tag": "0007_pretty_shooting_star",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1754031122909,
+      "tag": "0008_dapper_miracleman",
+      "breakpoints": true
     }
   ]
 }

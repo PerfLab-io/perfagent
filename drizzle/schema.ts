@@ -746,3 +746,4 @@ export const mcpServersRelations = relations(mcpServers, ({ one }) => ({
 		references: [user.id],
 	}),
 }));
+
