@@ -144,16 +144,18 @@ const mcpWorkflow = createWorkflow({
 						}
 
 						const toolsets = await mcpClient.getToolsets();
-						const servers = Object.entries(toolsets).map(([serverName, toolset]) => ({
-							name: serverName,
-							url: '', // TODO: Get actual URL from server registry
-							tools: Object.values(toolset).map((tool: any) => ({
-								name: tool.name,
-								description: tool.description,
-								inputSchema: tool.inputSchema,
-							})),
-							connected: true,
-						}));
+						const servers = Object.entries(toolsets).map(
+							([serverName, toolset]) => ({
+								name: serverName,
+								url: '', // TODO: Get actual URL from server registry
+								tools: Object.values(toolset).map((tool: any) => ({
+									name: tool.name,
+									description: tool.description,
+									inputSchema: tool.inputSchema,
+								})),
+								connected: true,
+							}),
+						);
 
 						const totalTools = servers.reduce(
 							(total, server) => total + server.tools.length,
@@ -182,7 +184,9 @@ const mcpWorkflow = createWorkflow({
 						});
 
 						// Use MCP agent to analyze user request and recommend tools
-						let recommendedTool: z.infer<typeof toolCallRequestSchema> | undefined;
+						let recommendedTool:
+							| z.infer<typeof toolCallRequestSchema>
+							| undefined;
 
 						if (messages.length > 0) {
 							const mcpAgent = mastra.getAgent('mcpAgent');
@@ -198,9 +202,10 @@ const mcpWorkflow = createWorkflow({
 								console.log('Requesting tool recommendation from MCP agent...');
 								console.log('Available tools context:', toolsContext);
 								console.log('User messages:', messages);
-								
+
 								const response = await mcpAgent.generate(
 									[
+										...messages,
 										{
 											role: 'system',
 											content: dedent`
@@ -213,7 +218,6 @@ const mcpWorkflow = createWorkflow({
 											If no suitable tool is found, respond with null.
 										`,
 										},
-										...messages,
 									],
 									{
 										output: z.object({
@@ -233,8 +237,11 @@ const mcpWorkflow = createWorkflow({
 						console.log('Tool discovery step complete:');
 						console.log('- Total tools found:', discovery.totalTools);
 						console.log('- Servers found:', discovery.servers.length);
-						console.log('- Recommended tool:', recommendedTool ? recommendedTool.toolName : 'none');
-						
+						console.log(
+							'- Recommended tool:',
+							recommendedTool ? recommendedTool.toolName : 'none',
+						);
+
 						// Send discovery completion update
 						dataStream.writeData({
 							type: 'text',
@@ -255,8 +262,11 @@ const mcpWorkflow = createWorkflow({
 
 						// If we have a recommended tool, send approval UI
 						if (recommendedTool) {
-							console.log('Sending tool call approval UI for:', recommendedTool);
-							
+							console.log(
+								'Sending tool call approval UI for:',
+								recommendedTool,
+							);
+
 							dataStream.writeData({
 								type: 'tool-call-approval',
 								runId,
@@ -273,7 +283,7 @@ const mcpWorkflow = createWorkflow({
 							});
 						} else {
 							console.log('No tool recommendation from MCP agent');
-							
+
 							// Still show available tools for manual selection
 							dataStream.writeData({
 								type: 'tool-catalog',
@@ -286,7 +296,8 @@ const mcpWorkflow = createWorkflow({
 										type: 'tool-catalog',
 										timestamp: Date.now(),
 										title: 'Available Tools',
-										message: 'Here are the available tools. You can request a specific tool to be used.',
+										message:
+											'Here are the available tools. You can request a specific tool to be used.',
 										servers: discovery.servers,
 									},
 								},
@@ -429,8 +440,4 @@ const mcpWorkflow = createWorkflow({
 
 export { mcpWorkflow };
 export type { TriggerSchema as MCPWorkflowTriggerSchema };
-export {
-	toolCallRequestSchema,
-	toolCallResultSchema,
-	mcpWorkflowInputSchema,
-};
+export { toolCallRequestSchema, toolCallResultSchema, mcpWorkflowInputSchema };
