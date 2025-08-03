@@ -3,22 +3,23 @@ import { createStep, createWorkflow } from '@mastra/core/workflows';
 import { z } from 'zod';
 import { createUserMcpClient } from '@/lib/ai/mastra/mcpClient';
 import dedent from 'dedent';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 
 // Message schema
 const messageSchema = coreMessageSchema;
 
-// Tool definition schema based on MCP specification
-const mcpToolSchema = z.object({
-	name: z.string(),
-	description: z.string().optional(),
-	inputSchema: z.record(z.any()).optional(),
-});
-
 // Tool call request schema
 const toolCallRequestSchema = z.object({
-	toolName: z.string(),
-	arguments: z.record(z.any()).default({}),
-	serverName: z.string(),
+	toolName: z.string().describe('Name of the tool to be called'),
+	arguments: z
+		.any()
+		.default({})
+		.describe(
+			"Selected tool's inputSchema. This is represents what should be passed to the tool",
+		),
+	serverName: z
+		.string()
+		.describe('Name of the server where the tool is located'),
 	reason: z.string().describe('Reason why this tool call is needed'),
 });
 
@@ -32,14 +33,7 @@ const toolCallResultSchema = z.object({
 
 // Tool discovery result schema
 const toolDiscoveryResultSchema = z.object({
-	servers: z.array(
-		z.object({
-			name: z.string(),
-			url: z.string(),
-			tools: z.array(mcpToolSchema),
-			connected: z.boolean(),
-		}),
-	),
+	totalServers: z.number(),
 	totalTools: z.number(),
 });
 
@@ -144,26 +138,15 @@ const mcpWorkflow = createWorkflow({
 						}
 
 						const toolsets = await mcpClient.getToolsets();
-						const servers = Object.entries(toolsets).map(
-							([serverName, toolset]) => ({
-								name: serverName,
-								url: '', // TODO: Get actual URL from server registry
-								tools: Object.values(toolset).map((tool: any) => ({
-									name: tool.name,
-									description: tool.description,
-									inputSchema: tool.inputSchema,
-								})),
-								connected: true,
-							}),
-						);
+						const totalServers = Object.keys(toolsets).length;
 
-						const totalTools = servers.reduce(
-							(total, server) => total + server.tools.length,
+						const totalTools = Object.values(toolsets).reduce(
+							(total, toolset) => total + Object.keys(toolset).length,
 							0,
 						);
 
 						const discovery: z.infer<typeof toolDiscoveryResultSchema> = {
-							servers,
+							totalServers,
 							totalTools,
 						};
 
@@ -178,7 +161,7 @@ const mcpWorkflow = createWorkflow({
 									type: 'mcp-discovery',
 									timestamp: Date.now(),
 									title: 'Tool Discovery',
-									message: `Found ${totalTools} tools across ${servers.length} servers`,
+									message: `Found ${totalTools} tools across ${totalServers} servers`,
 								},
 							},
 						});
@@ -190,45 +173,46 @@ const mcpWorkflow = createWorkflow({
 
 						if (messages.length > 0) {
 							const mcpAgent = mastra.getAgent('mcpAgent');
-
-							const toolsContext = servers
-								.map(
-									(server) =>
-										`Server: ${server.name}\\nTools: ${server.tools.map((t) => `- ${t.name}: ${t.description || 'No description'}`).join('\\n')}`,
-								)
-								.join('\\n\\n');
+							const parsedToolsets = JSON.stringify(
+								Object.keys(toolsets).map((serverName) => ({
+									serverName,
+									tools: Object.keys(toolsets[serverName]).map((toolName) => ({
+										toolName,
+										description: toolsets[serverName][toolName].description,
+										inputSchema: zodToJsonSchema(
+											toolsets[serverName][toolName].inputSchema,
+										),
+									})),
+								})),
+							);
 
 							try {
-								console.log('Requesting tool recommendation from MCP agent...');
-								console.log('Available tools context:', toolsContext);
-								console.log('User messages:', messages);
-
 								const response = await mcpAgent.generate(
 									[
 										...messages,
 										{
-											role: 'system',
+											role: 'user',
 											content: dedent`
-											You are an MCP tool recommendation agent. Analyze the user's request and recommend the most appropriate tool to use.
-											
-											Available tools:
-											${toolsContext}
-											
-											If you find a suitable tool, respond with a tool recommendation including the tool name, server name, arguments, and reason.
-											If no suitable tool is found, respond with null.
+											Here's the list of toolsets to choose from
+
+											${parsedToolsets}
 										`,
 										},
 									],
 									{
+										// toolsets,
 										output: z.object({
-											recommendedTool: toolCallRequestSchema.optional(),
+											selectedTool: toolCallRequestSchema,
 										}),
 									},
 								);
 
 								console.log('MCP agent response:', response.object);
-								recommendedTool = response.object.recommendedTool;
-								console.log('Recommended tool:', recommendedTool);
+								recommendedTool = response.object.selectedTool;
+								console.log(
+									'######################### Recommended tool:',
+									recommendedTool,
+								);
 							} catch (error) {
 								console.error('Error getting tool recommendation:', error);
 							}
@@ -236,7 +220,7 @@ const mcpWorkflow = createWorkflow({
 
 						console.log('Tool discovery step complete:');
 						console.log('- Total tools found:', discovery.totalTools);
-						console.log('- Servers found:', discovery.servers.length);
+						console.log('- Servers found:', discovery.totalServers);
 						console.log(
 							'- Recommended tool:',
 							recommendedTool ? recommendedTool.toolName : 'none',
@@ -254,7 +238,7 @@ const mcpWorkflow = createWorkflow({
 									type: 'mcp-discovery',
 									timestamp: Date.now(),
 									title: 'Tool Discovery',
-									message: `Discovery complete. Found ${discovery.totalTools} tools across ${discovery.servers.length} servers.`,
+									message: `Discovery complete. Found ${discovery.totalTools} tools across ${discovery.totalServers} servers.`,
 									discovery: discovery,
 								},
 							},
@@ -298,7 +282,7 @@ const mcpWorkflow = createWorkflow({
 										title: 'Available Tools',
 										message:
 											'Here are the available tools. You can request a specific tool to be used.',
-										servers: discovery.servers,
+										servers: [],
 									},
 								},
 							});
@@ -338,6 +322,22 @@ const mcpWorkflow = createWorkflow({
 						throw new Error('No tool call request provided for execution');
 					}
 
+					// Update the approval UI to show it's been approved
+					dataStream.writeData({
+						type: 'tool-call-approval',
+						runId,
+						status: 'started',
+						content: {
+							type: 'tool-call-approval',
+							data: {
+								toolCall: toolCallRequest,
+								status: 'approved',
+								title: 'Tool Call Approved',
+								timestamp: Date.now(),
+							},
+						},
+					});
+
 					dataStream.writeData({
 						type: 'text',
 						runId,
@@ -355,16 +355,36 @@ const mcpWorkflow = createWorkflow({
 					});
 
 					try {
-						// Create MCP client and execute tool
-						const mcpClient = await createUserMcpClient(userId);
-						if (!mcpClient) {
-							throw new Error('Failed to create MCP client');
+						// Import dependencies
+						const { toolExecutionService } = await import('../toolExecution');
+						const { db } = await import('@/drizzle/db');
+						const { mcpServers } = await import('@/drizzle/schema');
+						const { eq, and } = await import('drizzle-orm');
+
+						// Look up the server ID by name
+						const [server] = await db
+							.select()
+							.from(mcpServers)
+							.where(
+								and(
+									eq(mcpServers.name, toolCallRequest.serverName),
+									eq(mcpServers.userId, userId),
+								),
+							)
+							.limit(1);
+
+						if (!server) {
+							throw new Error(
+								`Server ${toolCallRequest.serverName} not found for user`,
+							);
 						}
 
-						const result = await mcpClient.callTool(
-							toolCallRequest.toolName,
-							toolCallRequest.arguments,
-						);
+						const result = await toolExecutionService.executeTool({
+							serverId: server.id,
+							userId,
+							toolName: toolCallRequest.toolName,
+							arguments: toolCallRequest.arguments,
+						});
 
 						const toolResult: z.infer<typeof toolCallResultSchema> = {
 							success: true,
@@ -388,7 +408,7 @@ const mcpWorkflow = createWorkflow({
 									timestamp: Date.now(),
 									title: 'Tool Execution',
 									message: `Successfully executed ${toolCallRequest.toolName}`,
-									result: result,
+									result: JSON.stringify(result), // Convert to string to avoid type issues
 								},
 							},
 						});

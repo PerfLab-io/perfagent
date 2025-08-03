@@ -22,6 +22,13 @@ export interface INPInteractionAnimation {
 	error: string | null;
 }
 
+export interface PendingToolCall {
+	toolName: string;
+	arguments: Record<string, any>;
+	serverName: string;
+	reason: string;
+}
+
 interface ChatUIState {
 	// Side panel state
 	showSidePanel: boolean | null;
@@ -57,6 +64,10 @@ interface ChatUIState {
 	// Serialized context
 	serializedContext: string | null;
 	setSerializedContext: (value: string | null) => void;
+
+	// Pending tool call state
+	pendingToolCall: PendingToolCall | null;
+	setPendingToolCall: (toolCall: PendingToolCall | null) => void;
 }
 
 export const useChatStore = create<ChatUIState>()((set) => ({
@@ -99,4 +110,8 @@ export const useChatStore = create<ChatUIState>()((set) => ({
 	// Serialized context
 	serializedContext: null,
 	setSerializedContext: (value) => set({ serializedContext: value }),
+
+	// Pending tool call state
+	pendingToolCall: null,
+	setPendingToolCall: (toolCall) => set({ pendingToolCall: toolCall }),
 }));

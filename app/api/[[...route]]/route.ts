@@ -5,7 +5,6 @@ import { Hono } from 'hono';
 import { handle } from 'hono/vercel';
 import { stream } from 'hono/streaming';
 import { zValidator } from '@hono/zod-validator';
-import { UserInteractionsData } from '@perflab/trace_engine/models/trace/handlers/UserInteractionsHandler';
 import { mastra } from '@/lib/ai/mastra';
 import { langfuse } from '@/lib/tools/langfuse';
 import { routerOutputSchema } from '@/lib/ai/mastra/agents/router';
@@ -33,6 +32,15 @@ const requestSchema = z.object({
 	traceFile: z.any().default(null),
 	inpInteractionAnimation: z.string().or(z.null()).default(null),
 	aiContext: z.string().or(z.null()).default(null),
+	toolApproval: z.object({
+		approved: z.boolean(),
+		toolCall: z.object({
+			toolName: z.string(),
+			arguments: z.record(z.any()),
+			serverName: z.string(),
+			reason: z.string(),
+		}),
+	}).optional(),
 });
 
 // Create Hono app for chat API
@@ -615,13 +623,10 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 	try {
 		const body = c.req.valid('json');
 		const messages = convertToCoreMessages(body.messages);
-		const files = body.files;
 		const insights: ReturnType<typeof analyseInsightsForCWV> = body.insights;
-		const userInteractions: UserInteractionsData = body.userInteractions;
-		const model = body.model;
-		const traceFile = body.traceFile;
 		const inpInteractionAnimation = body.inpInteractionAnimation;
 		const aiContext = body.aiContext;
+		const toolApproval = body.toolApproval;
 
 		if (messages.length === 0) {
 			return c.json({ error: 'No messages provided' }, 400);
@@ -633,6 +638,57 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 		const dataStream = createDataStream({
 			execute: async (dataStreamWriter) => {
 				dataStreamWriter.writeData('initialized call');
+
+				// Check if this is a tool approval response
+				if (toolApproval && sessionData) {
+					const mcpWorkflow = mastra.getWorkflow('mcpWorkflow');
+					const run = mcpWorkflow.createRun();
+
+					const unsubscribe = run.watch((event) => {
+						console.log('========== MCP workflow execution event', event);
+					});
+
+					if (toolApproval.approved) {
+						// Execute the approved tool
+						await run.start({
+							inputData: {
+								messages,
+								userId: sessionData.userId,
+								action: 'execute',
+								toolCallRequest: toolApproval.toolCall,
+								dataStream: dataStreamWriter,
+							},
+						});
+					} else {
+						// Update the approval UI to show it's been denied
+						dataStreamWriter.writeData({
+							type: 'tool-call-approval',
+							status: 'started',
+							content: {
+								type: 'tool-call-approval',
+								data: {
+									toolCall: toolApproval.toolCall,
+									status: 'denied',
+									title: 'Tool Call Denied',
+									timestamp: Date.now(),
+								},
+							},
+						});
+						
+						// Send denial message
+						dataStreamWriter.writeData({
+							type: 'text',
+							status: 'completed',
+							content: {
+								type: 'text',
+								data: `Tool call for ${toolApproval.toolCall.toolName} was denied.`,
+							},
+						});
+					}
+
+					unsubscribe();
+					return;
+				}
 
 				// Use standard router agent
 				const routerAgent = mastra.getAgent('routerAgent');
@@ -671,7 +727,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 									console.log('========== event', event);
 								});
 
-								const _run = await run.start({
+								await run.start({
 									inputData: {
 										// @ts-expect-error - TODO: fix this type error
 										insights,
@@ -703,7 +759,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 								console.log('========== event', event);
 							});
 
-							const _run = await run.start({
+							await run.start({
 								inputData: {
 									messages,
 									dataStream: dataStreamWriter,
@@ -721,7 +777,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 									console.log('========== MCP workflow event', event);
 								});
 
-								const _run = await run.start({
+								await run.start({
 									inputData: {
 										messages,
 										userId: sessionData.userId,

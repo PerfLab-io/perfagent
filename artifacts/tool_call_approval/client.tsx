@@ -8,11 +8,13 @@ import {
 	ChevronDown,
 	ChevronUp,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { useChatStore } from '@/lib/stores/chat-store';
+import { useChat } from '@ai-sdk/react';
 
 interface ToolCallApprovalMetadata {
 	title?: string;
@@ -43,7 +45,7 @@ export const toolCallApprovalArtifact = new Artifact<
 			timestamp: new Date(),
 		});
 	},
-	onStreamPart: ({ streamPart, setArtifact, setMetadata }) => {
+	onStreamPart: ({ streamPart, setMetadata }) => {
 		console.log('Tool Call Approval - Received streamPart:', streamPart);
 		console.log('Tool Call Approval - Content type:', streamPart.content?.type);
 		console.log('Tool Call Approval - Content data:', streamPart.content?.data);
@@ -81,8 +83,18 @@ export const toolCallApprovalArtifact = new Artifact<
 	},
 	content: ({ metadata }) => {
 		const [showDetails, setShowDetails] = useState(false);
+		const setPendingToolCall = useChatStore((state) => state.setPendingToolCall);
+		// Get the append function from useChat to send custom messages
+		const { append } = useChat({ id: 'current-chat' });
 
 		console.log('Tool Call Approval - Rendering with metadata:', metadata);
+
+		useEffect(() => {
+			if (metadata?.toolCall && metadata.status === 'pending') {
+				console.log('Setting pending tool call in store:', metadata.toolCall);
+				setPendingToolCall(metadata.toolCall);
+			}
+		}, [metadata?.toolCall, metadata?.status, setPendingToolCall]);
 
 		if (!metadata || !metadata.toolCall) {
 			console.log(
@@ -94,49 +106,47 @@ export const toolCallApprovalArtifact = new Artifact<
 		const { toolCall, status, title } = metadata;
 
 		const handleApprove = async () => {
-			try {
-				// Send approval to the chat API
-				const response = await fetch('/api/mcp/approve-tool-call', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						toolCall,
-						approved: true,
-					}),
-				});
-
-				if (!response.ok) {
-					throw new Error('Failed to approve tool call');
-				}
-
-				// The response will trigger a new message in the chat
-			} catch (error) {
-				console.error('Error approving tool call:', error);
-			}
+			console.log('Approve button clicked');
+			// Send a custom message with tool approval
+			await append(
+				{
+					role: 'user',
+					content: 'approve', // This will be intercepted by our custom logic
+				},
+				{
+					body: {
+						toolApproval: {
+							approved: true,
+							toolCall: toolCall,
+						},
+					},
+				},
+			);
+			// Clear the pending tool call
+			setPendingToolCall(null);
 		};
 
 		const handleDeny = async () => {
-			try {
-				// Send denial to the chat API
-				const response = await fetch('/api/mcp/approve-tool-call', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						toolCall,
-						approved: false,
-						reason: 'User denied the tool call',
-					}),
-				});
-
-				if (!response.ok) {
-					throw new Error('Failed to deny tool call');
-				}
-
-				// The response will trigger a new message in the chat
-			} catch (error) {
-				console.error('Error denying tool call:', error);
-			}
+			console.log('Deny button clicked');
+			// Send a custom message with tool denial
+			await append(
+				{
+					role: 'user',
+					content: 'deny', // This will be intercepted by our custom logic
+				},
+				{
+					body: {
+						toolApproval: {
+							approved: false,
+							toolCall: toolCall,
+						},
+					},
+				},
+			);
+			// Clear the pending tool call
+			setPendingToolCall(null);
 		};
+
 
 		const getStatusIcon = () => {
 			switch (status) {
@@ -232,13 +242,19 @@ export const toolCallApprovalArtifact = new Artifact<
 						</div>
 
 						{/* Arguments Details */}
-						{showDetails && Object.keys(toolCall.arguments).length > 0 && (
+						{showDetails && (
 							<div className="space-y-2">
 								<h5 className="text-sm font-medium">Arguments:</h5>
 								<div className="bg-muted/50 rounded-lg p-3">
-									<pre className="overflow-x-auto text-xs">
-										{JSON.stringify(toolCall.arguments, null, 2)}
-									</pre>
+									{Object.keys(toolCall.arguments).length > 0 ? (
+										<pre className="overflow-x-auto text-xs">
+											{JSON.stringify(toolCall.arguments, null, 2)}
+										</pre>
+									) : (
+										<p className="text-muted-foreground text-xs">
+											No arguments provided
+										</p>
+									)}
 								</div>
 							</div>
 						)}

@@ -301,6 +301,7 @@ export const ChatPageComponent = () => {
 				originalHandleSubmit(e as any, {
 					body,
 				});
+				
 				// Clear attached files after submission
 				setAttachedFiles([]);
 				// Clear suggestions when submitting a message
