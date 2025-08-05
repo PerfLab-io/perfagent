@@ -1,7 +1,7 @@
 'use client';
 
 import type React from 'react';
-import { useRef, useEffect, useCallback, useMemo } from 'react';
+import { useRef, useEffect, useCallback, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Paperclip, Send, X } from 'lucide-react';
 import { ChatMessage } from '@/components/chat-message';
@@ -13,6 +13,7 @@ import { cn, yieldToMain } from '@/lib/utils';
 import { useChat } from '@ai-sdk/react';
 import { analyzeTrace, analyzeTraceFromFile, TraceAnalysis } from '@/lib/trace';
 import { FileContextSection } from '@/components/trace-details';
+import { TraceProcessingIndicator } from '@/components/trace-processing-indicator';
 import { analyseInsightsForCWV } from '@/lib/insights';
 import { DataStreamHandler } from '@/components/data-stream-handler';
 import type { StandaloneCallTreeContext } from '@perflab/trace_engine/panels/ai_assistance/standalone';
@@ -116,6 +117,11 @@ export const ChatPageComponent = () => {
 
 	const { serializeInWorker } = useSerializationWorker();
 
+	const [progress, setProgress] = useState<{
+		phase: string;
+		percentage: number;
+	} | null>(null);
+
 	// Keep the traceAnalysis from SWR for compatibility
 	const { data: traceAnalysis, mutate: setTraceAnalysis } =
 		useSWR<TraceAnalysis | null>('trace-analysis', null, {
@@ -165,17 +171,41 @@ export const ChatPageComponent = () => {
 			requestAnimationFrame(async () => {
 				await yieldToMain();
 
-				setTimeout(() => {
-					analyzeTraceFromFile(file)
-						.then((contents) => {
-							traceContentsRef.current = contents;
-							return analyzeTrace(contents);
-						})
-						.then((trace) => {
-							setTraceAnalysis(trace);
+				setTimeout(async () => {
+					try {
+						setProgress({ phase: 'Reading trace file', percentage: 20 });
 
-							setCurrentContextFile(newFile);
+						const contents = await analyzeTraceFromFile(file);
+						traceContentsRef.current = contents;
+
+						setProgress({ phase: 'Parsing trace data', percentage: 40 });
+
+						// Use requestIdleCallback and chunking for better performance
+						await yieldToMain();
+
+						setProgress({
+							phase: 'Analyzing performance data',
+							percentage: 70,
 						});
+
+						// Process trace with yielding to prevent blocking
+						const trace = await analyzeTrace(contents);
+
+						setProgress({ phase: 'Finalizing analysis', percentage: 90 });
+
+						setTraceAnalysis(trace);
+						setCurrentContextFile(newFile);
+
+						setProgress({ phase: 'Complete', percentage: 100 });
+
+						// Clear progress after a short delay
+						setTimeout(() => {
+							setProgress(null);
+						}, 500);
+					} catch (error) {
+						console.error('Failed to process trace:', error);
+						setProgress(null);
+					}
 				}, 100);
 			});
 
@@ -184,7 +214,7 @@ export const ChatPageComponent = () => {
 
 			setSuggestions([]);
 		},
-		[],
+		[setTraceAnalysis, setCurrentContextFile, setAttachedFiles, setSuggestions],
 	);
 
 	useEffect(() => {
@@ -301,7 +331,7 @@ export const ChatPageComponent = () => {
 				originalHandleSubmit(e as any, {
 					body,
 				});
-				
+
 				// Clear attached files after submission
 				setAttachedFiles([]);
 				// Clear suggestions when submitting a message
@@ -366,18 +396,27 @@ export const ChatPageComponent = () => {
 					className="relative flex max-h-[90dvh] flex-1 flex-col px-4 focus-within:outline-hidden"
 					disabled={isLoading}
 				>
-					{/* File context section */}
-					<FileContextSection
-						metrics={contextFileInsights}
-						onTraceNavigationChange={handleTraceNavigationChange}
-						currentFile={currentContextFile}
-						isVisible={hasActiveFile}
-						traceAnalysis={traceAnalysis || null}
-						onINPInteractionAnimationChange={
-							setContextFileINPInteractionAnimation
-						}
-						onAIContextChange={handleAIContextChange}
-					/>
+					{/* Processing indicator */}
+					{progress !== null ? (
+						<div className="px-6 py-2">
+							<TraceProcessingIndicator
+								isProcessing={progress !== null}
+								progress={progress}
+							/>
+						</div>
+					) : (
+						<FileContextSection
+							metrics={contextFileInsights}
+							onTraceNavigationChange={handleTraceNavigationChange}
+							currentFile={currentContextFile}
+							isVisible={hasActiveFile}
+							traceAnalysis={traceAnalysis || null}
+							onINPInteractionAnimationChange={
+								setContextFileINPInteractionAnimation
+							}
+							onAIContextChange={handleAIContextChange}
+						/>
+					)}
 					{/* Chat messages container */}
 					<div
 						className={cn(
