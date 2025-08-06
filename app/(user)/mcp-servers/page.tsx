@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useOptimistic, useRef } from 'react';
+import { useEffect, useOptimistic, useRef } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import {
@@ -57,6 +57,11 @@ import {
 	toggleMcpServerAction,
 	deleteMcpServerAction,
 } from '@/app/actions/mcp-servers';
+import {
+	useMCPServersStore,
+	type MCPServer,
+	type ServerInfo,
+} from '@/lib/stores/mcp-servers-store';
 
 function SubmitButton() {
 	const { pending } = useFormStatus();
@@ -67,53 +72,46 @@ function SubmitButton() {
 	);
 }
 
-interface MCPServer {
-	id: string;
-	name: string;
-	url: string;
-	enabled: boolean;
-	authStatus?: 'unknown' | 'required' | 'authorized' | 'failed' | 'offline';
-	accessToken?: string | null;
-	refreshToken?: string | null;
-	tokenExpiresAt?: string | null;
-	createdAt: string;
-	updatedAt: string;
-}
-
-interface ServerInfo {
-	server: MCPServer;
-	toolsets: any;
-	resources: any;
-	prompts: any;
-}
-
 export default function MCPServersPage() {
-	const [servers, setServers] = useState<MCPServer[]>([]);
+	// Zustand store
+	const {
+		servers,
+		setServers,
+		updateServer,
+		removeServer,
+		loading,
+		setLoading,
+		isAddDialogOpen,
+		setIsAddDialogOpen,
+		formError,
+		setFormError,
+		serverToDelete,
+		setServerToDelete,
+		serverInfo,
+		setServerInfo,
+		loadingServerInfo,
+		setLoadingServerInfo,
+		serverInfoErrors,
+		setServerInfoErrors,
+		authUrls,
+		setAuthUrl,
+		removeAuthUrl,
+		serversRequiringAuth,
+		addServerRequiringAuth,
+		setServersRequiringAuth,
+		serverFailureReasons,
+		setServerFailureReason,
+		expandedServers,
+		toggleServerExpansion,
+	} = useMCPServersStore();
+
+	// Optimistic updates for adding servers
 	const [optimisticServers, addOptimisticServer] = useOptimistic(
 		servers,
 		(currentServers, newServer: MCPServer) => [...currentServers, newServer],
 	);
-	const [loading, setLoading] = useState(true);
-	const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-	const [formError, setFormError] = useState<string | null>(null);
-	const [serverToDelete, setServerToDelete] = useState<MCPServer | null>(null);
-	const [serverInfo, setServerInfo] = useState<Record<string, ServerInfo>>({});
-	const [loadingServerInfo, setLoadingServerInfo] = useState<
-		Record<string, boolean>
-	>({});
-	const [serverInfoErrors, setServerInfoErrors] = useState<
-		Record<string, boolean>
-	>({});
-	const [authUrls, setAuthUrls] = useState<Record<string, string>>({});
-	const [serversRequiringAuth, setServersRequiringAuth] = useState<Set<string>>(
-		new Set(),
-	);
-	const [serverFailureReasons, setServerFailureReasons] = useState<
-		Record<string, string>
-	>({});
-	const [expandedServers, setExpandedServers] = useState<
-		Record<string, boolean>
-	>({});
+
+	// Refs for non-UI state
 	const formRef = useRef<HTMLFormElement>(null);
 
 	useEffect(() => {
@@ -143,7 +141,7 @@ export default function MCPServersPage() {
 						(server.authStatus === 'authorized' && server.accessToken),
 				)
 				.map((server: MCPServer) => server.id);
-			setServersRequiringAuth(new Set(serversWithAuthRequired));
+			setServersRequiringAuth(serversWithAuthRequired);
 
 			// Test connection for each server to update auth status
 			normalizedData.forEach((server: MCPServer, index: number) => {
@@ -180,7 +178,7 @@ export default function MCPServersPage() {
 		const maxRetries = 3;
 		const retryDelay = Math.min(1000 * Math.pow(2, retryCount), 5000); // Exponential backoff, max 5s
 
-		setLoadingServerInfo((prev) => ({ ...prev, [serverId]: true }));
+		setLoadingServerInfo(serverId, true);
 
 		let shouldRetry = false;
 		let currentError: Error | null = null;
@@ -208,8 +206,8 @@ export default function MCPServersPage() {
 				);
 			}
 			const data = await response.json();
-			setServerInfo((prev) => ({ ...prev, [serverId]: data }));
-			setServerInfoErrors((prev) => ({ ...prev, [serverId]: false })); // Clear any previous error
+			setServerInfo(serverId, data);
+			setServerInfoErrors(serverId, false); // Clear any previous error
 			console.log(
 				`[Server Info] Successfully fetched info for ${serverId} on attempt ${retryCount + 1}`,
 			);
@@ -253,12 +251,12 @@ export default function MCPServersPage() {
 					`[Server Info] Max retries exceeded or non-retryable error for ${serverId}:`,
 					currentError.message,
 				);
-				setServerInfoErrors((prev) => ({ ...prev, [serverId]: true })); // Mark as having an error
+				setServerInfoErrors(serverId, true); // Mark as having an error
 			}
 		} finally {
 			// Only clear loading state if we're not retrying
 			if (!shouldRetry) {
-				setLoadingServerInfo((prev) => ({ ...prev, [serverId]: false }));
+				setLoadingServerInfo(serverId, false);
 			}
 		}
 	};
@@ -273,13 +271,7 @@ export default function MCPServersPage() {
 				// If response is not ok, check if it's a connection/network error
 				if (response.status >= 500 || response.status === 0) {
 					// Mark server as offline and disable it for server errors or network failures
-					setServers((prev) =>
-						prev.map((server) =>
-							server.id === serverId
-								? { ...server, authStatus: 'offline', enabled: false }
-								: server,
-						),
-					);
+					updateServer(serverId, { authStatus: 'offline', enabled: false });
 					// Also disable in backend to persist the change
 					await toggleMcpServerAction(serverId, false);
 					toast.warning(
@@ -297,17 +289,8 @@ export default function MCPServersPage() {
 									? 'Access forbidden'
 									: `Server error (${response.status})`;
 
-					setServers((prev) =>
-						prev.map((server) =>
-							server.id === serverId
-								? { ...server, authStatus: 'failed', enabled: false }
-								: server,
-						),
-					);
-					setServerFailureReasons((prev) => ({
-						...prev,
-						[serverId]: errorMessage,
-					}));
+					updateServer(serverId, { authStatus: 'failed', enabled: false });
+					setServerFailureReason(serverId, errorMessage);
 					// Also disable in backend to persist the change
 					await toggleMcpServerAction(serverId, false);
 					toast.error('Server failed and has been automatically disabled');
@@ -319,35 +302,16 @@ export default function MCPServersPage() {
 
 			if (result.status === 'auth_required') {
 				// Store the auth URL even if it's null (for manual setup cases)
-				setAuthUrls((prev) => ({
-					...prev,
-					[serverId]: result.authUrl || 'manual_setup',
-				}));
+				setAuthUrl(serverId, result.authUrl || 'manual_setup');
 				// Mark this server as requiring auth
-				setServersRequiringAuth((prev) => new Set(prev).add(serverId));
+				addServerRequiringAuth(serverId);
 				// Update server status to 'required' to show the Auth Required badge
-				setServers((prev) =>
-					prev.map((server) =>
-						server.id === serverId
-							? { ...server, authStatus: 'required' }
-							: server,
-					),
-				);
+				updateServer(serverId, { authStatus: 'required' });
 			} else if (result.status === 'authorized') {
 				// Remove from auth URLs if it was there
-				setAuthUrls((prev) => {
-					const newUrls = { ...prev };
-					delete newUrls[serverId];
-					return newUrls;
-				});
+				removeAuthUrl(serverId);
 				// Update server status to 'authorized'
-				setServers((prev) =>
-					prev.map((server) =>
-						server.id === serverId
-							? { ...server, authStatus: 'authorized' }
-							: server,
-					),
-				);
+				updateServer(serverId, { authStatus: 'authorized' });
 				// Fetch server info since it's now authorized
 				fetchServerInfo(serverId);
 			}
@@ -360,27 +324,15 @@ export default function MCPServersPage() {
 
 			if (isNetworkError) {
 				// Mark server as offline for network/connection errors
-				setServers((prev) =>
-					prev.map((server) =>
-						server.id === serverId
-							? { ...server, authStatus: 'offline', enabled: false }
-							: server,
-					),
-				);
+				updateServer(serverId, { authStatus: 'offline', enabled: false });
 				toast.warning('Server is offline and has been automatically disabled');
 			} else {
 				// Mark server as failed for other errors
-				setServers((prev) =>
-					prev.map((server) =>
-						server.id === serverId
-							? { ...server, authStatus: 'failed', enabled: false }
-							: server,
-					),
+				updateServer(serverId, { authStatus: 'failed', enabled: false });
+				setServerFailureReason(
+					serverId,
+					error instanceof Error ? error.message : 'Unknown error',
 				);
-				setServerFailureReasons((prev) => ({
-					...prev,
-					[serverId]: error instanceof Error ? error.message : 'Unknown error',
-				}));
 				toast.error('Server failed and has been automatically disabled');
 			}
 			// Also disable in backend to persist the change
@@ -415,7 +367,7 @@ export default function MCPServersPage() {
 
 			if (result.success) {
 				// Success: update actual state and test connection
-				setServers((prev) => [...prev, result.data]);
+				setServers([...servers, result.data]);
 				setIsAddDialogOpen(false);
 				formRef.current?.reset();
 				setFormError(null);
@@ -437,12 +389,8 @@ export default function MCPServersPage() {
 	const handleToggleServer = async (server: MCPServer) => {
 		const newEnabledState = !server.enabled;
 
-		// Optimistic update using regular state
-		setServers((prev) =>
-			prev.map((s) =>
-				s.id === server.id ? { ...s, enabled: newEnabledState } : s,
-			),
-		);
+		// Optimistic update
+		updateServer(server.id, { enabled: newEnabledState });
 
 		try {
 			const result = await toggleMcpServerAction(server.id, newEnabledState);
@@ -458,20 +406,12 @@ export default function MCPServersPage() {
 				toast.success(`Server ${newEnabledState ? 'enabled' : 'disabled'}`);
 			} else {
 				// Rollback optimistic update
-				setServers((prev) =>
-					prev.map((s) =>
-						s.id === server.id ? { ...s, enabled: server.enabled } : s,
-					),
-				);
+				updateServer(server.id, { enabled: server.enabled });
 				toast.error(result.error || 'Failed to update server');
 			}
 		} catch (error) {
 			// Rollback optimistic update
-			setServers((prev) =>
-				prev.map((s) =>
-					s.id === server.id ? { ...s, enabled: server.enabled } : s,
-				),
-			);
+			updateServer(server.id, { enabled: server.enabled });
 			toast.error('Failed to update server');
 		}
 	};
@@ -483,7 +423,7 @@ export default function MCPServersPage() {
 			const result = await deleteMcpServerAction(serverToDelete.id);
 
 			if (result.success) {
-				setServers(servers.filter((s) => s.id !== serverToDelete.id));
+				removeServer(serverToDelete.id);
 				setServerToDelete(null);
 				toast.success('MCP server deleted');
 			} else {
@@ -521,13 +461,6 @@ export default function MCPServersPage() {
 		);
 
 		return { toolCount, resourceCount, promptCount };
-	};
-
-	const toggleServerExpansion = (serverId: string) => {
-		setExpandedServers((prev) => ({
-			...prev,
-			[serverId]: !prev[serverId],
-		}));
 	};
 
 	const renderToolDetails = (serverId: string) => {
