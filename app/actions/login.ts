@@ -56,7 +56,6 @@ export async function login(email: string, password: string) {
 			};
 		}
 
-		// Create session for authenticated user
 		await createSession(userWithPassword.user.id);
 
 		return {
@@ -79,19 +78,16 @@ export async function checkUserPermission(
 	try {
 		const { action, entity, access } = parsePermissionString(permissionString);
 
-		// Build the base conditions
 		const baseConditions: SQL<unknown>[] = [
 			eq(roleToUser.b, userId),
 			eq(permission.action, action),
 			eq(permission.entity, entity),
 		];
 
-		// Add access conditions if specified
 		if (access && access.length > 0) {
 			if (access.length === 1) {
 				baseConditions.push(eq(permission.access, access[0]));
 			} else {
-				// Handle multiple access values with OR logic
 				const accessConditions = access.map((a) => eq(permission.access, a));
 				baseConditions.push(or(...accessConditions)!);
 			}
@@ -135,7 +131,6 @@ export async function grantRole(
 	userRecord: Pick<typeof user.$inferSelect, 'id' | 'email'>,
 ): Promise<boolean> {
 	try {
-		// Find the role by name
 		const roleResult = await db
 			.select({
 				id: role.id,
@@ -152,7 +147,6 @@ export async function grantRole(
 
 		const targetRole = roleResult[0];
 
-		// Check if user already has this role
 		const existingRoleToUser = await db
 			.select()
 			.from(roleToUser)
@@ -162,7 +156,6 @@ export async function grantRole(
 			.limit(1);
 
 		if (existingRoleToUser.length === 0) {
-			// Assign the role to the user
 			await db.insert(roleToUser).values({
 				a: targetRole.id,
 				b: userRecord.id,
@@ -191,7 +184,6 @@ export async function revokeRole(
 	userRecord: Pick<typeof user.$inferSelect, 'id' | 'email'>,
 ): Promise<boolean> {
 	try {
-		// Find the role by name
 		const roleResult = await db
 			.select({
 				id: role.id,
@@ -208,7 +200,6 @@ export async function revokeRole(
 
 		const targetRole = roleResult[0];
 
-		// Remove the role assignment from the user
 		const result = await db
 			.delete(roleToUser)
 			.where(
@@ -257,7 +248,6 @@ export async function createRoleWithPermissions(
 	permissionStrings: PermissionString[],
 ): Promise<boolean> {
 	try {
-		// Check if role already exists
 		const existingRole = await db
 			.select({
 				id: role.id,
@@ -270,7 +260,6 @@ export async function createRoleWithPermissions(
 		let roleId: string;
 
 		if (existingRole.length === 0) {
-			// Create new role with required fields
 			const newRole = await db
 				.insert(role)
 				.values({
@@ -289,14 +278,11 @@ export async function createRoleWithPermissions(
 			console.log(`Role already exists: ${roleName} with id ${roleId}`);
 		}
 
-		// Process each permission string
 		for (const permissionString of permissionStrings) {
 			const { action, entity, access } =
 				parsePermissionString(permissionString);
 
-			// Handle access conditions for permission creation
 			if (access && access.length > 0) {
-				// Create separate permissions for each access level
 				for (const accessLevel of access) {
 					const accessConditions = [
 						eq(permission.action, action),
@@ -315,7 +301,6 @@ export async function createRoleWithPermissions(
 					let permissionId: string;
 
 					if (existingPermission.length === 0) {
-						// Create new permission with all required fields
 						const newPermission = await db
 							.insert(permission)
 							.values({
@@ -337,7 +322,6 @@ export async function createRoleWithPermissions(
 						permissionId = existingPermission[0].id;
 					}
 
-					// Link permission to role if not already linked
 					const existingLink = await db
 						.select()
 						.from(permissionToRole)
@@ -360,11 +344,10 @@ export async function createRoleWithPermissions(
 					}
 				}
 			} else {
-				// Handle permission without access (default to empty string for access)
 				const whereConditions = [
 					eq(permission.action, action),
 					eq(permission.entity, entity),
-					eq(permission.access, ''), // Default to empty string for access
+					eq(permission.access, ''),
 				];
 
 				const existingPermission = await db
@@ -378,14 +361,13 @@ export async function createRoleWithPermissions(
 				let permissionId: string;
 
 				if (existingPermission.length === 0) {
-					// Create new permission with all required fields
 					const newPermission = await db
 						.insert(permission)
 						.values({
 							id: crypto.randomUUID(),
 							action,
 							entity,
-							access: '', // Default to empty string for access
+							access: '',
 							description: `Auto-generated permission: ${action}:${entity}`,
 							createdAt: new Date().toISOString(),
 							updatedAt: new Date().toISOString(),
@@ -400,7 +382,6 @@ export async function createRoleWithPermissions(
 					permissionId = existingPermission[0].id;
 				}
 
-				// Link permission to role if not already linked
 				const existingLink = await db
 					.select()
 					.from(permissionToRole)

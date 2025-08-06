@@ -82,7 +82,6 @@ export async function getUsersWithRoleInfo(
 			return [];
 		}
 
-		// Get all users from the database that match the audience contacts with their roles
 		const dbUsersWithRoles = await db
 			.select({
 				user: user,
@@ -98,23 +97,18 @@ export async function getUsersWithRoleInfo(
 
 		console.log('DB query results:', dbUsersWithRoles.length);
 
-		// Create a map of email to user with role info
 		const userMap = new Map<string, UserWithRole>();
 
-		// Add users from database
 		for (const userResult of dbUsersWithRoles) {
 			const { user: dbUser, role: dbRole } = userResult;
 
-			// Check if we already have this user in the map (to handle multiple role entries)
 			const existingUser = userMap.get(dbUser.email);
 
 			if (existingUser) {
-				// If we already have the user but didn't have the agent-user role, update it
 				if (!existingUser.hasAgentUserRole && dbRole?.name === 'agent-user') {
 					existingUser.hasAgentUserRole = true;
 				}
 			} else {
-				// Add new user to the map
 				userMap.set(dbUser.email, {
 					id: dbUser.id,
 					email: dbUser.email,
@@ -126,7 +120,6 @@ export async function getUsersWithRoleInfo(
 			}
 		}
 
-		// Add contacts that don't exist in database and check their verification status
 		const unregisteredEmails: string[] = [];
 		for (const contact of audienceContacts) {
 			if (!userMap.has(contact.email)) {
@@ -146,7 +139,6 @@ export async function getUsersWithRoleInfo(
 			}
 		}
 
-		// Check verification status for unregistered users
 		if (unregisteredEmails.length > 0) {
 			for (const email of unregisteredEmails) {
 				const verificationStatus = await getVerificationStatus({
@@ -193,12 +185,10 @@ export async function processPendingRoleUpdates(
 
 	try {
 		for (const update of pendingUpdates) {
-			// Skip if no change needed
 			if (update.shouldHaveRole === update.currentHasRole) {
 				continue;
 			}
 
-			// Skip if user doesn't exist in database (no userId) or missing data
 			if (!update.userId || !update.email) {
 				errors.push(
 					`Invalid user data for: ${update.email || 'unknown email'}`,
@@ -206,14 +196,12 @@ export async function processPendingRoleUpdates(
 				continue;
 			}
 
-			// Create user object with just id and email (all we need for role operations)
 			const userRecord = {
 				id: update.userId,
 				email: update.email,
 			};
 
 			if (update.shouldHaveRole) {
-				// Grant the agent-user role
 				const success = await grantRole('agent-user', userRecord);
 				if (success) {
 					processedCount++;
@@ -223,7 +211,6 @@ export async function processPendingRoleUpdates(
 					errors.push(`Failed to grant role to ${update.email}`);
 				}
 			} else {
-				// Revoke the agent-user role
 				const success = await revokeRole('agent-user', userRecord);
 				if (success) {
 					processedCount++;
@@ -234,13 +221,11 @@ export async function processPendingRoleUpdates(
 			}
 		}
 
-		// Send welcome emails to newly granted users
 		if (emailsToSend.length > 0) {
 			console.log(`Sending welcome emails to ${emailsToSend.length} users`);
 
 			for (const email of emailsToSend) {
 				try {
-					// Get user details for personalized email
 					const userDetails = await db
 						.select({
 							name: user.name,
@@ -281,8 +266,6 @@ export async function processPendingRoleUpdates(
 						`Failed to send welcome email to ${email}:`,
 						emailError,
 					);
-					// Don't add to errors array since role was granted successfully
-					// Just log the email failure
 				}
 			}
 		}
@@ -314,7 +297,6 @@ export async function inviteUnregisteredUsers(
 	let invitedCount = 0;
 
 	try {
-		// Import the signupAction dynamically to avoid circular dependencies
 		const { signupAction } = await import('./signup');
 
 		for (const email of emails) {

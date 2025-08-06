@@ -7,7 +7,6 @@ export const runtime = 'nodejs';
  */
 export async function GET(request: Request) {
 	try {
-		// Get URL from the query parameters
 		const { searchParams } = new URL(request.url);
 		const url = searchParams.get('url');
 
@@ -15,7 +14,6 @@ export async function GET(request: Request) {
 			return NextResponse.json({ error: 'URL is required' }, { status: 400 });
 		}
 
-		// Get the user's preferred language from the request
 		const acceptLanguage = request.headers.get('Accept-Language') || 'en-US';
 
 		// Fetch the webpage content with the user's language preference

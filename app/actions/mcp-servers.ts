@@ -17,7 +17,6 @@ export async function addMcpServerAction(
 	formData: FormData,
 ): Promise<ActionResult> {
 	try {
-		// Verify authentication
 		const sessionData = await verifySession();
 		if (!sessionData) {
 			return {
@@ -29,7 +28,6 @@ export async function addMcpServerAction(
 		const name = formData.get('name') as string;
 		const url = formData.get('url') as string;
 
-		// Validate form data
 		if (!name || !name.trim()) {
 			return {
 				success: false,
@@ -44,7 +42,6 @@ export async function addMcpServerAction(
 			};
 		}
 
-		// Basic URL validation
 		try {
 			new URL(url);
 		} catch (error) {
@@ -54,10 +51,8 @@ export async function addMcpServerAction(
 			};
 		}
 
-		// Generate a unique ID for the server
 		const serverId = crypto.randomUUID();
 
-		// Insert into database directly
 		const [newServer] = await db
 			.insert(mcpServers)
 			.values({
@@ -81,17 +76,14 @@ export async function addMcpServerAction(
 	} catch (error) {
 		console.error('Failed to add MCP server:', error);
 
-		// Handle specific database constraint errors
 		if (error && typeof error === 'object' && 'code' in error) {
 			if (error.code === '23505') {
-				// unique constraint violation
 				return {
 					success: false,
 					error: 'A server with this name or URL already exists.',
 				};
 			}
 			if (error.code === '23502') {
-				// not null constraint violation
 				return {
 					success: false,
 					error: 'Required server information is missing.',
@@ -111,7 +103,6 @@ export async function toggleMcpServerAction(
 	enabled: boolean,
 ): Promise<ActionResult> {
 	try {
-		// Verify authentication
 		const sessionData = await verifySession();
 		if (!sessionData) {
 			return {
@@ -120,7 +111,6 @@ export async function toggleMcpServerAction(
 			};
 		}
 
-		// Verify ownership and update server
 		const [updatedServer] = await db
 			.update(mcpServers)
 			.set({
@@ -161,7 +151,6 @@ export async function deleteMcpServerAction(
 	serverId: string,
 ): Promise<ActionResult> {
 	try {
-		// Verify authentication
 		const sessionData = await verifySession();
 		if (!sessionData) {
 			return {
@@ -170,7 +159,6 @@ export async function deleteMcpServerAction(
 			};
 		}
 
-		// Verify ownership and delete server
 		const [deletedServer] = await db
 			.delete(mcpServers)
 			.where(

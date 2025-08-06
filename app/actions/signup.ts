@@ -41,7 +41,6 @@ export async function signupAction({
 	skipRedirect?: boolean;
 }) {
 	try {
-		// Validate email with Zod
 		const validationResult = signupSchema.safeParse({ email });
 
 		if (!validationResult.success) {
@@ -54,7 +53,6 @@ export async function signupAction({
 
 		const validatedEmail = validationResult.data.email;
 
-		// Check if user already exists with this email
 		const existingUser = await db
 			.select()
 			.from(user)
@@ -76,7 +74,6 @@ export async function signupAction({
 			target: validatedEmail,
 		});
 
-		// Send email with React component
 		const emailResult = await sendEmail(
 			validatedEmail,
 			'Complete Your PerfAgent Onboarding',
@@ -93,7 +90,6 @@ export async function signupAction({
 			};
 		}
 
-		// Return success without redirecting if skipRedirect is true
 		if (skipRedirect) {
 			return {
 				success: true,

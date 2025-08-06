@@ -4,7 +4,6 @@ import { resend } from '@/lib/resend';
 import { emailSchema } from '@/lib/validations/email';
 import { SignupEmail } from '@/components/emails/signup-confirmation';
 
-// Check if we're in a local/development environment
 const isLocalEnvironment = process.env.NODE_ENV === 'development';
 
 // Waitlist audience ID for your users
@@ -34,7 +33,6 @@ async function ensureWaitlistAudience() {
 			throw new Error('Failed to list audiences');
 		}
 
-		// Check if our waitlist audience already exists
 		const waitlistAudience = audiences.data.find(
 			(audience) => audience.name === WAITLIST_AUDIENCE_NAME,
 		);
@@ -44,7 +42,6 @@ async function ensureWaitlistAudience() {
 			return waitlistAudience.id;
 		}
 
-		// Create a new waitlist audience if it doesn't exist
 		const { data: newAudience, error: createError } =
 			await resend.audiences.create({
 				name: WAITLIST_AUDIENCE_NAME,
@@ -143,10 +140,7 @@ export async function addToWaitlist(email: string) {
 
 export async function subscribeToNewsletter(formData: FormData) {
 	try {
-		// Extract email from form data
 		const email = formData.get('email') as string;
-
-		// Validate email with Zod schema
 		const validatedFields = emailSchema.safeParse({ email });
 
 		if (!validatedFields.success) {
