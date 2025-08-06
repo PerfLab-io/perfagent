@@ -7,6 +7,7 @@ import { JSONValue, UIMessage } from 'ai';
 import { researchUpdateArtifact } from '@/artifacts/research_update/client';
 import { textArtifact } from '@/artifacts/text/client';
 import { toolCallApprovalArtifact } from '@/artifacts/tool_call_approval/client';
+import { toolExecutionArtifact } from '@/artifacts/tool_execution/client';
 import { Artifact, UIArtifact } from '@/components/artifact';
 import { ChevronDown, ChevronUp, ExternalLink, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -29,6 +30,7 @@ artifactDefinitions.push(
 	textArtifact,
 	researchUpdateArtifact,
 	toolCallApprovalArtifact,
+	toolExecutionArtifact,
 );
 
 export function DataStreamHandler({
@@ -127,25 +129,74 @@ export function DataStreamHandler({
 			// Update the artifact
 			setArtifact((draftArtifact) => {
 				if (delta.status === 'started') {
+					// Special handling for artifact replacement scenarios
+					const isReplacingApprovalWithExecution =
+						deltaType === 'tool-execution' &&
+						draftArtifact.kind === 'tool-call-approval';
+
+					if (isReplacingApprovalWithExecution) {
+						console.log(
+							'DataStreamHandler - Replacing tool approval with execution artifact',
+						);
+						// Completely replace the approval artifact with execution
+						return {
+							documentId: delta.runId as string,
+							content: '',
+							kind: deltaType,
+							title: '',
+							timestamp: Date.now(),
+							status: 'streaming',
+							isVisible: true,
+							boundingBox: {
+								top: 0,
+								left: 0,
+								width: 0,
+								height: 0,
+							},
+						};
+					}
+
+					// Standard new artifact creation
 					return {
 						...draftArtifact,
 						documentId: delta.runId as string,
 						kind: deltaType,
 						isVisible: true,
+						status: 'streaming',
 					};
 				}
 
+				// Set status to idle when complete, or streaming when in-progress
+				const newStatus =
+					delta.status === 'complete' || delta.status === 'completed'
+						? 'idle'
+						: 'streaming';
 				return {
 					...draftArtifact,
-					status: delta.status === 'complete' ? 'idle' : 'streaming',
+					status: newStatus,
 				};
 			});
 
-			if (delta.status === 'started' && !metadata) {
-				artifactDefinition.initialize?.({
-					documentId: delta.runId as string,
-					setMetadata,
-				});
+			if (delta.status === 'started') {
+				// Check if we need to initialize or reset metadata
+				const isReplacingApprovalWithExecution =
+					deltaType === 'tool-execution' &&
+					artifact.kind === 'tool-call-approval';
+
+				if (!metadata || isReplacingApprovalWithExecution) {
+					// Clear any existing metadata when replacing artifacts
+					if (isReplacingApprovalWithExecution) {
+						console.log(
+							'DataStreamHandler - Clearing metadata for artifact replacement',
+						);
+						setMetadata(undefined);
+					}
+
+					artifactDefinition.initialize?.({
+						documentId: delta.runId as string,
+						setMetadata,
+					});
+				}
 			}
 
 			if (artifactDefinition.onStreamPart) {
@@ -207,7 +258,9 @@ function PureArtifactComponent(props: ArtifactProps) {
 							? 'Text'
 							: artifactDefinition.kind === 'tool-call-approval'
 								? 'Tool Call Approval'
-								: 'Research'}
+								: artifactDefinition.kind === 'tool-execution'
+									? 'Tool Execution'
+									: 'Research'}
 					</span>
 				</div>
 				<button

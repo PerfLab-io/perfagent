@@ -32,15 +32,17 @@ const requestSchema = z.object({
 	traceFile: z.any().default(null),
 	inpInteractionAnimation: z.string().or(z.null()).default(null),
 	aiContext: z.string().or(z.null()).default(null),
-	toolApproval: z.object({
-		approved: z.boolean(),
-		toolCall: z.object({
-			toolName: z.string(),
-			arguments: z.record(z.any()),
-			serverName: z.string(),
-			reason: z.string(),
-		}),
-	}).optional(),
+	toolApproval: z
+		.object({
+			approved: z.boolean(),
+			toolCall: z.object({
+				toolName: z.string(),
+				arguments: z.record(z.any()),
+				serverName: z.string(),
+				reason: z.string(),
+			}),
+		})
+		.optional(),
 });
 
 // Create Hono app for chat API
@@ -240,86 +242,6 @@ chat.post('/mcp/servers/:id/test', async (c) => {
 		);
 	}
 });
-
-// POST /api/mcp/approve-tool-call - Handle tool call approval/denial
-const toolCallApprovalSchema = z.object({
-	toolCall: z.object({
-		toolName: z.string(),
-		arguments: z.record(z.any()),
-		serverName: z.string(),
-		reason: z.string(),
-	}),
-	approved: z.boolean(),
-	reason: z.string().optional(),
-});
-
-chat.post(
-	'/mcp/approve-tool-call',
-	zValidator('json', toolCallApprovalSchema),
-	async (c) => {
-		try {
-			const sessionData = await verifySession();
-			if (!sessionData) {
-				return c.json({ error: 'Authentication required' }, 401);
-			}
-
-			const { toolCall, approved, reason } = c.req.valid('json');
-
-			if (approved) {
-				// Execute the MCP workflow with the approved tool call
-				const workflow = mastra.getWorkflow('mcpWorkflow');
-				const run = workflow.createRun();
-
-				// Create a simple data stream for execution feedback
-				const executionDataStream = {
-					writeData: (data: any) => {
-						console.log('MCP Execution:', data);
-						// In a real implementation, this would stream back to the client
-						// For now, we just log the execution progress
-					},
-				};
-
-				// Start the workflow with execution action
-				const result = await run.start({
-					inputData: {
-						messages: [
-							{
-								role: 'user',
-								content: `Execute approved tool call: ${toolCall.toolName}`,
-							},
-						],
-						userId: sessionData.userId,
-						action: 'execute',
-						toolCallRequest: toolCall,
-						dataStream: executionDataStream,
-					},
-				});
-
-				return c.json({
-					success: true,
-					message: 'Tool call approved and executed successfully',
-					runId: run.runId,
-					result: result,
-				});
-			} else {
-				return c.json({
-					success: false,
-					message: 'Tool call denied by user',
-					reason: reason || 'User denied the tool call',
-				});
-			}
-		} catch (error) {
-			console.error('Error handling tool call approval:', error);
-			return c.json(
-				{
-					error: 'Failed to handle tool call approval',
-					message: error instanceof Error ? error.message : 'Unknown error',
-				},
-				500,
-			);
-		}
-	},
-);
 
 // OAuth callback endpoints
 
@@ -632,15 +554,14 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 			return c.json({ error: 'No messages provided' }, 400);
 		}
 
-		// Get session data for user context
 		const sessionData = await verifySession();
 
 		const dataStream = createDataStream({
 			execute: async (dataStreamWriter) => {
 				dataStreamWriter.writeData('initialized call');
 
-				// Check if this is a tool approval response
 				if (toolApproval && sessionData) {
+					console.log('========== Tool approval received', toolApproval);
 					const mcpWorkflow = mastra.getWorkflow('mcpWorkflow');
 					const run = mcpWorkflow.createRun();
 
@@ -649,7 +570,6 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 					});
 
 					if (toolApproval.approved) {
-						// Execute the approved tool
 						await run.start({
 							inputData: {
 								messages,
@@ -663,7 +583,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 						// Update the approval UI to show it's been denied
 						dataStreamWriter.writeData({
 							type: 'tool-call-approval',
-							status: 'started',
+							status: 'complete',
 							content: {
 								type: 'tool-call-approval',
 								data: {
@@ -674,8 +594,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 								},
 							},
 						});
-						
-						// Send denial message
+
 						dataStreamWriter.writeData({
 							type: 'text',
 							status: 'completed',
@@ -690,8 +609,12 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 					return;
 				}
 
-				// Use standard router agent
 				const routerAgent = mastra.getAgent('routerAgent');
+
+				console.log(
+					'========== Router Agent Messages:',
+					JSON.stringify(messages, null, 2),
+				);
 
 				const { object } = await routerAgent.generate(messages, {
 					output: routerOutputSchema,
@@ -843,7 +766,6 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 		console.error('Error in chat API:', error);
 
 		if (error instanceof Error && error.name === 'AbortError') {
-			// Return a specific status code for aborted requests
 			console.log('Returning aborted response');
 			// @ts-expect-error - 499 status code is not standard, but it refers for user cancellation
 			return c.json({ error: 'Request aborted' }, 499);
@@ -880,75 +802,6 @@ chat.post('/suggest', zValidator('json', requestSchema), async (c) => {
 	);
 
 	return c.json(stream.object);
-});
-
-// POST /api/mcp/resource - Read a specific MCP resource
-const resourceSchema = z.object({
-	uri: z.string(),
-	serverName: z.string().optional(),
-});
-
-chat.post('/mcp/resource', zValidator('json', resourceSchema), async (c) => {
-	try {
-		const sessionData = await verifySession();
-		if (!sessionData) {
-			return c.json({ error: 'Authentication required' }, 401);
-		}
-
-		const { uri, serverName } = c.req.valid('json');
-
-		// Create MCP client for the user
-		const mcpClient = await createUserMcpClient(sessionData.userId);
-		if (!mcpClient) {
-			return c.json({ error: 'No MCP client available' }, 404);
-		}
-
-		try {
-			// If serverName is provided, read from specific server
-			if (serverName) {
-				const content = await mcpClient.resources.read(serverName, uri);
-				await mcpClient.disconnect();
-				return c.json(content);
-			} else {
-				// Try to find the resource across all servers
-				const servers = await db
-					.select()
-					.from(mcpServers)
-					.where(
-						and(
-							eq(mcpServers.userId, sessionData.userId),
-							eq(mcpServers.enabled, true),
-						),
-					);
-
-				for (const server of servers) {
-					try {
-						const content = await mcpClient.resources.read(server.name, uri);
-						await mcpClient.disconnect();
-						return c.json(content);
-					} catch (error) {
-						// Continue to next server if resource not found
-						continue;
-					}
-				}
-
-				await mcpClient.disconnect();
-				return c.json({ error: 'Resource not found in any server' }, 404);
-			}
-		} catch (error) {
-			await mcpClient.disconnect();
-			throw error;
-		}
-	} catch (error) {
-		console.error('Error reading MCP resource:', error);
-		return c.json(
-			{
-				error: 'Failed to read resource',
-				message: error instanceof Error ? error.message : 'Unknown error',
-			},
-			500,
-		);
-	}
 });
 
 export const GET = handle(chat);

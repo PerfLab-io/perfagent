@@ -81,9 +81,11 @@ export const toolCallApprovalArtifact = new Artifact<
 			});
 		}
 	},
-	content: ({ metadata }) => {
+	content: ({ metadata, setMetadata }) => {
 		const [showDetails, setShowDetails] = useState(false);
-		const setPendingToolCall = useChatStore((state) => state.setPendingToolCall);
+		const setPendingToolCall = useChatStore(
+			(state) => state.setPendingToolCall,
+		);
 		// Get the append function from useChat to send custom messages
 		const { append } = useChat({ id: 'current-chat' });
 
@@ -107,6 +109,11 @@ export const toolCallApprovalArtifact = new Artifact<
 
 		const handleApprove = async () => {
 			console.log('Approve button clicked');
+			// Update the metadata to show approval immediately
+			setMetadata((metadata) => ({
+				...metadata,
+				status: 'approved',
+			}));
 			// Send a custom message with tool approval
 			await append(
 				{
@@ -128,6 +135,11 @@ export const toolCallApprovalArtifact = new Artifact<
 
 		const handleDeny = async () => {
 			console.log('Deny button clicked');
+			// Update the metadata to show denial immediately
+			setMetadata((metadata) => ({
+				...metadata,
+				status: 'denied',
+			}));
 			// Send a custom message with tool denial
 			await append(
 				{
@@ -146,7 +158,6 @@ export const toolCallApprovalArtifact = new Artifact<
 			// Clear the pending tool call
 			setPendingToolCall(null);
 		};
-
 
 		const getStatusIcon = () => {
 			switch (status) {

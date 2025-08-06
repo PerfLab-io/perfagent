@@ -70,13 +70,11 @@ const mcpWorkflow = createWorkflow({
 	id: 'mcpWorkflow',
 	inputSchema: mcpWorkflowInputSchema,
 	outputSchema: z.union([
-		// Discovery output
 		z.object({
 			action: z.literal('discover'),
 			discovery: toolDiscoveryResultSchema,
 			recommendedTool: toolCallRequestSchema.optional(),
 		}),
-		// Execution output
 		z.object({
 			action: z.literal('execute'),
 			result: toolCallResultSchema,
@@ -89,13 +87,11 @@ const mcpWorkflow = createWorkflow({
 			id: 'mcp-action-handler',
 			inputSchema: mcpWorkflowInputSchema,
 			outputSchema: z.union([
-				// Discovery output
 				z.object({
 					action: z.literal('discover'),
 					discovery: toolDiscoveryResultSchema,
 					recommendedTool: toolCallRequestSchema.optional(),
 				}),
-				// Execution output
 				z.object({
 					action: z.literal('execute'),
 					result: toolCallResultSchema,
@@ -104,11 +100,13 @@ const mcpWorkflow = createWorkflow({
 			]),
 			execute: async ({ inputData, mastra, runId }) => {
 				const { action } = inputData;
+				const triggerData = inputData as TriggerSchema;
+				const { dataStream, userId, messages } = triggerData;
 
 				if (action === 'discover') {
-					// Run tool discovery inline
-					const triggerData = inputData as TriggerSchema;
-					const { dataStream, userId, messages } = triggerData;
+					let recommendedTool:
+						| z.infer<typeof toolCallRequestSchema>
+						| undefined;
 
 					if (!mastra) {
 						throw new Error('Mastra not found');
@@ -131,7 +129,6 @@ const mcpWorkflow = createWorkflow({
 					});
 
 					try {
-						// Create MCP client and discover tools
 						const mcpClient = await createUserMcpClient(userId);
 						if (!mcpClient) {
 							throw new Error('Failed to create MCP client');
@@ -166,67 +163,46 @@ const mcpWorkflow = createWorkflow({
 							},
 						});
 
-						// Use MCP agent to analyze user request and recommend tools
-						let recommendedTool:
-							| z.infer<typeof toolCallRequestSchema>
-							| undefined;
-
-						if (messages.length > 0) {
-							const mcpAgent = mastra.getAgent('mcpAgent');
-							const parsedToolsets = JSON.stringify(
-								Object.keys(toolsets).map((serverName) => ({
-									serverName,
-									tools: Object.keys(toolsets[serverName]).map((toolName) => ({
-										toolName,
-										description: toolsets[serverName][toolName].description,
-										inputSchema: zodToJsonSchema(
-											toolsets[serverName][toolName].inputSchema,
-										),
-									})),
+						const mcpAgent = mastra.getAgent('mcpAgent');
+						const parsedToolsets = JSON.stringify(
+							Object.keys(toolsets).map((serverName) => ({
+								serverName,
+								tools: Object.keys(toolsets[serverName]).map((toolName) => ({
+									toolName,
+									description: toolsets[serverName][toolName].description,
+									inputSchema: zodToJsonSchema(
+										toolsets[serverName][toolName].inputSchema,
+									),
 								})),
-							);
+							})),
+						);
 
-							try {
-								const response = await mcpAgent.generate(
-									[
-										...messages,
-										{
-											role: 'user',
-											content: dedent`
+						try {
+							const response = await mcpAgent.generate(
+								[
+									...messages,
+									{
+										role: 'user',
+										content: dedent`
 											Here's the list of toolsets to choose from
 
 											${parsedToolsets}
 										`,
-										},
-									],
-									{
-										// toolsets,
-										output: z.object({
-											selectedTool: toolCallRequestSchema,
-										}),
 									},
-								);
+								],
+								{
+									output: z.object({
+										selectedTool: toolCallRequestSchema,
+									}),
+								},
+							);
 
-								console.log('MCP agent response:', response.object);
-								recommendedTool = response.object.selectedTool;
-								console.log(
-									'######################### Recommended tool:',
-									recommendedTool,
-								);
-							} catch (error) {
-								console.error('Error getting tool recommendation:', error);
-							}
+							console.log('MCP agent response:', response.object);
+							recommendedTool = response.object.selectedTool;
+						} catch (error) {
+							console.error('Error getting tool recommendation:', error);
 						}
 
-						console.log('Tool discovery step complete:');
-						console.log('- Total tools found:', discovery.totalTools);
-						console.log('- Servers found:', discovery.totalServers);
-						console.log(
-							'- Recommended tool:',
-							recommendedTool ? recommendedTool.toolName : 'none',
-						);
-
-						// Send discovery completion update
 						dataStream.writeData({
 							type: 'text',
 							runId,
@@ -244,51 +220,38 @@ const mcpWorkflow = createWorkflow({
 							},
 						});
 
-						// If we have a recommended tool, send approval UI
-						if (recommendedTool) {
-							console.log(
-								'Sending tool call approval UI for:',
-								recommendedTool,
-							);
-
-							dataStream.writeData({
-								type: 'tool-call-approval',
-								runId,
-								status: 'started',
-								content: {
-									type: 'tool-call-approval',
-									data: {
-										toolCall: recommendedTool,
-										status: 'pending',
-										title: 'Tool Call Approval',
-										timestamp: Date.now(),
-									},
-								},
-							});
-						} else {
-							console.log('No tool recommendation from MCP agent');
-
-							// Still show available tools for manual selection
-							dataStream.writeData({
-								type: 'tool-catalog',
-								runId,
-								status: 'completed',
-								content: {
-									type: 'tool-catalog',
-									data: {
-										id: 'tool-catalog',
-										type: 'tool-catalog',
-										timestamp: Date.now(),
-										title: 'Available Tools',
-										message:
-											'Here are the available tools. You can request a specific tool to be used.',
-										servers: [],
-									},
-								},
-							});
+						if (!recommendedTool) {
+							throw new Error('No tool recommendation from MCP agent');
 						}
+						dataStream.writeData({
+							type: 'tool-call-approval',
+							runId,
+							status: 'started',
+							content: {
+								type: 'tool-call-approval',
+								data: {
+									toolCall: recommendedTool,
+									status: 'pending',
+									title: 'Tool Call Approval',
+									timestamp: Date.now(),
+								},
+							},
+						});
 
-						// Return discovery results - workflow stops here
+						const agentPrompt = recommendedTool
+							? `I found ${recommendedTool.toolName} and now should send a simple "Should I execute the tool call as shown above?" message to the user. Nothing more.`
+							: `I couldn't find any tools that could help me with my request. I should ask the user to help me understand his request so I can find tools that could fulfill it.`;
+
+						const agentStream = await mastra.getAgent('largeAssistant').stream([
+							...messages,
+							{
+								role: 'assistant',
+								content: agentPrompt,
+							},
+						]);
+
+						agentStream.mergeIntoDataStream(dataStream);
+
 						return {
 							action: 'discover' as const,
 							discovery: discovery,
@@ -314,7 +277,6 @@ const mcpWorkflow = createWorkflow({
 						throw error;
 					}
 				} else if (action === 'execute') {
-					// Execute the approved tool inline
 					const triggerData = inputData as TriggerSchema;
 					const { toolCallRequest, dataStream, userId } = triggerData;
 
@@ -322,11 +284,10 @@ const mcpWorkflow = createWorkflow({
 						throw new Error('No tool call request provided for execution');
 					}
 
-					// Update the approval UI to show it's been approved
 					dataStream.writeData({
 						type: 'tool-call-approval',
 						runId,
-						status: 'started',
+						status: 'complete',
 						content: {
 							type: 'tool-call-approval',
 							data: {
@@ -339,9 +300,9 @@ const mcpWorkflow = createWorkflow({
 					});
 
 					dataStream.writeData({
-						type: 'text',
+						type: 'tool-execution',
 						runId,
-						status: 'executing',
+						status: 'started',
 						content: {
 							type: 'tool-execution',
 							data: {
@@ -349,19 +310,19 @@ const mcpWorkflow = createWorkflow({
 								type: 'tool-execution',
 								timestamp: Date.now(),
 								title: 'Tool Execution',
+								toolName: toolCallRequest.toolName,
+								serverName: toolCallRequest.serverName,
 								message: `Executing ${toolCallRequest.toolName}...`,
 							},
 						},
 					});
 
 					try {
-						// Import dependencies
 						const { toolExecutionService } = await import('../toolExecution');
 						const { db } = await import('@/drizzle/db');
 						const { mcpServers } = await import('@/drizzle/schema');
 						const { eq, and } = await import('drizzle-orm');
 
-						// Look up the server ID by name
 						const [server] = await db
 							.select()
 							.from(mcpServers)
@@ -397,9 +358,9 @@ const mcpWorkflow = createWorkflow({
 						};
 
 						dataStream.writeData({
-							type: 'text',
+							type: 'tool-execution',
 							runId,
-							status: 'completed',
+							status: 'complete',
 							content: {
 								type: 'tool-execution',
 								data: {
@@ -407,11 +368,33 @@ const mcpWorkflow = createWorkflow({
 									type: 'tool-execution',
 									timestamp: Date.now(),
 									title: 'Tool Execution',
+									toolName: toolCallRequest.toolName,
+									serverName: toolCallRequest.serverName,
 									message: `Successfully executed ${toolCallRequest.toolName}`,
 									result: JSON.stringify(result), // Convert to string to avoid type issues
 								},
 							},
 						});
+
+						const agentSummary = await mastra
+							.getAgent('largeAssistant')
+							.stream([
+								...messages,
+								{
+									role: 'assistant',
+									content: dedent`
+										I just executed the ${toolCallRequest.toolName} tool from ${toolCallRequest.serverName} server.
+										
+										Tool result:
+
+										${typeof result === 'string' ? result : JSON.stringify(result, null, 2)}
+
+										I should format the result in a way that is easy to understand without ommiting any important details.
+									`,
+								},
+							]);
+
+						agentSummary.mergeIntoDataStream(dataStream);
 
 						return {
 							action: 'execute' as const,
@@ -430,9 +413,9 @@ const mcpWorkflow = createWorkflow({
 						};
 
 						dataStream.writeData({
-							type: 'text',
+							type: 'tool-execution',
 							runId,
-							status: 'error',
+							status: 'complete',
 							content: {
 								type: 'tool-execution',
 								data: {
@@ -440,10 +423,33 @@ const mcpWorkflow = createWorkflow({
 									type: 'tool-execution',
 									timestamp: Date.now(),
 									title: 'Tool Execution',
+									toolName: toolCallRequest.toolName,
+									serverName: toolCallRequest.serverName,
 									message: `Error executing ${toolCallRequest.toolName}: ${toolResult.error}`,
+									...(toolResult.error ? { error: toolResult.error } : {}),
 								},
 							},
 						});
+
+						// TEMPORARILY DISABLED to test if workflow agent responses are breaking message flow
+						// if (mastra) {
+						// 	// Follow the research workflow pattern: add a user message asking for summary
+						// 	// then let the agent respond naturally via mergeIntoDataStream
+						// 	const triggerData = inputData as TriggerSchema;
+						// 	const { messages } = triggerData;
+
+						// 	const agentSummary = await mastra
+						// 		.getAgent('largeAssistant')
+						// 		.stream([
+						// 			...messages,
+						// 			{
+						// 				role: 'user',
+						// 				content: `The ${toolCallRequest.toolName} tool execution failed with an error:\n\n${toolResult.error}\n\nPlease explain what went wrong and suggest next steps or alternative approaches.`,
+						// 			},
+						// 		]);
+
+						// 	agentSummary.mergeIntoDataStream(dataStream);
+						// }
 
 						return {
 							action: 'execute' as const,
