@@ -4,7 +4,6 @@ import {
 	XCircle,
 	Settings,
 	AlertTriangle,
-	Loader2,
 	ChevronDown,
 	ChevronUp,
 } from 'lucide-react';
@@ -46,23 +45,10 @@ export const toolCallApprovalArtifact = new Artifact<
 		});
 	},
 	onStreamPart: ({ streamPart, setMetadata }) => {
-		console.log('Tool Call Approval - Received streamPart:', streamPart);
-		console.log('Tool Call Approval - Content type:', streamPart.content?.type);
-		console.log('Tool Call Approval - Content data:', streamPart.content?.data);
-
 		if (
 			streamPart.content.type === 'tool-call-approval' &&
 			streamPart.content.data
 		) {
-			console.log(
-				'Tool Call Approval - Processing data:',
-				streamPart.content.data,
-			);
-			console.log(
-				'Tool Call Approval - Tool call:',
-				streamPart.content.data.toolCall,
-			);
-
 			setMetadata((metadata) => {
 				const newMetadata = {
 					...metadata,
@@ -71,7 +57,6 @@ export const toolCallApprovalArtifact = new Artifact<
 					title: streamPart.content.data.title || 'Tool Call Approval',
 					timestamp: new Date(streamPart.content.data.timestamp || Date.now()),
 				};
-				console.log('Tool Call Approval - Setting metadata:', newMetadata);
 				return newMetadata;
 			});
 		} else {
@@ -89,19 +74,13 @@ export const toolCallApprovalArtifact = new Artifact<
 		// Get the append function from useChat to send custom messages
 		const { append } = useChat({ id: 'current-chat' });
 
-		console.log('Tool Call Approval - Rendering with metadata:', metadata);
-
 		useEffect(() => {
 			if (metadata?.toolCall && metadata.status === 'pending') {
-				console.log('Setting pending tool call in store:', metadata.toolCall);
 				setPendingToolCall(metadata.toolCall);
 			}
 		}, [metadata?.toolCall, metadata?.status, setPendingToolCall]);
 
 		if (!metadata || !metadata.toolCall) {
-			console.log(
-				'Tool Call Approval - No metadata or toolCall, returning null',
-			);
 			return null;
 		}
 
