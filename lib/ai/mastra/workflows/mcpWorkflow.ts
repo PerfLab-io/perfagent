@@ -138,7 +138,8 @@ const mcpWorkflow = createWorkflow({
 						const totalServers = Object.keys(toolsets).length;
 
 						const totalTools = Object.values(toolsets).reduce(
-							(total, toolset) => total + Object.keys(toolset).length,
+							(total: number, toolset: any) =>
+								total + Object.keys(toolset).length,
 							0,
 						);
 
@@ -239,13 +240,25 @@ const mcpWorkflow = createWorkflow({
 						});
 
 						const agentPrompt = recommendedTool
-							? `I found ${recommendedTool.toolName} and now should send a simple "Should I execute the tool call as shown above?" message to the user. Nothing more.`
-							: `I couldn't find any tools that could help me with my request. I should ask the user to help me understand his request so I can find tools that could fulfill it.`;
+							? dedent`
+							You are a helpful assistant that can help the user with their request. You should ask the user if they want to try the tool call ${recommendedTool.toolName} from ${recommendedTool.serverName}.
+
+							You should not output anything else. A simple, short message is enough, as alongside your message the user will be presented with an interface to approve or reject the tool call.
+							`
+							: dedent`
+							You are a helpful assistant that can help the user with their request. You should ask the user to help you understand their request so you can find tools that could fulfill it.
+
+							You have access to the following tools:
+
+							${parsedToolsets}
+
+							You should output a message with a clear, well-structured, and concise message to help the user decide what tool, and which server, to use.
+							`;
 
 						const agentStream = await mastra.getAgent('largeAssistant').stream([
 							...messages,
 							{
-								role: 'assistant',
+								role: 'system',
 								content: agentPrompt,
 							},
 						]);
@@ -390,6 +403,8 @@ const mcpWorkflow = createWorkflow({
 										${typeof result === 'string' ? result : JSON.stringify(result, null, 2)}
 
 										I should format the result in a way that is easy to understand without ommiting any important details.
+
+										The result might be extensive, so I should format it using the best possible markdown formatting to display dense or extensive information.
 									`,
 								},
 							]);
@@ -430,26 +445,6 @@ const mcpWorkflow = createWorkflow({
 								},
 							},
 						});
-
-						// TEMPORARILY DISABLED to test if workflow agent responses are breaking message flow
-						// if (mastra) {
-						// 	// Follow the research workflow pattern: add a user message asking for summary
-						// 	// then let the agent respond naturally via mergeIntoDataStream
-						// 	const triggerData = inputData as TriggerSchema;
-						// 	const { messages } = triggerData;
-
-						// 	const agentSummary = await mastra
-						// 		.getAgent('largeAssistant')
-						// 		.stream([
-						// 			...messages,
-						// 			{
-						// 				role: 'user',
-						// 				content: `The ${toolCallRequest.toolName} tool execution failed with an error:\n\n${toolResult.error}\n\nPlease explain what went wrong and suggest next steps or alternative approaches.`,
-						// 			},
-						// 		]);
-
-						// 	agentSummary.mergeIntoDataStream(dataStream);
-						// }
 
 						return {
 							action: 'execute' as const,

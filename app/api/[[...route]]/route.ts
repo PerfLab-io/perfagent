@@ -700,7 +700,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 									console.log('========== MCP workflow event', event);
 								});
 
-								await run.start({
+								const stream = run.streamVNext({
 									inputData: {
 										messages,
 										userId: sessionData.userId,
@@ -708,6 +708,10 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 										dataStream: dataStreamWriter,
 									},
 								});
+
+								for await (const chunk of stream) {
+									dataStreamWriter.writeData(chunk);
+								}
 
 								unsubscribe();
 							} else {
