@@ -31,11 +31,11 @@ import { SessionData } from '@/lib/session.server';
 
 const data = {
 	navMain: [
-		{
-			title: 'Agent insights',
-			url: '#',
-			icon: BotMessageSquareIcon,
-		},
+		// {
+		// 	title: 'Agent insights',
+		// 	url: '#',
+		// 	icon: BotMessageSquareIcon,
+		// },
 	],
 	navClouds: [
 		{
@@ -91,28 +91,28 @@ const data = {
 			url: '/mcp-servers',
 			icon: ServerIcon,
 		},
-		{
-			title: 'Settings',
-			url: '#',
-			icon: SettingsIcon,
-		},
-		{
-			title: 'Get Help',
-			url: '#',
-			icon: HelpCircleIcon,
-		},
+		// {
+		// 	title: 'Settings',
+		// 	url: '#',
+		// 	icon: SettingsIcon,
+		// },
+		// {
+		// 	title: 'Get Help',
+		// 	url: '#',
+		// 	icon: HelpCircleIcon,
+		// },
 	],
 	documents: [
-		{
-			name: 'Saved Traces',
-			url: '#',
-			icon: DatabaseIcon,
-		},
-		{
-			name: 'Saved Reports',
-			url: '#',
-			icon: ClipboardListIcon,
-		},
+		// {
+		// 	name: 'Saved Traces',
+		// 	url: '#',
+		// 	icon: DatabaseIcon,
+		// },
+		// {
+		// 	name: 'Saved Reports',
+		// 	url: '#',
+		// 	icon: ClipboardListIcon,
+		// },
 	],
 };
 
