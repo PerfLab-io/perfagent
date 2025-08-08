@@ -42,14 +42,11 @@ export const toolExecutionArtifact = new Artifact<
 		});
 	},
 	onStreamPart: ({ streamPart, setMetadata }) => {
-		console.log('Tool Execution - Received streamPart:', streamPart);
-
 		if (
 			streamPart.content.type === 'tool-execution' &&
 			streamPart.content.data
 		) {
 			const data = streamPart.content.data;
-			console.log('Tool Execution - Processing data:', data);
 
 			setMetadata((metadata) => {
 				// Determine status based on the message content
@@ -70,15 +67,12 @@ export const toolExecutionArtifact = new Artifact<
 					error: data.error || metadata?.error,
 					timestamp: new Date(data.timestamp || Date.now()),
 				};
-				console.log('Tool Execution - Setting metadata:', newMetadata);
 				return newMetadata;
 			});
 		}
 	},
 	content: ({ metadata }) => {
 		const [showDetails, setShowDetails] = useState(true);
-
-		console.log('Tool Execution - Rendering with metadata:', metadata);
 
 		if (!metadata) {
 			return null;
