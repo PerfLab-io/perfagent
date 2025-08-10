@@ -43,7 +43,7 @@ export async function createSchedule(params: {
 	queue?: string;
 	retries?: number;
 }): Promise<Schedule> {
-	const destination = `${getAppUrl()}/api/qstash`;
+	const destination = `${getAppUrl()}/api/admin/qstash`;
 	const body: EnqueuedJob = { name: params.name, payload: params.payload };
 
 	const res = await fetch(`${QSTASH_BASE}/schedules`, {

@@ -20,7 +20,7 @@ export async function enqueue<T = unknown>(
 		queue?: string; // QStash queue name
 	},
 ) {
-	const url = `${getAppUrl()}/api/qstash`;
+	const url = `${getAppUrl()}/api/admin/qstash`;
 	const publishOptions: any = {
 		url,
 		body: job,
