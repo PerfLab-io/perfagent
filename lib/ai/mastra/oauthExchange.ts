@@ -153,7 +153,7 @@ export async function exchangeOAuthCode(
 		}
 
 		// Retrieve the code_verifier and client_id using the state
-		const pkceData = retrievePKCEData(state);
+		const pkceData = await retrievePKCEData(state);
 		if (!pkceData) {
 			console.error('[OAuth] No PKCE data found for state:', state);
 			throw new Error('PKCE data not found - authorization expired or invalid');

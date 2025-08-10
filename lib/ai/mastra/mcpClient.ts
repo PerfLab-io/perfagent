@@ -438,7 +438,7 @@ async function discoverOAuthAuthorizationUrl(
 		authUrl.searchParams.set('state', state);
 
 		// Store the code_verifier and client_id with the state for later retrieval
-		storePKCEVerifier(state, codeVerifier, clientId);
+		await storePKCEVerifier(state, codeVerifier, clientId);
 		console.log(
 			'[OAuth] Stored PKCE code_verifier and client_id for state:',
 			state,

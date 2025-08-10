@@ -1,8 +1,9 @@
 /**
- * Simple in-memory store for PKCE parameters
- * In production, use Redis or database with TTL
+ * Redis-backed PKCE store using the shared KV client
+ * Ensures 10-minute TTL and one-time retrieval semantics
  */
 import { OAUTH_CONFIG } from './mcpClient';
+import { kv } from '@/lib/kv';
 
 interface PKCEData {
 	codeVerifier: string;
@@ -10,50 +11,43 @@ interface PKCEData {
 	createdAt: number;
 }
 
-const pkceStore = new Map<string, PKCEData>();
+const PREFIX = 'perfagent:pkce:';
+const TTL_SECONDS = 10 * 60; // 10 minutes
 
-// Clean up expired entries every 5 minutes
-setInterval(
-	() => {
-		const now = Date.now();
-		const EXPIRY_TIME = 10 * 60 * 1000; // 10 minutes
-
-		for (const [state, data] of pkceStore.entries()) {
-			if (now - data.createdAt > EXPIRY_TIME) {
-				pkceStore.delete(state);
-			}
-		}
-	},
-	5 * 60 * 1000,
-);
-
-export function storePKCEVerifier(
+export async function storePKCEVerifier(
 	state: string,
 	codeVerifier: string,
 	clientId?: string,
-): void {
-	pkceStore.set(state, {
+): Promise<void> {
+	const value: PKCEData = {
 		codeVerifier,
 		clientId: clientId || OAUTH_CONFIG.clientName,
 		createdAt: Date.now(),
+	};
+
+	await kv.set(`${PREFIX}${state}`, value, {
+		expirationTtl: TTL_SECONDS,
+		// Small and sensitive; avoid compression
+		compress: false,
 	});
 }
 
-export function retrievePKCEData(
+export async function retrievePKCEData(
 	state: string,
-): { codeVerifier: string; clientId: string } | null {
-	const data = pkceStore.get(state);
+): Promise<{ codeVerifier: string; clientId: string } | null> {
+	const key = `${PREFIX}${state}`;
+	const data = await kv.get<PKCEData>(key);
 	if (!data) {
 		return null;
 	}
 
-	// Check if expired (10 minutes)
-	if (Date.now() - data.createdAt > 10 * 60 * 1000) {
-		pkceStore.delete(state);
+	// Extra safety: validate not older than TTL, though Redis TTL should enforce this
+	if (Date.now() - data.createdAt > TTL_SECONDS * 1000) {
+		await kv.delete(key);
 		return null;
 	}
 
-	// Delete after retrieval for security
-	pkceStore.delete(state);
+	// Best-effort one-time read: delete after retrieval
+	await kv.delete(key);
 	return { codeVerifier: data.codeVerifier, clientId: data.clientId };
 }
