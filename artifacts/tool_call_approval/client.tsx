@@ -188,6 +188,11 @@ export const toolCallApprovalArtifact = new Artifact<
 										{title || 'Tool Call Approval'}
 									</CardTitle>
 									<div className="mt-1 flex items-center gap-2">
+										{toolCall.toolName && (
+											<Badge variant="outline" className="text-xs">
+												{toolCall.toolName}
+											</Badge>
+										)}
 										<Badge variant="outline" className="text-xs">
 											{toolCall.serverName}
 										</Badge>
@@ -198,56 +203,50 @@ export const toolCallApprovalArtifact = new Artifact<
 									</div>
 								</div>
 							</div>
+							<Button
+								variant="ghost"
+								size="sm"
+								onClick={() => setShowDetails(!showDetails)}
+								className="text-xs"
+							>
+								{showDetails ? (
+									<>
+										<ChevronUp className="mr-1 h-3 w-3" />
+										Hide Details
+									</>
+								) : (
+									<>
+										<ChevronDown className="mr-1 h-3 w-3" />
+										Show Details
+									</>
+								)}
+							</Button>
 						</div>
 					</CardHeader>
 
 					<CardContent className="space-y-4">
 						{/* Tool Information */}
 						<div className="space-y-2">
-							<div className="flex items-center justify-between">
-								<h4 className="text-sm font-medium">
-									Tool: {toolCall.toolName}
-								</h4>
-								<Button
-									variant="ghost"
-									size="sm"
-									onClick={() => setShowDetails(!showDetails)}
-									className="text-xs"
-								>
-									{showDetails ? (
-										<>
-											<ChevronUp className="mr-1 h-3 w-3" />
-											Hide Details
-										</>
-									) : (
-										<>
-											<ChevronDown className="mr-1 h-3 w-3" />
-											Show Details
-										</>
-									)}
-								</Button>
-							</div>
+							{/* Arguments Details */}
+							{showDetails && (
+								<div className="space-y-2">
+									<h5 className="text-sm font-medium">Arguments:</h5>
+									<div className="bg-muted/50 rounded-lg p-3">
+										{Object.keys(toolCall.arguments).length > 0 ? (
+											<pre className="overflow-x-auto text-xs">
+												{JSON.stringify(toolCall.arguments, null, 2)}
+											</pre>
+										) : (
+											<p className="text-muted-foreground text-xs">
+												No arguments provided
+											</p>
+										)}
+									</div>
+								</div>
+							)}
 
 							<p className="text-muted-foreground text-sm">{toolCall.reason}</p>
 						</div>
-
-						{/* Arguments Details */}
-						{showDetails && (
-							<div className="space-y-2">
-								<h5 className="text-sm font-medium">Arguments:</h5>
-								<div className="bg-muted/50 rounded-lg p-3">
-									{Object.keys(toolCall.arguments).length > 0 ? (
-										<pre className="overflow-x-auto text-xs">
-											{JSON.stringify(toolCall.arguments, null, 2)}
-										</pre>
-									) : (
-										<p className="text-muted-foreground text-xs">
-											No arguments provided
-										</p>
-									)}
-								</div>
-							</div>
-						)}
 
 						{/* Action Buttons */}
 						{status === 'pending' && (

@@ -72,7 +72,7 @@ export const toolExecutionArtifact = new Artifact<
 		}
 	},
 	content: ({ metadata }) => {
-		const [showDetails, setShowDetails] = useState(true);
+		const [showDetails, setShowDetails] = useState(false);
 
 		if (!metadata) {
 			return null;
