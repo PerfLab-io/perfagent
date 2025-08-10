@@ -144,3 +144,25 @@ pnpm dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 application.
+
+## Background Jobs (Upstash QStash)
+
+- Receiver endpoint: `POST /api/qstash` (signature verified)
+- Verify endpoint: `POST /api/qstash/verify` (use to set up verification in QStash UI)
+- Enqueue helper: `lib/jobs/enqueue.ts`
+- Job registry: `lib/jobs/registry.ts`
+
+Environment variables required:
+
+- `QSTASH_TOKEN`
+- `QSTASH_CURRENT_SIGNING_KEY`
+- `QSTASH_NEXT_SIGNING_KEY`
+- `NEXT_PUBLIC_APP_URL` (or `VERCEL_URL`)
+
+Example enqueue:
+
+```ts
+import { enqueue } from '@/lib/jobs/enqueue';
+
+await enqueue({ name: 'kv.cleanup.mcp' });
+```
