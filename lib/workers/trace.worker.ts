@@ -80,7 +80,7 @@ self.onmessage = async (e: MessageEvent<TraceWorkerMessage>) => {
 		} else {
 			throw new Error('Invalid message type');
 		}
-		
+
 		self.postMessage({
 			type: 'success',
 			data: { result },

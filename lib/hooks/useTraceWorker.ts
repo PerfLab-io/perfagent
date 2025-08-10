@@ -35,12 +35,14 @@ export const useTraceWorker = (): UseTraceWorkerResult => {
 				try {
 					// Read file contents
 					const fileContents = await file.text();
-					
+
 					const handleMessage = (e: MessageEvent<TraceWorkerResponse>) => {
 						const response = e.data;
 
 						if (response.type === 'error') {
-							reject(new Error(response.error || 'analyzeTraceFromFile failed'));
+							reject(
+								new Error(response.error || 'analyzeTraceFromFile failed'),
+							);
 							workerRef.current?.removeEventListener('message', handleMessage);
 						} else if (response.type === 'success' && response.data) {
 							resolve(response.data.result);
@@ -61,35 +63,32 @@ export const useTraceWorker = (): UseTraceWorkerResult => {
 		[],
 	);
 
-	const analyzeTraceInWorker = useCallback(
-		(contents: string): Promise<any> => {
-			return new Promise((resolve, reject) => {
-				if (!workerRef.current) {
-					reject(new Error('Worker not initialized'));
-					return;
+	const analyzeTraceInWorker = useCallback((contents: string): Promise<any> => {
+		return new Promise((resolve, reject) => {
+			if (!workerRef.current) {
+				reject(new Error('Worker not initialized'));
+				return;
+			}
+
+			const handleMessage = (e: MessageEvent<TraceWorkerResponse>) => {
+				const response = e.data;
+
+				if (response.type === 'error') {
+					reject(new Error(response.error || 'analyzeTrace failed'));
+					workerRef.current?.removeEventListener('message', handleMessage);
+				} else if (response.type === 'success' && response.data) {
+					resolve(response.data.result);
+					workerRef.current?.removeEventListener('message', handleMessage);
 				}
-				
-				const handleMessage = (e: MessageEvent<TraceWorkerResponse>) => {
-					const response = e.data;
+			};
 
-					if (response.type === 'error') {
-						reject(new Error(response.error || 'analyzeTrace failed'));
-						workerRef.current?.removeEventListener('message', handleMessage);
-					} else if (response.type === 'success' && response.data) {
-						resolve(response.data.result);
-						workerRef.current?.removeEventListener('message', handleMessage);
-					}
-				};
-
-				workerRef.current.addEventListener('message', handleMessage);
-				workerRef.current.postMessage({
-					type: 'analyzeTrace',
-					contents,
-				} as TraceWorkerMessage);
-			});
-		},
-		[],
-	);
+			workerRef.current.addEventListener('message', handleMessage);
+			workerRef.current.postMessage({
+				type: 'analyzeTrace',
+				contents,
+			} as TraceWorkerMessage);
+		});
+	}, []);
 
 	return {
 		analyzeTraceFromFileInWorker,
