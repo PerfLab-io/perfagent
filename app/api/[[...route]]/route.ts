@@ -14,7 +14,6 @@ import { db } from '@/drizzle/db';
 import { mcpServers } from '@/drizzle/schema';
 import { eq, and } from 'drizzle-orm';
 import {
-	createUserMcpClient,
 	getMcpServerInfo,
 	testMcpServerConnection,
 } from '@/lib/ai/mastra/mcpClient';
@@ -561,7 +560,6 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 				dataStreamWriter.writeData('initialized call');
 
 				if (toolApproval && sessionData) {
-					console.log('========== Tool approval received', toolApproval);
 					const mcpWorkflow = mastra.getWorkflow('mcpWorkflow');
 					const run = mcpWorkflow.createRun();
 
@@ -580,10 +578,10 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 							},
 						});
 					} else {
-						// Update the approval UI to show it's been denied
 						dataStreamWriter.writeData({
 							type: 'tool-call-approval',
-							status: 'complete',
+							runId: run.runId,
+							status: 'completed',
 							content: {
 								type: 'tool-call-approval',
 								data: {
@@ -595,14 +593,16 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 							},
 						});
 
-						dataStreamWriter.writeData({
-							type: 'text',
-							status: 'completed',
-							content: {
-								type: 'text',
-								data: `Tool call for ${toolApproval.toolCall.toolName} was denied.`,
+						const agent = mastra.getAgent('smallAssistant');
+						const stream = await agent.stream([
+							...messages,
+							{
+								role: 'assistant',
+								content:
+									'Tool call denied by user. I should ask the user if I should try with a different tool or ask for clarification.',
 							},
-						});
+						]);
+						stream.mergeIntoDataStream(dataStreamWriter);
 					}
 
 					unsubscribe();
@@ -611,16 +611,9 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 
 				const routerAgent = mastra.getAgent('routerAgent');
 
-				console.log(
-					'========== Router Agent Messages:',
-					JSON.stringify(messages, null, 2),
-				);
-
 				const { object } = await routerAgent.generate(messages, {
 					output: routerOutputSchema,
 				});
-
-				console.log('========== object', object);
 
 				const smallAssistant = mastra.getAgent('smallAssistant');
 
