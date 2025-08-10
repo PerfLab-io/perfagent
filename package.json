@@ -8,7 +8,6 @@
     "start": "next start",
     "lint": "next lint",
     "prettier": "prettier --write .",
-    "test": "vitest",
     "test:run": "vitest run",
     "test:mcp": "vitest run --testNamePattern=\"MCP\"",
     "test:coverage": "vitest run --coverage"
