@@ -341,6 +341,12 @@ export const ChatPageComponent = () => {
 		[input, attachedFiles?.length, originalHandleSubmit],
 	);
 
+	useEffect(() => {
+		if (textareaRef.current && !isLoading) {
+			textareaRef.current.focus();
+		}
+	}, [textareaRef, isLoading]);
+
 	/**
 	 * Handles keyboard shortcuts for message submission
 	 */
