@@ -62,6 +62,8 @@ import {
 	type MCPServer,
 	type ServerInfo,
 } from '@/lib/stores/mcp-servers-store';
+import { useUIStore } from '@/lib/stores/ui-store';
+import { useShallow } from 'zustand/react/shallow';
 
 function SubmitButton() {
 	const { pending } = useFormStatus();
@@ -104,6 +106,12 @@ export default function MCPServersPage() {
 		expandedServers,
 		toggleServerExpansion,
 	} = useMCPServersStore();
+	const { setIsEditable, setPageTitle } = useUIStore(
+		useShallow((state) => ({
+			setIsEditable: state.setIsEditable,
+			setPageTitle: state.setPageTitle,
+		})),
+	);
 
 	// Optimistic updates for adding servers
 	const [optimisticServers, addOptimisticServer] = useOptimistic(
@@ -115,7 +123,14 @@ export default function MCPServersPage() {
 	const formRef = useRef<HTMLFormElement>(null);
 
 	useEffect(() => {
+		setPageTitle('MCP Servers');
+		setIsEditable(false);
 		fetchServers();
+
+		return () => {
+			setPageTitle('Loading...');
+			setIsEditable(false);
+		};
 	}, []);
 
 	const fetchServers = async () => {

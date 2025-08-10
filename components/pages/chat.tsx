@@ -21,6 +21,8 @@ import { useSerializationWorker } from '@/lib/hooks/useSerializationWorker';
 import useSWR from 'swr';
 import { useScrollToBottom } from '@/lib/hooks/use-scroll-to-bottom';
 import { useChatStore } from '@/lib/stores';
+import { useUIStore } from '@/lib/stores/ui-store';
+import { useShallow } from 'zustand/react/shallow';
 
 export interface AttachedFile {
 	id: string;
@@ -216,6 +218,23 @@ export const ChatPageComponent = () => {
 		},
 		[setTraceAnalysis, setCurrentContextFile, setAttachedFiles, setSuggestions],
 	);
+
+	const { setIsEditable, setPageTitle } = useUIStore(
+		useShallow((state) => ({
+			setIsEditable: state.setIsEditable,
+			setPageTitle: state.setPageTitle,
+		})),
+	);
+
+	useEffect(() => {
+		setPageTitle('Agent Insight #20');
+		setIsEditable(true);
+
+		return () => {
+			setPageTitle('Loading...');
+			setIsEditable(false);
+		};
+	}, []);
 
 	useEffect(() => {
 		if (!contextFileInsights) return;
