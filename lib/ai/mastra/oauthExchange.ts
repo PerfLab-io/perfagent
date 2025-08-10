@@ -1,5 +1,5 @@
 import { OAUTH_CONFIG } from './mcpClient';
-import { retrievePKCEData, retrievePKCEVerifier } from './pkceStore';
+import { retrievePKCEData } from './pkceStore';
 
 /**
  * Generate fallback authorization server metadata for token exchange

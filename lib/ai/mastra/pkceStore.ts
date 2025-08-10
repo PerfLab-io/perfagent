@@ -57,9 +57,3 @@ export function retrievePKCEData(
 	pkceStore.delete(state);
 	return { codeVerifier: data.codeVerifier, clientId: data.clientId };
 }
-
-// Backward compatibility
-export function retrievePKCEVerifier(state: string): string | null {
-	const data = retrievePKCEData(state);
-	return data?.codeVerifier || null;
-}

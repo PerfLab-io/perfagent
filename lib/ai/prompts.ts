@@ -939,7 +939,7 @@ When external MCP tools are available, consider that:
 }
 
 /**
- * Creates a context-aware prompt that adapts to user queries (Phase 3.3 implementation)
+ * Creates a context-aware prompt that adapts to user queries
  * @param userQuery - The user's query to generate context for
  * @param basePrompt - The base system prompt to enhance
  * @returns Enhanced prompt with contextual tool recommendations
@@ -1004,7 +1004,7 @@ export function createContextAwarePrompt(
 }
 
 /**
- * Enhanced MCP-aware prompt with full Phase 3 implementation
+ * Enhanced MCP-aware
  * @param toolsets - Available MCP toolsets (optional)
  * @param userQuery - User's current query for context (optional)
  * @returns Fully enhanced system prompt with Gemini CLI patterns
