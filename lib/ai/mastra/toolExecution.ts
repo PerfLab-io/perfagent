@@ -12,6 +12,8 @@ import { mcpToolCache } from './cache/MCPCache';
 import { db } from '@/drizzle/db';
 import { mcpServers } from '@/drizzle/schema';
 import { eq, and } from 'drizzle-orm';
+import { telemetryService } from './monitoring/TelemetryService';
+import { performance } from 'node:perf_hooks';
 
 interface ToolExecutionRequest {
 	serverId: string;
@@ -63,7 +65,7 @@ export class ToolExecutionService {
 	async executeTool(
 		request: ToolExecutionRequest,
 	): Promise<ToolExecutionResult> {
-		const startTime = Date.now();
+		performance.mark('toolExecutionStart');
 		console.log(
 			`[Tool Execution] Executing tool ${request.toolName} on server ${request.serverId}`,
 		);
@@ -96,16 +98,22 @@ export class ToolExecutionService {
 
 			// Check if we got an error result
 			if ('error' in result) {
-				const errorResult = result.error;
 				const message =
-					typeof errorResult === 'string'
-						? errorResult
-						: errorResult?.userMessage || 'Tool execution failed';
+					result.error instanceof Error
+						? result.error.message
+						: 'Unknown error';
+
+				// Track failed execution
+				const duration = performance.measure(
+					'toolExecution',
+					'toolExecutionStart',
+				).duration;
+				telemetryService.trackToolExecution('failed', duration);
 
 				return {
 					success: false,
 					error: message,
-					executionTime: Date.now() - startTime,
+					executionTime: duration,
 					connectionStatus: updatedConnectionStatus || undefined,
 				};
 			}
@@ -113,10 +121,22 @@ export class ToolExecutionService {
 			console.log(
 				`[Tool Execution] Successfully executed tool ${request.toolName}`,
 			);
+
+			// Track successful execution
+			const duration = performance.measure(
+				'toolExecution',
+				'toolExecutionStart',
+			).duration;
+			telemetryService.trackToolExecution('success', duration);
+
+			// Track result type
+			const resultType = telemetryService.classifyResultType(result);
+			telemetryService.trackToolResult(resultType, 'success');
+
 			return {
 				success: true,
-				result: result.result || result,
-				executionTime: Date.now() - startTime,
+				result: result,
+				executionTime: duration,
 				connectionStatus: updatedConnectionStatus || undefined,
 			};
 		} catch (error) {
@@ -128,10 +148,25 @@ export class ToolExecutionService {
 				request.serverId,
 			);
 
+			// Track execution failure
+			const duration = performance.measure(
+				'toolExecution',
+				'toolExecutionStart',
+			).duration;
+			telemetryService.trackToolExecution('failed', duration);
+
+			// Track critical error if timeout
+			if (duration > 30000) {
+				telemetryService.trackSlowOperation('tool_execution', duration);
+			}
+
+			performance.clearMarks();
+			performance.clearMeasures();
+
 			return {
 				success: false,
 				error: error instanceof Error ? error.message : 'Unknown error',
-				executionTime: Date.now() - startTime,
+				executionTime: duration,
 				connectionStatus: connectionStatus || undefined,
 			};
 		}
@@ -143,6 +178,8 @@ export class ToolExecutionService {
 	 */
 	async discoverTools(userId: string): Promise<ToolDiscoveryResult> {
 		console.log(`[Tool Discovery] Discovering tools for user ${userId}`);
+
+		performance.mark('toolDiscoveryStart');
 
 		// Get all user's enabled servers
 		const servers = await db
@@ -211,6 +248,16 @@ export class ToolExecutionService {
 		console.log(
 			`[Tool Discovery] Discovered ${tools.length} tools from ${authorizedServers}/${servers.length} servers`,
 		);
+
+		// Track tool discovery
+		const discoveryDuration = performance.measure(
+			'toolDiscovery',
+			'toolDiscoveryStart',
+		).duration;
+		telemetryService.trackToolDiscovery(tools.length, discoveryDuration);
+
+		performance.clearMarks();
+		performance.clearMeasures();
 
 		return {
 			tools,

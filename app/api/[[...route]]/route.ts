@@ -18,6 +18,8 @@ import {
 	testMcpServerConnection,
 } from '@/lib/ai/mastra/mcpClient';
 import { exchangeOAuthCode } from '@/lib/ai/mastra/oauthExchange';
+import { telemetryService } from '@/lib/ai/mastra/monitoring/TelemetryService';
+import { performance } from 'node:perf_hooks';
 
 export const runtime = 'nodejs';
 
@@ -228,10 +230,29 @@ chat.post('/mcp/servers/:id/test', async (c) => {
 
 		const serverId = c.req.param('id');
 
-		const result = await testMcpServerConnection(sessionData.userId, serverId);
-		return c.json(result);
+		try {
+			const result = await testMcpServerConnection(
+				sessionData.userId,
+				serverId,
+			);
+
+			// Track successful test
+			const testResult = result.status === 'connected' ? 'success' : 'failed';
+			telemetryService.trackServerTest(testResult, serverId);
+
+			return c.json(result);
+		} catch (testError) {
+			// Track failed test
+			telemetryService.trackServerTest('failed', serverId);
+			throw testError;
+		}
 	} catch (error) {
 		console.error('Error testing MCP server connection:', error);
+
+		// Track error if not already tracked
+		const errorCategory = telemetryService.classifyError(error);
+		telemetryService.trackCriticalError(errorCategory, 'server_test');
+
 		return c.json(
 			{
 				error: 'Connection test failed',
@@ -335,6 +356,10 @@ chat.get(
 					`[OAuth] Successfully authorized ${serverRecord.name} with tokens`,
 				);
 
+				// Track successful OAuth authorization
+				const authMethod = serverRecord.clientId ? 'oauth' : 'api_key';
+				telemetryService.trackServerAuth('success', authMethod);
+
 				// Redirect to the MCP servers page with success message
 				return c.html(`
 					<html>
@@ -353,6 +378,9 @@ chat.get(
 				`);
 			} catch (error) {
 				console.error('OAuth callback error:', error);
+
+				// Track failed OAuth authorization
+				telemetryService.trackServerAuth('failed', 'oauth');
 
 				// Update server status to failed
 				await db
@@ -485,6 +513,10 @@ chat.post('/mcp/oauth/callback', async (c) => {
 				`[OAuth] Successfully authorized ${serverRecord.name} with tokens`,
 			);
 
+			// Track successful OAuth authorization
+			const authMethod = serverRecord.clientId ? 'oauth' : 'api_key';
+			telemetryService.trackServerAuth('success', authMethod);
+
 			// Redirect to the MCP servers page with success message
 			return c.html(`
 				<html>
@@ -503,6 +535,9 @@ chat.post('/mcp/oauth/callback', async (c) => {
 			`);
 		} catch (error) {
 			console.error('OAuth callback error:', error);
+
+			// Track failed OAuth authorization
+			telemetryService.trackServerAuth('failed', 'oauth');
 
 			// Update server status to failed
 			await db
@@ -560,6 +595,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 				dataStreamWriter.writeData('initialized call');
 
 				if (toolApproval && sessionData) {
+					performance.mark('toolApprovalStart');
 					const mcpWorkflow = mastra.getWorkflow('mcpWorkflow');
 					const run = mcpWorkflow.createRun();
 
@@ -568,6 +604,12 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 					});
 
 					if (toolApproval.approved) {
+						// Track tool approval
+						const responseTime = performance.measure(
+							'toolApproval',
+							'toolApprovalStart',
+						).duration;
+						telemetryService.trackToolApproval('approved', responseTime);
 						await run.start({
 							inputData: {
 								messages,
@@ -578,6 +620,13 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 							},
 						});
 					} else {
+						// Track tool rejection
+						const responseTime = performance.measure(
+							'toolApproval',
+							'toolApprovalStart',
+						).duration;
+						telemetryService.trackToolApproval('rejected', responseTime);
+
 						dataStreamWriter.writeData({
 							type: 'tool-call-approval',
 							runId: run.runId,
@@ -592,6 +641,9 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 								},
 							},
 						});
+
+						performance.clearMarks();
+						performance.clearMeasures();
 
 						const agent = mastra.getAgent('smallAssistant');
 						const stream = await agent.stream([

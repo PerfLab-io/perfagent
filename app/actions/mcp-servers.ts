@@ -1,11 +1,11 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
-import { redirect } from 'next/navigation';
 import { verifySession } from '@/lib/session.server';
 import { db } from '@/drizzle/db';
 import { mcpServers } from '@/drizzle/schema';
 import { eq, and } from 'drizzle-orm';
+import { telemetryService } from '@/lib/ai/mastra/monitoring/TelemetryService';
+import crypto from 'crypto';
 
 interface ActionResult {
 	success: boolean;
@@ -67,6 +67,11 @@ export async function addMcpServerAction(
 			})
 			.returning();
 
+		// Track successful server addition
+		const requiresAuth =
+			newServer.authStatus !== 'none' && newServer.authStatus !== 'unknown';
+		telemetryService.trackServerAdded(newServer.url, requiresAuth);
+
 		// Note: No revalidatePath needed - using optimistic updates on frontend
 
 		return {
@@ -75,6 +80,10 @@ export async function addMcpServerAction(
 		};
 	} catch (error) {
 		console.error('Failed to add MCP server:', error);
+
+		// Track failure
+		const errorCategory = telemetryService.classifyError(error);
+		telemetryService.trackCriticalError(errorCategory, 'server_add');
 
 		if (error && typeof error === 'object' && 'code' in error) {
 			if (error.code === '23505') {
@@ -132,6 +141,10 @@ export async function toggleMcpServerAction(
 			};
 		}
 
+		// Track server toggle
+		const action = enabled ? 'activated' : 'deactivated';
+		telemetryService.trackServerToggle(action, 'manual');
+
 		// Note: No revalidatePath needed - using optimistic updates on frontend
 
 		return {
@@ -140,6 +153,11 @@ export async function toggleMcpServerAction(
 		};
 	} catch (error) {
 		console.error('Failed to toggle MCP server:', error);
+
+		// Track error
+		const errorCategory = telemetryService.classifyError(error);
+		telemetryService.trackCriticalError(errorCategory, 'server_toggle');
+
 		return {
 			success: false,
 			error: 'Failed to update server. Please try again.',
@@ -176,6 +194,9 @@ export async function deleteMcpServerAction(
 			};
 		}
 
+		// Track server removal
+		telemetryService.trackServerRemoved(deletedServer.url, 'user');
+
 		// Note: No revalidatePath needed - using optimistic updates on frontend
 
 		return {
@@ -183,6 +204,11 @@ export async function deleteMcpServerAction(
 		};
 	} catch (error) {
 		console.error('Failed to delete MCP server:', error);
+
+		// Track error
+		const errorCategory = telemetryService.classifyError(error);
+		telemetryService.trackCriticalError(errorCategory, 'server_delete');
+
 		return {
 			success: false,
 			error: 'Failed to delete server. Please try again.',
