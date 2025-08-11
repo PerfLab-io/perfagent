@@ -22,6 +22,11 @@ export const MCP_EVENTS = {
 	TOOL_EXECUTION: 'mcp_tool_execution',
 	TOOL_RESULT: 'mcp_tool_result',
 
+	// MCP client operations
+	CLIENT_ADD_SERVER: 'mcp_client_add_server',
+	CLIENT_AUTHORIZE: 'mcp_client_authorize',
+	CLIENT_LIST_RESOURCES: 'mcp_client_list_resources',
+
 	// Performance & errors (reuse existing)
 	SLOW_OPERATION: 'mcp_slow_operation',
 	CRITICAL_ERROR: 'mcp_critical_error',
@@ -328,6 +333,45 @@ export class TelemetryService {
 		if (!this.isProduction) return false;
 		if (isCritical) return true;
 		return Math.random() < this.samplingRate;
+	}
+
+	/**
+	 * Track MCP client add server operation
+	 */
+	trackClientAddServer(status: 'success' | 'failed', durationMs: number): void {
+		if (!this.isProduction) return;
+
+		track(MCP_EVENTS.CLIENT_ADD_SERVER, {
+			operation_status: status,
+			duration_bucket: this.getDurationBucket(durationMs),
+		});
+	}
+
+	/**
+	 * Track MCP client authorization operation
+	 */
+	trackClientAuthorize(status: 'success' | 'failed', durationMs: number): void {
+		if (!this.isProduction) return;
+
+		track(MCP_EVENTS.CLIENT_AUTHORIZE, {
+			operation_status: status,
+			duration_bucket: this.getDurationBucket(durationMs),
+		});
+	}
+
+	/**
+	 * Track MCP client list resources operation
+	 */
+	trackClientListResources(resourceCount: number, durationMs: number): void {
+		if (!this.isProduction) return;
+
+		// Sample at 10% for non-critical operations
+		if (Math.random() > this.samplingRate) return;
+
+		track(MCP_EVENTS.CLIENT_LIST_RESOURCES, {
+			resource_count_bucket: this.getCountBucket(resourceCount),
+			duration_bucket: this.getDurationBucket(durationMs),
+		});
 	}
 }
 

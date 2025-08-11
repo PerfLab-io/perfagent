@@ -16,6 +16,8 @@ import {
 import { db } from '@/drizzle/db';
 import { mcpServers } from '@/drizzle/schema';
 import { eq, and } from 'drizzle-orm';
+import { telemetryService } from '@/lib/ai/mastra/monitoring/TelemetryService';
+import { performance } from 'node:perf_hooks';
 // Import removed - using flexible any[] type for tools to handle different MCP server formats
 
 interface ServerCapabilities {
@@ -99,6 +101,8 @@ export class ConnectionManager {
 			`[Connection Manager] Getting capabilities for server ${serverId}`,
 		);
 
+		performance.mark('listResourcesStart');
+
 		try {
 			// Check KV cache first (capabilities only - 2h TTL per plan)
 			const cached = await mcpToolCache.getServerTools(serverId);
@@ -112,6 +116,24 @@ export class ConnectionManager {
 					lastTested: new Date(cached.cachedAt),
 					lastSuccess: new Date(cached.cachedAt),
 				});
+
+				// Track resource listing from cache
+				const resourceCount =
+					(cached.tools?.length || 0) +
+					(Array.isArray(cached.capabilities?.resources)
+						? cached.capabilities.resources.length
+						: 0) +
+					(Array.isArray(cached.capabilities?.prompts)
+						? cached.capabilities.prompts.length
+						: 0);
+				const duration = performance.measure(
+					'listResources',
+					'listResourcesStart',
+				).duration;
+				telemetryService.trackClientListResources(resourceCount, duration);
+				performance.clearMarks('listResourcesStart');
+				performance.clearMeasures('listResources');
+
 				return {
 					success: true,
 					capabilities: cached.capabilities,
@@ -124,6 +146,14 @@ export class ConnectionManager {
 			const connectionHealthy = await this.testLiveConnection(serverId, userId);
 			if (!connectionHealthy) {
 				const status = this.liveConnectionStatus.get(serverId);
+				const duration = performance.measure(
+					'listResources',
+					'listResourcesStart',
+				).duration;
+				telemetryService.trackClientListResources(0, duration);
+				performance.clearMarks('listResourcesStart');
+				performance.clearMeasures('listResources');
+
 				return {
 					success: false,
 					error: status?.error || 'Connection test failed',
@@ -146,6 +176,21 @@ export class ConnectionManager {
 						}
 					});
 				}
+
+				// Count total resources (tools + resources + prompts)
+				const resourceCount =
+					tools.length +
+					(Array.isArray(result.resources) ? result.resources.length : 0) +
+					(Array.isArray(result.prompts) ? result.prompts.length : 0);
+
+				// Track resource listing success
+				const duration = performance.measure(
+					'listResources',
+					'listResourcesStart',
+				).duration;
+				telemetryService.trackClientListResources(resourceCount, duration);
+				performance.clearMarks('listResourcesStart');
+				performance.clearMeasures('listResources');
 
 				// Cache capabilities only (NOT connection status per plan)
 				const cacheEntry: ToolCacheEntry = {
@@ -186,6 +231,15 @@ export class ConnectionManager {
 					error: 'Failed to get server info',
 				});
 
+				// Track resource listing failure
+				const duration = performance.measure(
+					'listResources',
+					'listResourcesStart',
+				).duration;
+				telemetryService.trackClientListResources(0, duration);
+				performance.clearMarks('listResourcesStart');
+				performance.clearMeasures('listResources');
+
 				return {
 					success: false,
 					error:
@@ -198,6 +252,15 @@ export class ConnectionManager {
 				`[Connection Manager] Error getting capabilities for server ${serverId}:`,
 				error,
 			);
+
+			// Track resource listing error
+			const duration = performance.measure(
+				'listResources',
+				'listResourcesStart',
+			).duration;
+			telemetryService.trackClientListResources(0, duration);
+			performance.clearMarks('listResourcesStart');
+			performance.clearMeasures('listResources');
 			// Update live status on error
 			this.updateLiveStatus(serverId, {
 				status: 'disconnected',

@@ -6,6 +6,7 @@ import { mcpServers } from '@/drizzle/schema';
 import { eq, and } from 'drizzle-orm';
 import { telemetryService } from '@/lib/ai/mastra/monitoring/TelemetryService';
 import crypto from 'crypto';
+import { performance } from 'node:perf_hooks';
 
 interface ActionResult {
 	success: boolean;
@@ -16,9 +17,18 @@ interface ActionResult {
 export async function addMcpServerAction(
 	formData: FormData,
 ): Promise<ActionResult> {
+	performance.mark('mcpServerAddStart');
+
 	try {
 		const sessionData = await verifySession();
 		if (!sessionData) {
+			const duration = performance.measure(
+				'mcpServerAdd',
+				'mcpServerAddStart',
+			).duration;
+			telemetryService.trackClientAddServer('failed', duration);
+			performance.clearMarks('mcpServerAddStart');
+			performance.clearMeasures('mcpServerAdd');
 			return {
 				success: false,
 				error: 'Authentication required',
@@ -29,6 +39,13 @@ export async function addMcpServerAction(
 		const url = formData.get('url') as string;
 
 		if (!name || !name.trim()) {
+			const duration = performance.measure(
+				'mcpServerAdd',
+				'mcpServerAddStart',
+			).duration;
+			telemetryService.trackClientAddServer('failed', duration);
+			performance.clearMarks('mcpServerAddStart');
+			performance.clearMeasures('mcpServerAdd');
 			return {
 				success: false,
 				error: 'Server name is required',
@@ -36,6 +53,13 @@ export async function addMcpServerAction(
 		}
 
 		if (!url || !url.trim()) {
+			const duration = performance.measure(
+				'mcpServerAdd',
+				'mcpServerAddStart',
+			).duration;
+			telemetryService.trackClientAddServer('failed', duration);
+			performance.clearMarks('mcpServerAddStart');
+			performance.clearMeasures('mcpServerAdd');
 			return {
 				success: false,
 				error: 'Server URL is required',
@@ -45,6 +69,13 @@ export async function addMcpServerAction(
 		try {
 			new URL(url);
 		} catch (error) {
+			const duration = performance.measure(
+				'mcpServerAdd',
+				'mcpServerAddStart',
+			).duration;
+			telemetryService.trackClientAddServer('failed', duration);
+			performance.clearMarks('mcpServerAddStart');
+			performance.clearMeasures('mcpServerAdd');
 			return {
 				success: false,
 				error: 'Please provide a valid URL',
@@ -67,10 +98,21 @@ export async function addMcpServerAction(
 			})
 			.returning();
 
-		// Track successful server addition
+		// Track successful server addition with high-resolution timing
+		const duration = performance.measure(
+			'mcpServerAdd',
+			'mcpServerAddStart',
+		).duration;
+		telemetryService.trackClientAddServer('success', duration);
+
+		// Also track the original server added event
 		const requiresAuth =
 			newServer.authStatus !== 'none' && newServer.authStatus !== 'unknown';
 		telemetryService.trackServerAdded(newServer.url, requiresAuth);
+
+		// Clear performance marks and measures
+		performance.clearMarks('mcpServerAddStart');
+		performance.clearMeasures('mcpServerAdd');
 
 		// Note: No revalidatePath needed - using optimistic updates on frontend
 
@@ -81,9 +123,20 @@ export async function addMcpServerAction(
 	} catch (error) {
 		console.error('Failed to add MCP server:', error);
 
-		// Track failure
+		// Track failure with timing
+		const duration = performance.measure(
+			'mcpServerAdd',
+			'mcpServerAddStart',
+		).duration;
+		telemetryService.trackClientAddServer('failed', duration);
+
+		// Track failure with error category
 		const errorCategory = telemetryService.classifyError(error);
 		telemetryService.trackCriticalError(errorCategory, 'server_add');
+
+		// Clear performance marks and measures
+		performance.clearMarks('mcpServerAddStart');
+		performance.clearMeasures('mcpServerAdd');
 
 		if (error && typeof error === 'object' && 'code' in error) {
 			if (error.code === '23505') {

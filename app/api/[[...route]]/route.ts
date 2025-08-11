@@ -276,6 +276,8 @@ chat.get(
 	'/mcp/oauth/callback',
 	zValidator('query', oauthCallbackSchema),
 	async (c) => {
+		performance.mark('oauthAuthorizationStart');
+
 		try {
 			const { code, state, iss } = c.req.valid('query');
 
@@ -308,6 +310,14 @@ chat.get(
 			}
 
 			if (!matchingServer) {
+				const duration = performance.measure(
+					'oauthAuthorization',
+					'oauthAuthorizationStart',
+				).duration;
+				telemetryService.trackClientAuthorize('failed', duration);
+				performance.clearMarks('oauthAuthorizationStart');
+				performance.clearMeasures('oauthAuthorization');
+
 				return c.html(`
 					<html>
 						<body>
@@ -356,9 +366,20 @@ chat.get(
 					`[OAuth] Successfully authorized ${serverRecord.name} with tokens`,
 				);
 
-				// Track successful OAuth authorization
+				// Track successful OAuth authorization with timing
+				const duration = performance.measure(
+					'oauthAuthorization',
+					'oauthAuthorizationStart',
+				).duration;
+				telemetryService.trackClientAuthorize('success', duration);
+
+				// Also track the original server auth event
 				const authMethod = serverRecord.clientId ? 'oauth' : 'api_key';
 				telemetryService.trackServerAuth('success', authMethod);
+
+				// Clear performance marks and measures
+				performance.clearMarks('oauthAuthorizationStart');
+				performance.clearMeasures('oauthAuthorization');
 
 				// Redirect to the MCP servers page with success message
 				return c.html(`
@@ -379,8 +400,19 @@ chat.get(
 			} catch (error) {
 				console.error('OAuth callback error:', error);
 
-				// Track failed OAuth authorization
+				// Track failed OAuth authorization with timing
+				const duration = performance.measure(
+					'oauthAuthorization',
+					'oauthAuthorizationStart',
+				).duration;
+				telemetryService.trackClientAuthorize('failed', duration);
+
+				// Also track the original server auth failure
 				telemetryService.trackServerAuth('failed', 'oauth');
+
+				// Clear performance marks and measures
+				performance.clearMarks('oauthAuthorizationStart');
+				performance.clearMeasures('oauthAuthorization');
 
 				// Update server status to failed
 				await db
@@ -404,6 +436,18 @@ chat.get(
 			}
 		} catch (error) {
 			console.error('OAuth callback error:', error);
+
+			// Track general failure with timing
+			const duration = performance.measure(
+				'oauthAuthorization',
+				'oauthAuthorizationStart',
+			).duration;
+			telemetryService.trackClientAuthorize('failed', duration);
+
+			// Clear performance marks and measures
+			performance.clearMarks('oauthAuthorizationStart');
+			performance.clearMeasures('oauthAuthorization');
+
 			return c.html(`
 				<html>
 					<body>
