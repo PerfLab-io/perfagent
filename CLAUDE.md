@@ -92,6 +92,21 @@ The project uses Mastra agents for different analysis tasks:
 - **suggestionsAssistant**: Generates follow-up questions
 - **reportAssistant**: Creates optimization reports
 
+## Performance Telemetry
+The project implements high-resolution performance tracking for MCP operations:
+- **Node.js Performance API**: Uses `perf_hooks` for microsecond-precision timing
+- **Telemetry Service**: Located at `lib/ai/mastra/monitoring/TelemetryService.ts`
+- **MCP Client Events**: Tracks server addition, OAuth authorization, and resource listing
+- **Performance Pattern**: Mark/measure with cleanup in finally blocks
+- **Sampling Strategy**: 100% tracking for critical operations, 10% for high-volume
+
+### Performance Best Practices
+- Always use `performance.mark()` and `performance.measure()` over `Date.now()`
+- Clear marks and measures in finally blocks to prevent memory leaks
+- Use unique mark names for concurrent operations
+- Track at operation boundaries, not implementation details
+- Implement exponential backoff for retries: 1s, 2s, 4s, etc.
+
 ## Important Notes
 - This is a performance analysis tool, not a security testing tool
 - Focus on web performance optimization and Core Web Vitals
