@@ -51,6 +51,15 @@ Uses Zustand stores organized by domain:
 - **artifact-store**: UI artifacts management
 - **toast-store**: Toast notifications
 
+#### Zustand Best Practices
+- **Derived State**: Always compute derived state using selectors, never store computed values
+- **UI-Only State**: State variables should reflect direct UI changes; use refs for non-UI data
+- **Selectors**: Always use selectors to avoid unnecessary re-renders when accessing store state
+- **Performance**: Slice stores by domain to minimize re-render scope
+- **Patterns**: Follow established patterns in existing stores (see `/lib/stores` directory)
+
+For detailed state management documentation, refer to `STATE_MANAGEMENT.md`
+
 ## Code Style
 - **TypeScript**: Use strict TypeScript for all code; prefer interfaces over types
 - **Formatting**: Uses Prettier with tabs (2 spaces), single quotes, trailing commas
