@@ -75,7 +75,6 @@ function SubmitButton() {
 }
 
 export default function MCPServersPage() {
-	// Zustand store
 	const {
 		servers,
 		setServers,
@@ -113,13 +112,11 @@ export default function MCPServersPage() {
 		})),
 	);
 
-	// Optimistic updates for adding servers
 	const [optimisticServers, addOptimisticServer] = useOptimistic(
 		servers,
 		(currentServers, newServer: MCPServer) => [...currentServers, newServer],
 	);
 
-	// Refs for non-UI state
 	const formRef = useRef<HTMLFormElement>(null);
 
 	useEffect(() => {
@@ -138,6 +135,7 @@ export default function MCPServersPage() {
 			const response = await fetch('/api/mcp/servers');
 			if (!response.ok) throw new Error('Failed to fetch servers');
 			const data = await response.json();
+
 			// Ensure offline and failed servers are disabled (data consistency check)
 			const normalizedData = data.map((server: MCPServer) =>
 				(server.authStatus === 'offline' || server.authStatus === 'failed') &&
@@ -505,30 +503,21 @@ export default function MCPServersPage() {
 
 		return (
 			<div className="mt-4 space-y-2">
-				<h4 className="flex items-center text-sm font-medium">
-					<Wrench className="mr-2 h-4 w-4" />
-					Available Tools
-				</h4>
 				<div className="space-y-2">
 					{tools.map((tool, index) => (
 						<div
 							key={`${tool.server}-${tool.name}-${index}`}
 							className="bg-muted/50 rounded-md p-3"
 						>
-							<div className="flex items-start justify-between">
-								<div className="flex-1">
-									<div className="flex items-center space-x-2">
-										<code className="bg-background rounded px-2 py-1 font-mono text-sm">
-											{tool.name}
-										</code>
-										<Badge variant="outline" className="text-xs">
-											{tool.server}
-										</Badge>
-									</div>
-									<p className="text-muted-foreground mt-2 text-sm">
-										{tool.description}
-									</p>
+							<div className="flex flex-col gap-3">
+								<div className="flex items-center space-x-2">
+									<code className="bg-secondary rounded-md px-2 py-1 font-mono text-sm">
+										{tool.name}
+									</code>
 								</div>
+								<p className="text-muted-foreground mt-2 overflow-hidden text-sm text-pretty text-ellipsis">
+									{tool.description}
+								</p>
 							</div>
 						</div>
 					))}
@@ -582,13 +571,11 @@ export default function MCPServersPage() {
 	}
 
 	return (
-		<div className="mx-auto max-w-4xl space-y-6 px-4 sm:px-6">
+		<div className="mx-auto w-3xl space-y-6 px-4 sm:px-6">
 			<div className="flex items-center justify-between">
 				<div>
 					<h1 className="text-3xl font-bold">MCP Servers</h1>
-					<p className="text-muted-foreground">
-						Manage your Model Context Protocol servers
-					</p>
+					<p className="text-muted-foreground">Manage your MCP servers</p>
 				</div>
 				<Dialog
 					open={isAddDialogOpen}
@@ -839,11 +826,7 @@ export default function MCPServersPage() {
 														}
 													>
 														<CollapsibleTrigger asChild>
-															<Button
-																variant="ghost"
-																size="sm"
-																className="flex h-auto items-center space-x-2 p-0 text-sm"
-															>
+															<Button variant="ghost" size="sm">
 																{expandedServers[server.id] ? (
 																	<ChevronDown className="h-4 w-4" />
 																) : (
