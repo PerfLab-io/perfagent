@@ -1,4 +1,4 @@
-import { OAUTH_CONFIG } from './mcpClient';
+import { OAUTH_CONFIG } from './config';
 import { retrievePKCEData } from './pkceStore';
 
 /**
@@ -77,7 +77,7 @@ async function attemptDynamicClientRegistration(
 async function discoverTokenEndpoint(
 	authServerIssuer: string,
 	resourceUrl: string,
-): Promise<string | null> {
+): Promise<{ tokenEndpoint: string; registrationEndpoint?: string } | null> {
 	const u = new URL(authServerIssuer);
 	const metadataUrls = [
 		// RFC 8414 standard location
@@ -98,7 +98,10 @@ async function discoverTokenEndpoint(
 				const metadata = await metadataResponse.json();
 				if (metadata.token_endpoint) {
 					console.log('[OAuth] Found token endpoint:', metadata.token_endpoint);
-					return metadata.token_endpoint;
+					return {
+						tokenEndpoint: metadata.token_endpoint,
+						registrationEndpoint: metadata.registration_endpoint,
+					};
 				}
 			}
 		} catch (error) {
@@ -111,7 +114,7 @@ async function discoverTokenEndpoint(
 		console.log('[OAuth] Using fallback token endpoint');
 		const fallbackMetadata =
 			generateFallbackAuthServerMetadata(authServerIssuer);
-		return fallbackMetadata.token_endpoint;
+		return { tokenEndpoint: fallbackMetadata.token_endpoint };
 	}
 
 	return null;
@@ -133,23 +136,36 @@ export async function exchangeOAuthCode(
 		const authServerUrl = resourceUrl.origin;
 
 		// Discover the token endpoint using enhanced discovery
-		let tokenEndpoint = await discoverTokenEndpoint(authServerUrl, serverUrl);
+		let tokenDetails = await discoverTokenEndpoint(authServerUrl, serverUrl);
 
-		if (!tokenEndpoint) {
+		if (!tokenDetails) {
 			throw new Error('Could not discover token endpoint');
 		}
 
+		const { tokenEndpoint, registrationEndpoint } = tokenDetails;
 		console.log('[OAuth] Using token endpoint:', tokenEndpoint);
 
-		// For fallback cases, we might need to try alternative endpoints
-		let tokenExchangeEndpoints = [tokenEndpoint];
-		if (
-			tokenEndpoint.includes('/token') &&
-			!tokenEndpoint.includes('/oauth/')
-		) {
-			// If using fallback /token endpoint, also try /oauth/token as alternative
-			const altEndpoint = tokenEndpoint.replace('/token', '/oauth/token');
-			tokenExchangeEndpoints.push(altEndpoint);
+		// Build list of endpoints to try in order of likelihood
+		const tokenExchangeEndpoints: string[] = [];
+		// 1) The discovered endpoint
+		tokenExchangeEndpoints.push(tokenEndpoint);
+		// 2) If discovered endpoint is /token, also try /oauth/token
+		if (tokenEndpoint.endsWith('/token')) {
+			const altOauthToken = tokenEndpoint.replace(/\/token$/, '/oauth/token');
+			if (!tokenExchangeEndpoints.includes(altOauthToken))
+				tokenExchangeEndpoints.push(altOauthToken);
+		}
+		// 3) Try same-origin common paths if not already included
+		const origin = new URL(serverUrl).origin;
+		for (const path of [
+			'/oauth/token',
+			'/oauth2/token',
+			'/api/oauth/token',
+			'/token',
+		]) {
+			const candidate = `${origin}${path}`;
+			if (!tokenExchangeEndpoints.includes(candidate))
+				tokenExchangeEndpoints.push(candidate);
 		}
 
 		// Retrieve the code_verifier and client_id using the state
@@ -171,35 +187,33 @@ export async function exchangeOAuthCode(
 		);
 
 		// Build token exchange parameters
-		// Use the client_id from the authorization phase first, then fallbacks
-		const clientStrategies: (string | null)[] = [
-			// Primary: Client ID used during authorization
-			pkceData.clientId,
+		// Always attempt multiple client identification strategies including public client (no client_id)
+		const strategiesRaw: (string | null)[] = [
+			// 1) Client ID used during authorization (may be a display name)
+			pkceData.clientId ?? null,
+			// 2) Default configured client name
+			OAUTH_CONFIG.clientName,
+			// 3) URL-safe variant
+			'perfagent-web-performance-tool',
+			// 4) Simple variant
+			'perfagent',
+			// 5) Public client (omit client_id)
+			null,
 		];
-
-		// Add fallback strategies only if the primary differs from our defaults
-		if (pkceData.clientId !== OAUTH_CONFIG.clientName) {
-			clientStrategies.push(
-				// Fallback 1: Original client name
-				OAUTH_CONFIG.clientName,
-				// Fallback 2: URL-safe client name
-				'perfagent-web-performance-tool',
-				// Fallback 3: Simple client name
-				'perfagent',
-				// Fallback 4: No client_id (public client with PKCE only)
-				null,
-			);
-		}
+		const clientStrategies = Array.from(new Set(strategiesRaw));
 
 		// Build initial token params (will be modified per attempt)
-		const baseTokenParams = {
+		const baseTokenParamsObj: Record<string, string> = {
 			grant_type: 'authorization_code',
 			code: code,
 			redirect_uri: OAUTH_CONFIG.redirectUris[0],
 			code_verifier: pkceData.codeVerifier, // Include the PKCE code_verifier
 		};
+		if (pkceData.resource) {
+			baseTokenParamsObj.resource = pkceData.resource;
+		}
 
-		let tokenParams = new URLSearchParams(baseTokenParams);
+		let tokenParams = new URLSearchParams(baseTokenParamsObj);
 
 		console.log(
 			'[OAuth] Token exchange parameters:',
@@ -211,6 +225,7 @@ export async function exchangeOAuthCode(
 		let lastError: string = '';
 		let successfulEndpoint: string = '';
 		let successfulClientId: string = '';
+		let invalidClientSeen = false;
 
 		for (const endpoint of tokenExchangeEndpoints) {
 			console.log('[OAuth] Attempting token exchange with endpoint:', endpoint);
@@ -223,7 +238,7 @@ export async function exchangeOAuthCode(
 				);
 
 				// Create fresh token params for each attempt
-				tokenParams = new URLSearchParams(baseTokenParams);
+				tokenParams = new URLSearchParams(baseTokenParamsObj);
 				if (clientId) {
 					tokenParams.set('client_id', clientId);
 				}
@@ -252,7 +267,55 @@ export async function exchangeOAuthCode(
 							`[OAuth] Failed with client_id "${clientId || 'none'}":`,
 							lastError,
 						);
-						tokenResponse = null;
+						if (
+							/invalid_client|client\s*not\s*found|client id is required/i.test(
+								errorText,
+							)
+						) {
+							invalidClientSeen = true;
+						}
+						// If server explicitly says invalid_client, ensure we try without client_id
+						if (
+							/client\s*not\s*found|invalid_client/i.test(errorText) &&
+							clientId !== null
+						) {
+							// push a public-client attempt immediately after
+							const publicParams = new URLSearchParams(baseTokenParamsObj);
+							try {
+								const publicResp = await fetch(endpoint, {
+									method: 'POST',
+									headers: {
+										'Content-Type': 'application/x-www-form-urlencoded',
+									},
+									body: publicParams,
+								});
+
+								if (publicResp.ok) {
+									successfulEndpoint = endpoint;
+									successfulClientId = 'none';
+									console.log(
+										'[OAuth] Token exchange successful after omitting client_id',
+									);
+									tokenResponse = publicResp;
+									break;
+								} else {
+									lastError = `${publicResp.status} - ${await publicResp.text()}`;
+									if (
+										/invalid_client|client\s*not\s*found|client id is required/i.test(
+											lastError,
+										)
+									) {
+										invalidClientSeen = true;
+									}
+									tokenResponse = null;
+								}
+							} catch (e) {
+								lastError = e instanceof Error ? e.message : String(e);
+								tokenResponse = null;
+							}
+						} else {
+							tokenResponse = null;
+						}
 					}
 				} catch (error) {
 					lastError = error instanceof Error ? error.message : 'Unknown error';
@@ -270,13 +333,101 @@ export async function exchangeOAuthCode(
 		}
 
 		if (!tokenResponse || !tokenResponse.ok) {
-			console.error('[OAuth] All token endpoints failed');
-			console.error('[OAuth] Endpoints tried:', tokenExchangeEndpoints);
-			console.error('[OAuth] Authorization server derived:', authServerUrl);
-			console.error('[OAuth] Resource URL:', serverUrl);
-			throw new Error(
-				`Token exchange failed with all endpoints. Last error: ${lastError}`,
-			);
+			// Attempt Dynamic Client Registration if available and failure indicates invalid_client
+			if (
+				registrationEndpoint &&
+				(invalidClientSeen ||
+					/invalid_client|client\s*not\s*found/i.test(lastError))
+			) {
+				const newClientId =
+					await attemptDynamicClientRegistration(registrationEndpoint);
+				if (newClientId) {
+					// Retry with the newly registered client
+					for (const endpoint of tokenExchangeEndpoints) {
+						const retryParams = new URLSearchParams(baseTokenParamsObj);
+						retryParams.set('client_id', newClientId);
+						try {
+							const retryResp = await fetch(endpoint, {
+								method: 'POST',
+								headers: {
+									'Content-Type': 'application/x-www-form-urlencoded',
+								},
+								body: retryParams,
+							});
+							if (retryResp.ok) {
+								successfulEndpoint = endpoint;
+								successfulClientId = newClientId;
+								tokenResponse = retryResp;
+								console.log(
+									'[OAuth] Token exchange successful after dynamic client registration',
+								);
+								break;
+							} else {
+								lastError = `${retryResp.status} - ${await retryResp.text()}`;
+							}
+						} catch (e) {
+							lastError = e instanceof Error ? e.message : String(e);
+						}
+					}
+				}
+			}
+			// If still failing and no explicit registration endpoint was provided in metadata,
+			// attempt a conservative dynamic registration at common paths.
+			if (
+				(!registrationEndpoint || registrationEndpoint.length === 0) &&
+				(invalidClientSeen ||
+					/invalid_client|client\s*not\s*found/i.test(lastError))
+			) {
+				const origin = new URL(serverUrl).origin;
+				const guessed = [
+					`${origin}/oauth/register`,
+					`${origin}/register`,
+					`${origin}/oauth2/register`,
+					`${origin}/api/oauth/register`,
+				];
+				for (const regUrl of guessed) {
+					const newClientId = await attemptDynamicClientRegistration(regUrl);
+					if (newClientId) {
+						// Retry token exchange with newly registered client id
+						for (const endpoint of tokenExchangeEndpoints) {
+							const retryParams = new URLSearchParams(baseTokenParamsObj);
+							retryParams.set('client_id', newClientId);
+							try {
+								const retryResp = await fetch(endpoint, {
+									method: 'POST',
+									headers: {
+										'Content-Type': 'application/x-www-form-urlencoded',
+									},
+									body: retryParams,
+								});
+								if (retryResp.ok) {
+									successfulEndpoint = endpoint;
+									successfulClientId = newClientId;
+									tokenResponse = retryResp;
+									console.log(
+										'[OAuth] Token exchange successful after fallback dynamic registration',
+									);
+									break;
+								} else {
+									lastError = `${retryResp.status} - ${await retryResp.text()}`;
+								}
+							} catch (e) {
+								lastError = e instanceof Error ? e.message : String(e);
+							}
+						}
+						if (tokenResponse && tokenResponse.ok) break;
+					}
+				}
+			}
+			if (!tokenResponse || !tokenResponse.ok) {
+				console.error('[OAuth] All token endpoints failed');
+				console.error('[OAuth] Endpoints tried:', tokenExchangeEndpoints);
+				console.error('[OAuth] Authorization server derived:', authServerUrl);
+				console.error('[OAuth] Resource URL:', serverUrl);
+				throw new Error(
+					`Token exchange failed with all endpoints. Last error: ${lastError}`,
+				);
+			}
 		}
 
 		const tokenData = await tokenResponse.json();

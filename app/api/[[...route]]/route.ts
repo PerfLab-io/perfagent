@@ -399,6 +399,9 @@ chat.get(
 				`);
 			} catch (error) {
 				console.error('OAuth callback error:', error);
+				console.error(
+					'[OAuth] Hint: Some servers require public client (no client_id) for token exchange. The exchange logic now automatically retries without client_id when invalid_client is detected.',
+				);
 
 				// Track failed OAuth authorization with timing
 				const duration = performance.measure(
