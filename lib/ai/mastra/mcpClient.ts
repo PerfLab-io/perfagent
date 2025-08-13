@@ -9,12 +9,10 @@ import { storePKCEVerifier } from './pkceStore';
 import { toolCatalog } from './toolCatalog';
 import { mcpToolCache, type ToolCacheEntry } from './cache/MCPCache';
 
-// OAuth configuration constants
 export const OAUTH_CONFIG = {
 	redirectUris: [
 		'http://localhost:3000/api/mcp/oauth/callback',
 		'https://agent.perflab.io/api/mcp/oauth/callback',
-		// Add your production domain here
 	] as string[],
 	scopes: ['read', 'write'] as string[], // Default scopes to request
 	clientName: 'PerfAgent - AI Web Performance Analysis Tool',
@@ -1621,16 +1619,17 @@ export async function getMcpServerInfo(userId: string, serverId: string) {
 
 	// First check cache
 	const cached = await mcpToolCache.getServerTools(serverId);
+	const server = await db
+		.select()
+		.from(mcpServers)
+		.where(and(eq(mcpServers.id, serverId), eq(mcpServers.userId, userId)))
+		.limit(1);
+
 	if (cached) {
 		console.log(
 			`[MCP Server Info] Using cached capabilities for server ${serverId}`,
 		);
 		// Still need server record for response format
-		const server = await db
-			.select()
-			.from(mcpServers)
-			.where(and(eq(mcpServers.id, serverId), eq(mcpServers.userId, userId)))
-			.limit(1);
 
 		if (server.length === 0) {
 			return null;
@@ -1639,22 +1638,10 @@ export async function getMcpServerInfo(userId: string, serverId: string) {
 		return {
 			server: server[0],
 			toolsets: cached.capabilities?.tools || {},
-			resources: cached.capabilities?.resources
-				? { resources: cached.capabilities.resources }
-				: {},
-			prompts: cached.capabilities?.prompts
-				? { prompts: cached.capabilities.prompts }
-				: {},
+			resources: cached.capabilities?.resources || {},
+			prompts: cached.capabilities?.prompts || {},
 		};
 	}
-
-	// Cache miss - fetch from server using the proven working logic
-	// Fetch the specific server from the database
-	const server = await db
-		.select()
-		.from(mcpServers)
-		.where(and(eq(mcpServers.id, serverId), eq(mcpServers.userId, userId)))
-		.limit(1);
 
 	if (server.length === 0) {
 		return null;
@@ -1860,7 +1847,7 @@ export async function getMcpServerInfo(userId: string, serverId: string) {
 			console.log(
 				`[MCP Server Info] Allowing SSE connection establishment time for ${serverRecord.name}`,
 			);
-			await new Promise((resolve) => setTimeout(resolve, 500)); // 500ms delay for connection establishment
+			await new Promise((resolve) => setTimeout(resolve, 150)); // shorter delay for connection establishment
 		}
 
 		// Fetch all capabilities with error handling for date fields

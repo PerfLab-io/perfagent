@@ -5,6 +5,7 @@ import { db } from '@/drizzle/db';
 import { mcpServers } from '@/drizzle/schema';
 import { eq, and } from 'drizzle-orm';
 import { telemetryService } from '@/lib/ai/mastra/monitoring/TelemetryService';
+import { mcpToolCache } from '@/lib/ai/mastra/cache/MCPCache';
 import crypto from 'crypto';
 import { performance } from 'node:perf_hooks';
 
@@ -197,6 +198,21 @@ export async function toggleMcpServerAction(
 		// Track server toggle
 		const action = enabled ? 'activated' : 'deactivated';
 		telemetryService.trackServerToggle(action, 'manual');
+
+		// Invalidate cached capabilities only when disabling.
+		// When enabling, keep cache to allow instant display of stale data
+		// and let the client revalidate in the background.
+		if (!enabled) {
+			try {
+				await mcpToolCache.invalidateServer(serverId);
+			} catch (cacheError) {
+				console.warn(
+					'Failed to invalidate MCP cache for server:',
+					serverId,
+					cacheError,
+				);
+			}
+		}
 
 		// Note: No revalidatePath needed - using optimistic updates on frontend
 

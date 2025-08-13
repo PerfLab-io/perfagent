@@ -36,19 +36,6 @@ interface MCPServersState {
 	formError: string | null;
 	setFormError: (error: string | null) => void;
 
-	serverToDelete: MCPServer | null;
-	setServerToDelete: (server: MCPServer | null) => void;
-
-	// Server info state
-	serverInfo: Record<string, ServerInfo>;
-	setServerInfo: (serverId: string, info: ServerInfo) => void;
-
-	loadingServerInfo: Record<string, boolean>;
-	setLoadingServerInfo: (serverId: string, loading: boolean) => void;
-
-	serverInfoErrors: Record<string, boolean>;
-	setServerInfoErrors: (serverId: string, hasError: boolean) => void;
-
 	// Auth state
 	authUrls: Record<string, string>;
 	setAuthUrl: (serverId: string, url: string) => void;
@@ -69,7 +56,7 @@ interface MCPServersState {
 	toggleServerExpansion: (serverId: string) => void;
 }
 
-export const useMCPServersStore = create<MCPServersState>((set, get) => ({
+export const useMCPServersStore = create<MCPServersState>((set) => ({
 	servers: [],
 	setServers: (servers) => set({ servers }),
 	addServer: (server) =>
@@ -94,28 +81,6 @@ export const useMCPServersStore = create<MCPServersState>((set, get) => ({
 
 	formError: null,
 	setFormError: (formError) => set({ formError }),
-
-	serverToDelete: null,
-	setServerToDelete: (serverToDelete) => set({ serverToDelete }),
-
-	// Server info state
-	serverInfo: {},
-	setServerInfo: (serverId, info) =>
-		set((state) => ({
-			serverInfo: { ...state.serverInfo, [serverId]: info },
-		})),
-
-	loadingServerInfo: {},
-	setLoadingServerInfo: (serverId, loading) =>
-		set((state) => ({
-			loadingServerInfo: { ...state.loadingServerInfo, [serverId]: loading },
-		})),
-
-	serverInfoErrors: {},
-	setServerInfoErrors: (serverId, hasError) =>
-		set((state) => ({
-			serverInfoErrors: { ...state.serverInfoErrors, [serverId]: hasError },
-		})),
 
 	// Auth state
 	authUrls: {},
