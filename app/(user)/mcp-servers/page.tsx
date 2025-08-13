@@ -1,5 +1,6 @@
 'use client';
 
+import type React from 'react';
 import { useEffect, useOptimistic, useRef } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
@@ -32,7 +33,6 @@ import {
 	AlertCircle,
 	ChevronDown,
 	ChevronRight,
-	Wrench,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -65,7 +65,130 @@ import {
 import { useUIStore } from '@/lib/stores/ui-store';
 import { useShallow } from 'zustand/react/shallow';
 
-function SubmitButton() {
+export interface CapabilitiesCount {
+	toolCount: number;
+	resourceCount: number;
+	promptCount: number;
+}
+
+export function getCapabilitiesCountFromInfo(
+	info: ServerInfo | undefined | null,
+): CapabilitiesCount | null {
+	if (!info) return null;
+
+	const toolCount = Object.keys(info.toolsets || {}).reduce(
+		(sum, serverName) => {
+			const serverToolset = (info.toolsets as any)[serverName];
+			if (serverToolset && typeof serverToolset === 'object') {
+				return sum + Object.keys(serverToolset).length;
+			}
+			return sum;
+		},
+		0,
+	);
+
+	const resourceCount = Object.keys(info.resources || {}).reduce(
+		(sum, key) => sum + ((info.resources as any)[key]?.length || 0),
+		0,
+	);
+	const promptCount = Object.keys(info.prompts || {}).reduce(
+		(sum, key) => sum + ((info.prompts as any)[key]?.length || 0),
+		0,
+	);
+
+	return { toolCount, resourceCount, promptCount };
+}
+
+export function ToolDetails({ info }: { info: ServerInfo | undefined }) {
+	if (!info?.toolsets) return null;
+
+	const tools: Array<{ name: string; description?: string; server: string }> =
+		[];
+
+	Object.entries(info.toolsets).forEach(([serverName, serverToolset]) => {
+		if (serverToolset && typeof serverToolset === 'object') {
+			Object.entries(serverToolset as Record<string, any>).forEach(
+				([toolName, toolConfig]) => {
+					tools.push({
+						name: toolName,
+						description:
+							(toolConfig as any)?.description || 'No description available',
+						server: serverName,
+					});
+				},
+			);
+		}
+	});
+
+	if (tools.length === 0) return null;
+
+	return (
+		<div className="mt-4 space-y-2">
+			<div className="space-y-2">
+				{tools.map((tool, index) => (
+					<div
+						key={`${tool.server}-${tool.name}-${index}`}
+						className="bg-muted/50 rounded-md p-3"
+					>
+						<div className="flex flex-col gap-3">
+							<div className="flex items-center space-x-2">
+								<code className="bg-secondary rounded-md px-2 py-1 font-mono text-sm">
+									{tool.name}
+								</code>
+							</div>
+							<p className="text-muted-foreground mt-2 overflow-hidden text-sm text-pretty text-ellipsis">
+								{tool.description}
+							</p>
+						</div>
+					</div>
+				))}
+			</div>
+		</div>
+	);
+}
+
+export function AuthStatusBadge({
+	server,
+	requiredAuthServerIds,
+}: {
+	server: MCPServer;
+	requiredAuthServerIds: Set<string>;
+}) {
+	switch (server.authStatus) {
+		case 'authorized':
+			return requiredAuthServerIds.has(server.id) ? (
+				<Badge variant="outline" className="text-xs text-green-600">
+					Authorized
+				</Badge>
+			) : null;
+		case 'required':
+			return (
+				<Badge variant="outline" className="text-xs text-yellow-600">
+					Auth Required
+				</Badge>
+			);
+		case 'failed':
+			return (
+				<Badge variant="outline" className="text-xs text-red-600">
+					Failed
+				</Badge>
+			);
+		case 'offline':
+			return (
+				<Badge variant="outline" className="text-xs text-gray-600">
+					Offline
+				</Badge>
+			);
+		default:
+			return (
+				<Badge variant="outline" className="text-xs text-gray-600">
+					Checking...
+				</Badge>
+			);
+	}
+}
+
+export function SubmitButton() {
 	const { pending } = useFormStatus();
 	return (
 		<Button type="submit" disabled={pending}>
@@ -74,37 +197,285 @@ function SubmitButton() {
 	);
 }
 
+export function AddServerDialog({
+	open,
+	onOpenChange,
+	onCancel,
+	formRef,
+	formError,
+	formAction,
+}: {
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+	onCancel: () => void;
+	formRef: React.RefObject<HTMLFormElement | null>;
+	formError: string | null;
+	formAction: (formData: FormData) => Promise<void>;
+}) {
+	return (
+		<Dialog open={open} onOpenChange={onOpenChange}>
+			<DialogTrigger asChild>
+				<Button>
+					<Plus className="mr-2 h-4 w-4" />
+					Add Server
+				</Button>
+			</DialogTrigger>
+			<DialogContent>
+				<DialogHeader>
+					<DialogTitle>Add MCP Server</DialogTitle>
+					<DialogDescription>
+						Connect to a new Model Context Protocol server
+					</DialogDescription>
+				</DialogHeader>
+				{/* TODO: Future migration to TanStack Form for enhanced validation and type safety */}
+				<form ref={formRef} action={formAction} className="space-y-4">
+					{formError && (
+						<Alert variant="destructive">
+							<AlertCircle className="h-4 w-4" />
+							<AlertDescription>{formError}</AlertDescription>
+						</Alert>
+					)}
+					<div>
+						<Label htmlFor="name">Server Name</Label>
+						<Input id="name" name="name" required placeholder="My MCP Server" />
+					</div>
+					<div>
+						<Label htmlFor="url">Server URL</Label>
+						<Input
+							id="url"
+							name="url"
+							type="url"
+							required
+							placeholder="https://example.com/api/mcp"
+						/>
+					</div>
+					<p className="text-muted-foreground text-sm">
+						OAuth authentication will be automatically detected and configured
+						if required by the server.
+					</p>
+					<DialogFooter>
+						<Button type="button" variant="outline" onClick={onCancel}>
+							Cancel
+						</Button>
+						<SubmitButton />
+					</DialogFooter>
+				</form>
+			</DialogContent>
+		</Dialog>
+	);
+}
+
+export function ServerCard({
+	server,
+	onToggle,
+	onDelete,
+}: {
+	server: MCPServer;
+	onToggle: (server: MCPServer) => void;
+	onDelete: (server: MCPServer) => void;
+}) {
+	const isLoadingInfo = useMCPServersStore(
+		(s) => s.loadingServerInfo[server.id] ?? false,
+	);
+	const authUrl = useMCPServersStore((s) => s.authUrls[server.id]);
+	const requiredAuthServerIds = useMCPServersStore(
+		(s) => s.serversRequiringAuth,
+	);
+	const info = useMCPServersStore((s) => s.serverInfo[server.id]);
+	const hasInfoError = useMCPServersStore(
+		(s) => s.serverInfoErrors[server.id] ?? false,
+	);
+	const failureReason = useMCPServersStore(
+		(s) => s.serverFailureReasons[server.id],
+	);
+	const isExpanded = useMCPServersStore(
+		(s) => s.expandedServers[server.id] ?? false,
+	);
+	const toggleServerExpansion = useMCPServersStore(
+		(s) => s.toggleServerExpansion,
+	);
+
+	const counts = getCapabilitiesCountFromInfo(info);
+
+	return (
+		<Card key={server.id}>
+			<CardHeader>
+				<div className="flex items-center justify-between">
+					<div className="flex items-center space-x-4">
+						<div className="relative">
+							<Server className="h-5 w-5" />
+						</div>
+						<div>
+							<div className="flex items-center space-x-2">
+								<CardTitle className="text-xl">{server.name}</CardTitle>
+								<AuthStatusBadge
+									server={server}
+									requiredAuthServerIds={requiredAuthServerIds}
+								/>
+							</div>
+							<CardDescription>{server.url}</CardDescription>
+						</div>
+					</div>
+					<div className="flex items-center space-x-2">
+						<Switch
+							checked={server.enabled}
+							onCheckedChange={() => onToggle(server)}
+						/>
+						<Button
+							variant="ghost"
+							size="icon"
+							onClick={() => onDelete(server)}
+						>
+							<Trash2 className="h-4 w-4" />
+						</Button>
+					</div>
+				</div>
+			</CardHeader>
+			{(server.enabled || server.authStatus === 'failed') && (
+				<CardContent>
+					{server.authStatus === 'required' && authUrl && (
+						<div className="mb-4 rounded-md border border-yellow-200 bg-yellow-50 p-3">
+							<p className="mb-2 text-sm text-yellow-800">
+								Authentication required.
+							</p>
+							{authUrl === 'manual_setup' ? (
+								<div>
+									<p className="mb-2 text-xs text-yellow-700">
+										OAuth authentication required but could not auto-discover
+										authorization server. Please check server documentation for
+										OAuth setup instructions.
+									</p>
+									<Button
+										variant="outline"
+										size="sm"
+										disabled
+										className="border-yellow-300 text-yellow-600"
+									>
+										<AlertCircle className="mr-2 h-4 w-4" />
+										Manual Setup Required
+									</Button>
+								</div>
+							) : (
+								<div>
+									<p className="mb-2 text-sm text-yellow-800">
+										Click here to continue:
+									</p>
+									<Button
+										variant="outline"
+										size="sm"
+										onClick={() => window.open(authUrl, '_blank')}
+										className="border-yellow-300 text-yellow-700 hover:bg-yellow-100"
+									>
+										<ExternalLink className="mr-2 h-4 w-4" />
+										Authorize Access
+									</Button>
+								</div>
+							)}
+						</div>
+					)}
+
+					{server.authStatus === 'failed' && failureReason && (
+						<div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3">
+							<p className="mb-2 text-sm text-red-800">
+								Server connection failed.
+							</p>
+							<p className="text-xs text-red-700">{failureReason}</p>
+						</div>
+					)}
+
+					{isLoadingInfo ? (
+						<div className="text-muted-foreground flex items-center space-x-2 text-sm">
+							<Loader2 className="h-4 w-4 animate-spin" />
+							<span>Loading capabilities...</span>
+						</div>
+					) : counts ? (
+						<div className="space-y-3">
+							<div className="flex space-x-4">
+								<Badge variant="secondary">
+									{counts.toolCount} {counts.toolCount === 1 ? 'Tool' : 'Tools'}
+								</Badge>
+								<Badge variant="secondary">
+									{counts.resourceCount}{' '}
+									{counts.resourceCount === 1 ? 'Resource' : 'Resources'}
+								</Badge>
+								<Badge variant="secondary">
+									{counts.promptCount}{' '}
+									{counts.promptCount === 1 ? 'Prompt' : 'Prompts'}
+								</Badge>
+							</div>
+
+							{counts.toolCount > 0 && (
+								<Collapsible
+									open={isExpanded}
+									onOpenChange={() => toggleServerExpansion(server.id)}
+								>
+									<CollapsibleTrigger asChild>
+										<Button variant="ghost" size="sm">
+											{isExpanded ? (
+												<ChevronDown className="h-4 w-4" />
+											) : (
+												<ChevronRight className="h-4 w-4" />
+											)}
+											<span>View Tool Details</span>
+										</Button>
+									</CollapsibleTrigger>
+									<CollapsibleContent>
+										<ToolDetails info={info} />
+									</CollapsibleContent>
+								</Collapsible>
+							)}
+						</div>
+					) : hasInfoError ? (
+						<p className="text-muted-foreground text-sm">
+							Unable to fetch server capabilities
+						</p>
+					) : null}
+				</CardContent>
+			)}
+		</Card>
+	);
+}
+
 export default function MCPServersPage() {
-	const {
-		servers,
-		setServers,
-		updateServer,
-		removeServer,
-		loading,
-		setLoading,
-		isAddDialogOpen,
-		setIsAddDialogOpen,
-		formError,
-		setFormError,
-		serverToDelete,
-		setServerToDelete,
-		serverInfo,
-		setServerInfo,
-		loadingServerInfo,
-		setLoadingServerInfo,
-		serverInfoErrors,
-		setServerInfoErrors,
-		authUrls,
-		setAuthUrl,
-		removeAuthUrl,
-		serversRequiringAuth,
-		addServerRequiringAuth,
-		setServersRequiringAuth,
-		serverFailureReasons,
-		setServerFailureReason,
-		expandedServers,
-		toggleServerExpansion,
-	} = useMCPServersStore();
+	const servers = useMCPServersStore((s) => s.servers);
+	const setServers = useMCPServersStore((s) => s.setServers);
+	const updateServer = useMCPServersStore((s) => s.updateServer);
+	const removeServer = useMCPServersStore((s) => s.removeServer);
+	const loading = useMCPServersStore((s) => s.loading);
+	const setLoading = useMCPServersStore((s) => s.setLoading);
+	const isAddDialogOpen = useMCPServersStore((s) => s.isAddDialogOpen);
+	const setIsAddDialogOpen = useMCPServersStore((s) => s.setIsAddDialogOpen);
+	const formError = useMCPServersStore((s) => s.formError);
+	const setFormError = useMCPServersStore((s) => s.setFormError);
+	const serverToDelete = useMCPServersStore((s) => s.serverToDelete);
+	const setServerToDelete = useMCPServersStore((s) => s.setServerToDelete);
+	const setServerInfo = useMCPServersStore((s) => s.setServerInfo);
+	const setLoadingServerInfo = useMCPServersStore(
+		(s) => s.setLoadingServerInfo,
+	);
+	const setServerInfoErrors = useMCPServersStore((s) => s.setServerInfoErrors);
+	const authUrls = useMCPServersStore((s) => s.authUrls);
+	const setAuthUrl = useMCPServersStore((s) => s.setAuthUrl);
+	const removeAuthUrl = useMCPServersStore((s) => s.removeAuthUrl);
+	const serversRequiringAuth = useMCPServersStore(
+		(s) => s.serversRequiringAuth,
+	);
+	const addServerRequiringAuth = useMCPServersStore(
+		(s) => s.addServerRequiringAuth,
+	);
+	const setServersRequiringAuth = useMCPServersStore(
+		(s) => s.setServersRequiringAuth,
+	);
+	const serverFailureReasons = useMCPServersStore(
+		(s) => s.serverFailureReasons,
+	);
+	const setServerFailureReason = useMCPServersStore(
+		(s) => s.setServerFailureReason,
+	);
+	const expandedServers = useMCPServersStore((s) => s.expandedServers);
+	const toggleServerExpansion = useMCPServersStore(
+		(s) => s.toggleServerExpansion,
+	);
 	const { setIsEditable, setPageTitle } = useUIStore(
 		useShallow((state) => ({
 			setIsEditable: state.setIsEditable,
@@ -447,84 +818,7 @@ export default function MCPServersPage() {
 		}
 	};
 
-	const getCapabilitiesCount = (serverId: string) => {
-		const info = serverInfo[serverId];
-		if (!info) return null;
-
-		// Fix toolsets counting - toolsets are objects where each key is a tool name
-		const toolCount = Object.keys(info.toolsets || {}).reduce(
-			(sum, serverName) => {
-				const serverToolset = info.toolsets[serverName];
-				if (serverToolset && typeof serverToolset === 'object') {
-					// Count the number of tool keys in this server's toolset
-					return sum + Object.keys(serverToolset).length;
-				}
-				return sum;
-			},
-			0,
-		);
-
-		const resourceCount = Object.keys(info.resources || {}).reduce(
-			(sum, key) => sum + (info.resources[key]?.length || 0),
-			0,
-		);
-		const promptCount = Object.keys(info.prompts || {}).reduce(
-			(sum, key) => sum + (info.prompts[key]?.length || 0),
-			0,
-		);
-
-		return { toolCount, resourceCount, promptCount };
-	};
-
-	const renderToolDetails = (serverId: string) => {
-		const info = serverInfo[serverId];
-		if (!info?.toolsets) return null;
-
-		const tools: Array<{ name: string; description?: string; server: string }> =
-			[];
-
-		// Extract all tools from all servers in toolsets
-		Object.entries(info.toolsets).forEach(([serverName, serverToolset]) => {
-			if (serverToolset && typeof serverToolset === 'object') {
-				Object.entries(serverToolset).forEach(
-					([toolName, toolConfig]: [string, any]) => {
-						tools.push({
-							name: toolName,
-							description:
-								toolConfig?.description || 'No description available',
-							server: serverName,
-						});
-					},
-				);
-			}
-		});
-
-		if (tools.length === 0) return null;
-
-		return (
-			<div className="mt-4 space-y-2">
-				<div className="space-y-2">
-					{tools.map((tool, index) => (
-						<div
-							key={`${tool.server}-${tool.name}-${index}`}
-							className="bg-muted/50 rounded-md p-3"
-						>
-							<div className="flex flex-col gap-3">
-								<div className="flex items-center space-x-2">
-									<code className="bg-secondary rounded-md px-2 py-1 font-mono text-sm">
-										{tool.name}
-									</code>
-								</div>
-								<p className="text-muted-foreground mt-2 overflow-hidden text-sm text-pretty text-ellipsis">
-									{tool.description}
-								</p>
-							</div>
-						</div>
-					))}
-				</div>
-			</div>
-		);
-	};
+	// NOTE: legacy helpers replaced by extracted components/utilities above
 
 	if (loading) {
 		return (
@@ -572,308 +866,71 @@ export default function MCPServersPage() {
 
 	return (
 		<div className="mx-auto w-3xl space-y-6 px-4 sm:px-6">
+			{/* Heeading and add server dialog */}
 			<div className="flex items-center justify-between">
 				<div>
 					<h1 className="text-3xl font-bold">MCP Servers</h1>
 					<p className="text-muted-foreground">Manage your MCP servers</p>
 				</div>
-				<Dialog
+				<AddServerDialog
 					open={isAddDialogOpen}
 					onOpenChange={(open) => {
 						setIsAddDialogOpen(open);
-						if (open) {
-							setFormError(null); // Clear errors when opening dialog
-						}
+						if (open) setFormError(null);
 					}}
+					onCancel={() => setIsAddDialogOpen(false)}
+					formRef={formRef}
+					formError={formError}
+					formAction={formAction}
+				/>
+			</div>
+
+			{/* MCP server cards */}
+			<div>
+				<div className="space-y-4">
+					{optimisticServers.length === 0 ? (
+						<Card>
+							<CardContent className="flex flex-col items-center justify-center py-12">
+								<Server className="text-muted-foreground mb-4 h-12 w-12" />
+								<p className="text-lg font-medium">No servers configured</p>
+								<p className="text-muted-foreground text-sm">
+									Add your first MCP server to get started
+								</p>
+							</CardContent>
+						</Card>
+					) : (
+						optimisticServers.map((server) => (
+							<ServerCard
+								key={server.id}
+								server={server}
+								onToggle={handleToggleServer}
+								onDelete={(s) => setServerToDelete(s)}
+							/>
+						))
+					)}
+				</div>
+
+				<AlertDialog
+					open={!!serverToDelete}
+					onOpenChange={() => setServerToDelete(null)}
 				>
-					<DialogTrigger asChild>
-						<Button>
-							<Plus className="mr-2 h-4 w-4" />
-							Add Server
-						</Button>
-					</DialogTrigger>
-					<DialogContent>
-						<DialogHeader>
-							<DialogTitle>Add MCP Server</DialogTitle>
-							<DialogDescription>
-								Connect to a new Model Context Protocol server
-							</DialogDescription>
-						</DialogHeader>
-						{/* TODO: Future migration to TanStack Form for enhanced validation and type safety
-						     Current native form approach provides good foundation for migration:
-						     - FormData already structured for server actions
-						     - Loading states implemented
-						     - Error handling patterns established
-						     Migration benefits: field-level validation, better TypeScript integration */}
-						<form ref={formRef} action={formAction} className="space-y-4">
-							{formError && (
-								<Alert variant="destructive">
-									<AlertCircle className="h-4 w-4" />
-									<AlertDescription>{formError}</AlertDescription>
-								</Alert>
-							)}
-							<div>
-								<Label htmlFor="name">Server Name</Label>
-								<Input
-									id="name"
-									name="name"
-									required
-									placeholder="My MCP Server"
-								/>
-							</div>
-							<div>
-								<Label htmlFor="url">Server URL</Label>
-								<Input
-									id="url"
-									name="url"
-									type="url"
-									required
-									placeholder="https://example.com/api/mcp"
-								/>
-							</div>
-							<p className="text-muted-foreground text-sm">
-								OAuth authentication will be automatically detected and
-								configured if required by the server.
-							</p>
-							<DialogFooter>
-								<Button
-									type="button"
-									variant="outline"
-									onClick={() => setIsAddDialogOpen(false)}
-								>
-									Cancel
-								</Button>
-								<SubmitButton />
-							</DialogFooter>
-						</form>
-					</DialogContent>
-				</Dialog>
+					<AlertDialogContent>
+						<AlertDialogHeader>
+							<AlertDialogTitle>Delete Server</AlertDialogTitle>
+							<AlertDialogDescription>
+								Are you sure you want to delete "{serverToDelete?.name}"? This
+								action cannot be undone.
+							</AlertDialogDescription>
+						</AlertDialogHeader>
+						<AlertDialogFooter>
+							<AlertDialogCancel>Cancel</AlertDialogCancel>
+							<AlertDialogAction onClick={handleDeleteServer}>
+								Delete
+							</AlertDialogAction>
+						</AlertDialogFooter>
+					</AlertDialogContent>
+				</AlertDialog>
 			</div>
-
-			<div className="space-y-4">
-				{optimisticServers.length === 0 ? (
-					<Card>
-						<CardContent className="flex flex-col items-center justify-center py-12">
-							<Server className="text-muted-foreground mb-4 h-12 w-12" />
-							<p className="text-lg font-medium">No servers configured</p>
-							<p className="text-muted-foreground text-sm">
-								Add your first MCP server to get started
-							</p>
-						</CardContent>
-					</Card>
-				) : (
-					optimisticServers.map((server) => {
-						const counts = getCapabilitiesCount(server.id);
-						const isLoadingInfo = loadingServerInfo[server.id];
-						const authUrl = authUrls[server.id];
-
-						const getAuthStatusBadge = () => {
-							switch (server.authStatus) {
-								case 'authorized':
-									// Only show badge if this server actually required auth
-									return serversRequiringAuth.has(server.id) ? (
-										<Badge variant="outline" className="text-xs text-green-600">
-											Authorized
-										</Badge>
-									) : null;
-								case 'required':
-									return (
-										<Badge
-											variant="outline"
-											className="text-xs text-yellow-600"
-										>
-											Auth Required
-										</Badge>
-									);
-								case 'failed':
-									return (
-										<Badge variant="outline" className="text-xs text-red-600">
-											Failed
-										</Badge>
-									);
-								case 'offline':
-									return (
-										<Badge variant="outline" className="text-xs text-gray-600">
-											Offline
-										</Badge>
-									);
-								default:
-									return (
-										<Badge variant="outline" className="text-xs text-gray-600">
-											Checking...
-										</Badge>
-									);
-							}
-						};
-
-						return (
-							<Card key={server.id}>
-								<CardHeader>
-									<div className="flex items-center justify-between">
-										<div className="flex items-center space-x-4">
-											<div className="relative">
-												<Server className="h-5 w-5" />
-											</div>
-											<div>
-												<div className="flex items-center space-x-2">
-													<CardTitle className="text-xl">
-														{server.name}
-													</CardTitle>
-													{getAuthStatusBadge()}
-												</div>
-												<CardDescription>{server.url}</CardDescription>
-											</div>
-										</div>
-										<div className="flex items-center space-x-2">
-											<Switch
-												checked={server.enabled}
-												onCheckedChange={() => handleToggleServer(server)}
-											/>
-											<Button
-												variant="ghost"
-												size="icon"
-												onClick={() => setServerToDelete(server)}
-											>
-												<Trash2 className="h-4 w-4" />
-											</Button>
-										</div>
-									</div>
-								</CardHeader>
-								{(server.enabled || server.authStatus === 'failed') && (
-									<CardContent>
-										{server.authStatus === 'required' && authUrl && (
-											<div className="mb-4 rounded-md border border-yellow-200 bg-yellow-50 p-3">
-												<p className="mb-2 text-sm text-yellow-800">
-													Authentication required.
-												</p>
-												{authUrl === 'manual_setup' ? (
-													<div>
-														<p className="mb-2 text-xs text-yellow-700">
-															OAuth authentication required but could not
-															auto-discover authorization server. Please check
-															server documentation for OAuth setup instructions.
-														</p>
-														<Button
-															variant="outline"
-															size="sm"
-															disabled
-															className="border-yellow-300 text-yellow-600"
-														>
-															<AlertCircle className="mr-2 h-4 w-4" />
-															Manual Setup Required
-														</Button>
-													</div>
-												) : (
-													<div>
-														<p className="mb-2 text-sm text-yellow-800">
-															Click here to continue:
-														</p>
-														<Button
-															variant="outline"
-															size="sm"
-															onClick={() => window.open(authUrl, '_blank')}
-															className="border-yellow-300 text-yellow-700 hover:bg-yellow-100"
-														>
-															<ExternalLink className="mr-2 h-4 w-4" />
-															Authorize Access
-														</Button>
-													</div>
-												)}
-											</div>
-										)}
-
-										{server.authStatus === 'failed' &&
-											serverFailureReasons[server.id] && (
-												<div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3">
-													<p className="mb-2 text-sm text-red-800">
-														Server connection failed.
-													</p>
-													<p className="text-xs text-red-700">
-														{serverFailureReasons[server.id]}
-													</p>
-												</div>
-											)}
-
-										{isLoadingInfo ? (
-											<div className="text-muted-foreground flex items-center space-x-2 text-sm">
-												<Loader2 className="h-4 w-4 animate-spin" />
-												<span>Loading capabilities...</span>
-											</div>
-										) : counts ? (
-											<div className="space-y-3">
-												<div className="flex space-x-4">
-													<Badge variant="secondary">
-														{counts.toolCount}{' '}
-														{counts.toolCount === 1 ? 'Tool' : 'Tools'}
-													</Badge>
-													<Badge variant="secondary">
-														{counts.resourceCount}{' '}
-														{counts.resourceCount === 1
-															? 'Resource'
-															: 'Resources'}
-													</Badge>
-													<Badge variant="secondary">
-														{counts.promptCount}{' '}
-														{counts.promptCount === 1 ? 'Prompt' : 'Prompts'}
-													</Badge>
-												</div>
-
-												{counts.toolCount > 0 && (
-													<Collapsible
-														open={expandedServers[server.id]}
-														onOpenChange={() =>
-															toggleServerExpansion(server.id)
-														}
-													>
-														<CollapsibleTrigger asChild>
-															<Button variant="ghost" size="sm">
-																{expandedServers[server.id] ? (
-																	<ChevronDown className="h-4 w-4" />
-																) : (
-																	<ChevronRight className="h-4 w-4" />
-																)}
-																<span>View Tool Details</span>
-															</Button>
-														</CollapsibleTrigger>
-														<CollapsibleContent>
-															{renderToolDetails(server.id)}
-														</CollapsibleContent>
-													</Collapsible>
-												)}
-											</div>
-										) : serverInfoErrors[server.id] ? (
-											<p className="text-muted-foreground text-sm">
-												Unable to fetch server capabilities
-											</p>
-										) : null}
-									</CardContent>
-								)}
-							</Card>
-						);
-					})
-				)}
-			</div>
-
-			<AlertDialog
-				open={!!serverToDelete}
-				onOpenChange={() => setServerToDelete(null)}
-			>
-				<AlertDialogContent>
-					<AlertDialogHeader>
-						<AlertDialogTitle>Delete Server</AlertDialogTitle>
-						<AlertDialogDescription>
-							Are you sure you want to delete "{serverToDelete?.name}"? This
-							action cannot be undone.
-						</AlertDialogDescription>
-					</AlertDialogHeader>
-					<AlertDialogFooter>
-						<AlertDialogCancel>Cancel</AlertDialogCancel>
-						<AlertDialogAction onClick={handleDeleteServer}>
-							Delete
-						</AlertDialogAction>
-					</AlertDialogFooter>
-				</AlertDialogContent>
-			</AlertDialog>
 		</div>
 	);
 }
