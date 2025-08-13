@@ -686,55 +686,21 @@ export async function createUserMcpClient(userId: string) {
 				`[OAuth] Found stored access token for server: ${server.name}`,
 			);
 
-			// Check if token is expired and refresh if needed
-			let currentAccessToken = server.accessToken;
-			if (server.tokenExpiresAt) {
-				const expiresAt = new Date(server.tokenExpiresAt);
-				const now = new Date();
-				const isExpired = now >= expiresAt;
-
-				if (isExpired && server.refreshToken) {
-					console.log(
-						`[OAuth] Token expired for ${server.name}, attempting refresh...`,
-					);
-					try {
-						const refreshedTokens = await refreshOAuthToken(
-							server.url,
-							server.refreshToken,
-							server.id,
-							userId,
-							server.clientId || undefined,
-						);
-						if (refreshedTokens) {
-							console.log(
-								`[OAuth] Successfully refreshed token for ${server.name}`,
-							);
-							currentAccessToken = refreshedTokens.accessToken;
-						} else {
-							console.warn(
-								`[OAuth] Failed to refresh token for ${server.name}, using expired token`,
-							);
-						}
-					} catch (error) {
-						console.error(
-							`[OAuth] Error refreshing token for ${server.name}:`,
-							error,
-						);
-					}
-				}
-			}
+			// Ensure token is fresh (refresh if actually expired); do not validate here
+			const ensured = await ensureFreshToken(server, server.id, userId, {
+				preemptiveWindowMs: 0,
+				validate: false,
+			});
+			const tokenToUse =
+				ensured?.updatedServerRecord?.accessToken || server.accessToken;
 
 			const authHeaders = {
-				Authorization: `Bearer ${currentAccessToken}`,
+				Authorization: `Bearer ${tokenToUse}`,
 			};
 
 			// Set authorization for both HTTP and SSE transports
-			config.requestInit = {
-				headers: authHeaders,
-			};
-			config.eventSourceInit = {
-				headers: authHeaders,
-			};
+			config.requestInit = { headers: authHeaders };
+			config.eventSourceInit = { headers: authHeaders };
 		} else if (server.authStatus === 'authorized' && !server.accessToken) {
 			console.warn(
 				`[OAuth] Server ${server.name} marked as authorized but no access token found!`,
@@ -1466,31 +1432,26 @@ export async function testMcpServerConnection(
 							tokenExpiresAt: refreshedTokens.expiresAt?.toISOString() || null,
 						};
 
-						// Validate the new token
-						const isNewTokenValid = await validateAccessToken(
-							updatedServerRecord.url,
-							updatedServerRecord.accessToken!,
+						// Validate the new token (ensure freshness helper)
+						const ensured = await ensureFreshToken(
+							updatedServerRecord,
+							serverId,
+							userId,
+							{ validate: true },
 						);
-
-						if (isNewTokenValid) {
-							return { status: 'authorized' };
-						} else {
-							console.log(
-								`[OAuth Test] Refreshed token is also invalid for ${serverRecord.name}`,
-							);
-							// Mark for re-authorization
-							await db
-								.update(mcpServers)
-								.set({
-									authStatus: 'required',
-									accessToken: null,
-									refreshToken: null,
-									tokenExpiresAt: null,
-									clientId: null,
-									updatedAt: new Date().toISOString(),
-								})
-								.where(eq(mcpServers.id, serverId));
-						}
+						if (ensured) return { status: 'authorized' };
+						// Mark for re-authorization
+						await db
+							.update(mcpServers)
+							.set({
+								authStatus: 'required',
+								accessToken: null,
+								refreshToken: null,
+								tokenExpiresAt: null,
+								clientId: null,
+								updatedAt: new Date().toISOString(),
+							})
+							.where(eq(mcpServers.id, serverId));
 					} else {
 						console.log(
 							`[OAuth Test] Token refresh failed for ${serverRecord.name}`,
