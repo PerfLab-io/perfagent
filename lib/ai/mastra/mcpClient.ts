@@ -18,6 +18,89 @@ export const OAUTH_CONFIG = {
 	clientName: 'PerfAgent - AI Web Performance Analysis Tool',
 };
 
+// ---- Internal constants and helpers (Phase 1 refactor) ---------------------------------
+
+const REQUEST_TIMEOUT_MS = 10_000;
+const OAUTH_REQUEST_TIMEOUT_MS = 15_000;
+const SSE_ESTABLISH_DELAY_MS = 150; // keep existing behavior
+const TOKEN_EXPIRY_SKEW_MS = 5 * 60 * 1000; // 5 minutes
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+	const controller = new AbortController();
+	const timeout = setTimeout(() => controller.abort(), timeoutMs);
+	return Promise.race([
+		promise,
+		new Promise<never>((_, reject) =>
+			reject(new Error(`Request timed out after ${timeoutMs}ms`)),
+		),
+	]).finally(() => clearTimeout(timeout)) as Promise<T>;
+}
+
+async function fetchJson(
+	url: string,
+	init?: RequestInit,
+	timeoutMs = REQUEST_TIMEOUT_MS,
+) {
+	const response = await withTimeout(
+		fetch(url, { ...init, signal: undefined }),
+		timeoutMs,
+	);
+	if (!response.ok) return null;
+	try {
+		return await response.json();
+	} catch {
+		return null;
+	}
+}
+
+async function fetchForm(
+	url: string,
+	body: URLSearchParams,
+	timeoutMs = OAUTH_REQUEST_TIMEOUT_MS,
+) {
+	return await withTimeout(
+		fetch(url, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+			body,
+		}),
+		timeoutMs,
+	);
+}
+
+async function readTextSafely(response: Response): Promise<string> {
+	try {
+		return await response.text();
+	} catch {
+		try {
+			const clone = response.clone();
+			return await clone.text();
+		} catch {
+			return `HTTP ${response.status}`;
+		}
+	}
+}
+
+// Discovery memoization (simple TTL cache)
+const DISCOVERY_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const protectedResourceCache = new Map<string, { data: any; ts: number }>();
+const authServerMetadataCache = new Map<string, { data: any; ts: number }>();
+
+function getCached(cache: Map<string, { data: any; ts: number }>, key: string) {
+	const entry = cache.get(key);
+	if (entry && Date.now() - entry.ts < DISCOVERY_CACHE_TTL_MS)
+		return entry.data;
+	return null;
+}
+
+function setCached(
+	cache: Map<string, { data: any; ts: number }>,
+	key: string,
+	data: any,
+) {
+	cache.set(key, { data, ts: Date.now() });
+}
+
 /**
  * Generate discovery URLs for .well-known endpoints following RFC patterns
  */
@@ -26,11 +109,11 @@ function generateDiscoveryUrls(
 	endpoint: string,
 ): string[] {
 	const u = new URL(resourceUrl);
+	const origin = u.origin.replace(/\/$/, '');
+	const href = u.href.replace(/\/$/, '');
 	return [
-		// RFC compliant: protocol//hostname/.well-known/endpoint
-		`${u.protocol}//${u.hostname}/.well-known/${endpoint}`,
-		// Fallback: full URL path with .well-known/endpoint
-		`${u.href}/.well-known/${endpoint}`,
+		`${origin}/.well-known/${endpoint}`,
+		`${href}/.well-known/${endpoint}`,
 	];
 }
 
@@ -57,6 +140,8 @@ async function discoverProtectedResourceMetadata(resourceUrl: string): Promise<{
 				'[OAuth] Fetching protected resource metadata from:',
 				endpoint,
 			);
+			const cached = getCached(protectedResourceCache, endpoint);
+			if (cached) return cached;
 			const response = await fetch(endpoint);
 
 			if (response.ok) {
@@ -66,11 +151,13 @@ async function discoverProtectedResourceMetadata(resourceUrl: string): Promise<{
 					JSON.stringify(metadata, null, 2),
 				);
 
-				return {
+				const result = {
 					authorization_servers: metadata.authorization_servers || [],
 					resource: metadata.resource || resourceUrl,
 					scopes_supported: metadata.scopes_supported || [],
 				};
+				setCached(protectedResourceCache, endpoint, result);
+				return result;
 			} else {
 				console.log(
 					'[OAuth] Failed to fetch protected resource metadata:',
@@ -105,10 +192,8 @@ async function discoverAuthorizationServerMetadata(
 	);
 
 	const u = new URL(authServerIssuer);
-	const metadataUrls = [
-		// RFC 8414 standard location
-		`${u.protocol}//${u.hostname}/.well-known/oauth-authorization-server`,
-	];
+	const origin = u.origin.replace(/\/$/, '');
+	const metadataUrls = [`${origin}/.well-known/oauth-authorization-server`];
 
 	// Add alternative location using the resource URL path if available
 	if (resourceUrl) {
@@ -127,6 +212,8 @@ async function discoverAuthorizationServerMetadata(
 				'[OAuth] Fetching authorization server metadata from:',
 				metadataUrl,
 			);
+			const cached = getCached(authServerMetadataCache, metadataUrl);
+			if (cached) return cached;
 			const response = await fetch(metadataUrl);
 
 			if (response.ok) {
@@ -144,6 +231,7 @@ async function discoverAuthorizationServerMetadata(
 					// Continue anyway for compatibility, but log the warning
 				}
 
+				setCached(authServerMetadataCache, metadataUrl, metadata);
 				return metadata;
 			} else {
 				console.log(
@@ -472,12 +560,12 @@ function parseWWWAuthenticateHeader(header: string): {
 	// Remove "Bearer " prefix
 	const params = header.replace(/^Bearer\s+/, '');
 
-	// Parse key=value pairs
-	const regex = /(\w+)="([^"]+)"/g;
-	let match;
-
+	// More robust regex: supports hyphens, single/double quotes, or bare tokens
+	const regex = /([A-Za-z0-9_-]+)=("([^"]*)"|'([^']*)'|([^,\s]+))/g;
+	let match: RegExpExecArray | null;
 	while ((match = regex.exec(params)) !== null) {
-		const [, key, value] = match;
+		const key = match[1];
+		const value = match[3] ?? match[4] ?? match[5] ?? '';
 		switch (key) {
 			case 'realm':
 				result.realm = value;
@@ -1247,6 +1335,78 @@ async function validateAccessToken(
 }
 
 /**
+ * Ensures an access token is usable by checking expiry window and/or validating via initialize.
+ * Optionally performs a refresh when needed.
+ * Returns updated headers and serverRecord if a valid token is available; otherwise null.
+ */
+async function ensureFreshToken(
+	serverRecord: any,
+	serverId: string,
+	userId: string,
+	options: { preemptiveWindowMs?: number; validate?: boolean } = {},
+): Promise<{
+	updatedServerRecord: any;
+	headers: { Authorization: string };
+} | null> {
+	if (!serverRecord?.accessToken) return null;
+
+	let shouldRefresh = false;
+
+	// Expiry check
+	if (serverRecord.tokenExpiresAt) {
+		const expiresAt = new Date(serverRecord.tokenExpiresAt);
+		const now = new Date();
+		const preemptiveWindow = options.preemptiveWindowMs ?? 0;
+		if (now >= expiresAt) {
+			shouldRefresh = true;
+		} else if (preemptiveWindow > 0) {
+			shouldRefresh = expiresAt.getTime() - now.getTime() < preemptiveWindow;
+		}
+	}
+
+	// Optional validation
+	if (!shouldRefresh && options.validate) {
+		const isValid = await validateAccessToken(
+			serverRecord.url,
+			serverRecord.accessToken,
+		);
+		shouldRefresh = !isValid;
+	}
+
+	let currentAccessToken = serverRecord.accessToken as string;
+
+	if (shouldRefresh && serverRecord.refreshToken) {
+		try {
+			const refreshed = await refreshOAuthToken(
+				serverRecord.url,
+				serverRecord.refreshToken,
+				serverId,
+				userId,
+				serverRecord.clientId || undefined,
+			);
+			if (refreshed?.accessToken) {
+				serverRecord = {
+					...serverRecord,
+					accessToken: refreshed.accessToken,
+					refreshToken: refreshed.refreshToken || serverRecord.refreshToken,
+					tokenExpiresAt: refreshed.expiresAt?.toISOString() || null,
+				};
+				currentAccessToken = refreshed.accessToken;
+			}
+		} catch {
+			// Swallow and let caller decide marking re-auth
+		}
+	}
+
+	if (!currentAccessToken) return null;
+
+	return {
+		updatedServerRecord: serverRecord,
+		headers: { Authorization: `Bearer ${currentAccessToken}` },
+	};
+}
+
+/**
  * Tests connection to an MCP server and detects OAuth requirements
  * Now uses the new Connection Manager for better error handling
  */
@@ -1649,60 +1809,13 @@ export async function getMcpServerInfo(userId: string, serverId: string) {
 
 	let serverRecord = server[0];
 
-	// Pre-flight token refresh check for SSE connections
-	// SSE connections are more sensitive to expired tokens, so we need to ensure tokens are fresh before creating the client
-	if (
-		serverRecord.authStatus === 'authorized' &&
-		serverRecord.accessToken &&
-		serverRecord.tokenExpiresAt
-	) {
-		const expiresAt = new Date(serverRecord.tokenExpiresAt);
-		const now = new Date();
-		// Refresh tokens if they expire within the next 5 minutes (buffer for SSE connection time)
-		const shouldRefresh = expiresAt.getTime() - now.getTime() < 5 * 60 * 1000;
-
-		if (shouldRefresh && serverRecord.refreshToken) {
-			const secondsUntilExpiry = Math.round(
-				(expiresAt.getTime() - now.getTime()) / 1000,
-			);
-			const expiredText =
-				secondsUntilExpiry <= 0
-					? 'already expired'
-					: `expires in ${secondsUntilExpiry}s`;
-			console.log(
-				`[OAuth SSE] Pre-emptively refreshing token for ${serverRecord.name} (${expiredText})`,
-			);
-			try {
-				const refreshedTokens = await refreshOAuthToken(
-					serverRecord.url,
-					serverRecord.refreshToken,
-					serverId,
-					userId,
-					serverRecord.clientId || undefined,
-				);
-				if (refreshedTokens) {
-					console.log(
-						`[OAuth SSE] Successfully pre-refreshed token for ${serverRecord.name}`,
-					);
-					// Update the serverRecord with new tokens
-					serverRecord = {
-						...serverRecord,
-						accessToken: refreshedTokens.accessToken,
-						refreshToken:
-							refreshedTokens.refreshToken || serverRecord.refreshToken,
-						tokenExpiresAt: refreshedTokens.expiresAt?.toISOString() || null,
-					};
-				} else {
-					console.error(
-						`[OAuth SSE] Failed to pre-refresh token for ${serverRecord.name}`,
-					);
-				}
-			} catch (error) {
-				console.error(
-					`[OAuth SSE] Error pre-refreshing token for ${serverRecord.name}:`,
-					error,
-				);
-			}
+	if (serverRecord.authStatus === 'authorized' && serverRecord.accessToken) {
+		const ensured = await ensureFreshToken(serverRecord, serverId, userId, {
+			preemptiveWindowMs: TOKEN_EXPIRY_SKEW_MS,
+			validate: false,
+		});
+		if (ensured) {
+			serverRecord = ensured.updatedServerRecord;
 		}
 	}
 
@@ -1732,58 +1845,14 @@ export async function getMcpServerInfo(userId: string, serverId: string) {
 			`[MCP OAuth] Setting up authenticated connection for: ${serverRecord.name}`,
 		);
 
-		// Validate token before using it for capability requests
-		const isTokenValid = await validateAccessToken(
-			serverRecord.url,
-			serverRecord.accessToken,
-		);
-
-		if (!isTokenValid) {
-			console.log(
-				`[MCP OAuth] Token invalid for ${serverRecord.name}, attempting refresh`,
-			);
-
-			if (serverRecord.refreshToken) {
-				try {
-					const refreshedTokens = await refreshOAuthToken(
-						serverRecord.url,
-						serverRecord.refreshToken,
-						serverId,
-						userId,
-						serverRecord.clientId || undefined,
-					);
-
-					if (refreshedTokens) {
-						console.log(
-							`[MCP OAuth] Successfully refreshed token for ${serverRecord.name}`,
-						);
-						// Update serverRecord with fresh tokens
-						serverRecord = {
-							...serverRecord,
-							accessToken: refreshedTokens.accessToken,
-							refreshToken:
-								refreshedTokens.refreshToken || serverRecord.refreshToken,
-							tokenExpiresAt: refreshedTokens.expiresAt?.toISOString() || null,
-						};
-					} else {
-						throw new Error(
-							`Server ${serverRecord.name} requires re-authorization`,
-						);
-					}
-				} catch (refreshError) {
-					console.error(
-						`[MCP OAuth] Failed to refresh token for ${serverRecord.name}:`,
-						refreshError,
-					);
-					throw new Error(
-						`Server ${serverRecord.name} requires re-authorization`,
-					);
-				}
-			} else {
-				throw new Error(
-					`Server ${serverRecord.name} requires re-authorization`,
-				);
-			}
+		// Validate or refresh if needed
+		const ensured = await ensureFreshToken(serverRecord, serverId, userId, {
+			validate: true,
+		});
+		if (ensured) {
+			serverRecord = ensured.updatedServerRecord;
+		} else if (!serverRecord.accessToken) {
+			throw new Error(`Server ${serverRecord.name} requires re-authorization`);
 		}
 
 		// Configure authorization headers per MCP specification
@@ -1797,12 +1866,10 @@ export async function getMcpServerInfo(userId: string, serverId: string) {
 		);
 
 		// Apply authentication to transport configuration
-		serverConfig.requestInit = {
-			headers: authHeaders,
-		};
+		serverConfig.requestInit = { headers: authHeaders };
 		serverConfig.eventSourceInit = {
 			headers: authHeaders,
-			withCredentials: false, // Per MCP spec: use Authorization header, not cookies
+			withCredentials: false,
 		};
 	} else {
 		console.log(
@@ -1847,7 +1914,9 @@ export async function getMcpServerInfo(userId: string, serverId: string) {
 			console.log(
 				`[MCP Server Info] Allowing SSE connection establishment time for ${serverRecord.name}`,
 			);
-			await new Promise((resolve) => setTimeout(resolve, 150)); // shorter delay for connection establishment
+			await new Promise((resolve) =>
+				setTimeout(resolve, SSE_ESTABLISH_DELAY_MS),
+			);
 		}
 
 		// Fetch all capabilities with error handling for date fields
