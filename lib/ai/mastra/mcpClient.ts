@@ -18,12 +18,19 @@ export const OAUTH_CONFIG = {
 	clientName: 'PerfAgent - AI Web Performance Analysis Tool',
 };
 
-// ---- Internal constants and helpers (Phase 1 refactor) ---------------------------------
-
 const REQUEST_TIMEOUT_MS = 10_000;
 const OAUTH_REQUEST_TIMEOUT_MS = 15_000;
-const SSE_ESTABLISH_DELAY_MS = 150; // keep existing behavior
+const SSE_ESTABLISH_DELAY_MS = 150;
 const TOKEN_EXPIRY_SKEW_MS = 5 * 60 * 1000; // 5 minutes
+
+export class OAuthRequiredError extends Error {
+	authUrl: string;
+	constructor(authUrl: string) {
+		super(`OAUTH_REQUIRED:${authUrl}`);
+		this.name = 'OAuthRequiredError';
+		this.authUrl = authUrl;
+	}
+}
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
 	const controller = new AbortController();
@@ -653,8 +660,8 @@ export async function createUserMcpClient(userId: string) {
 				.where(eq(mcpServers.id, serverRecord.id));
 		}
 
-		// Throw error with auth URL - this will be caught and handled gracefully
-		throw new Error(`OAUTH_REQUIRED:${authUrl}`);
+		// Throw typed error (legacy string pattern handling remains in catch-sites)
+		throw new OAuthRequiredError(authUrl);
 	};
 
 	// Create server configuration for Mastra MCPClient
@@ -1608,7 +1615,7 @@ export async function testMcpServerConnection(
 						})
 						.where(eq(mcpServers.id, serverId));
 
-					throw new Error(`OAUTH_REQUIRED:${authUrl}`);
+					throw new OAuthRequiredError(authUrl);
 				},
 			};
 		}
@@ -1683,8 +1690,8 @@ export async function testMcpServerConnection(
 		await testClient.disconnect();
 		return { status: 'authorized' };
 	} catch (error) {
-		if (error instanceof Error && error.message.startsWith('OAUTH_REQUIRED:')) {
-			const authUrl = error.message.split('OAUTH_REQUIRED:')[1];
+		if (error instanceof OAuthRequiredError) {
+			const authUrl = error.authUrl;
 			return { status: 'auth_required', authUrl };
 		} else {
 			// For any other error, mark as failed
