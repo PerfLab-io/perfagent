@@ -23,6 +23,7 @@ import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import { ensureFreshToken } from '@/lib/ai/mastra/oauth/tokens';
 import { TOKEN_EXPIRY_SKEW_MS } from '@/lib/ai/mastra/config';
+import { Readable } from 'node:stream';
 // Import removed - using flexible any[] type for tools to handle different MCP server formats
 
 interface ServerCapabilities {
@@ -792,6 +793,23 @@ export class ConnectionManager {
 								console.log(
 									`[Connection Manager] Retry succeeded with Accept: */*`,
 								);
+								const retryContentType =
+									retryResponse.headers.get('content-type')?.toLowerCase() ||
+									'';
+								if (retryContentType.includes('text/event-stream')) {
+									const sseResult = await this.readSseJsonRpcResponse(
+										retryResponse,
+										request.id,
+										serverIdForSession,
+									);
+									if ((sseResult as any).error) {
+										return {
+											success: false,
+											error: (sseResult as any).error?.message || 'MCP Error',
+										};
+									}
+									return { success: true, result: (sseResult as any).result };
+								}
 								const mcpResponse: MCPResponse = await retryResponse.json();
 								if (mcpResponse.error) {
 									return {
@@ -837,6 +855,28 @@ export class ConnectionManager {
 											console.log(
 												`[Connection Manager] Success with minimal headers`,
 											);
+											const minimalContentType =
+												minimalResponse.headers
+													.get('content-type')
+													?.toLowerCase() || '';
+											if (minimalContentType.includes('text/event-stream')) {
+												const sseResult = await this.readSseJsonRpcResponse(
+													minimalResponse,
+													request.id,
+													serverIdForSession,
+												);
+												if ((sseResult as any).error) {
+													return {
+														success: false,
+														error:
+															(sseResult as any).error?.message || 'MCP Error',
+													};
+												}
+												return {
+													success: true,
+													result: (sseResult as any).result,
+												};
+											}
 											const mcpResponse: MCPResponse =
 												await minimalResponse.json();
 											if (mcpResponse.error) {
@@ -898,19 +938,32 @@ export class ConnectionManager {
 				};
 			}
 
-			const mcpResponse: MCPResponse = await response.json();
+			// Handle JSON vs SSE response per Streamable HTTP
+			const contentType =
+				response.headers.get('content-type')?.toLowerCase() || '';
+			if (contentType.includes('text/event-stream')) {
+				const sseResult = await this.readSseJsonRpcResponse(
+					response,
+					request.id,
+					serverIdForSession,
+				);
+				if ((sseResult as any).error) {
+					return {
+						success: false,
+						error: (sseResult as any).error?.message || 'MCP Error',
+					};
+				}
+				return { success: true, result: (sseResult as any).result };
+			}
 
+			const mcpResponse: MCPResponse = await response.json();
 			if (mcpResponse.error) {
 				return {
 					success: false,
 					error: `MCP Error ${mcpResponse.error.code}: ${mcpResponse.error.message}`,
 				};
 			}
-
-			return {
-				success: true,
-				result: mcpResponse.result,
-			};
+			return { success: true, result: mcpResponse.result };
 		} catch (error) {
 			console.error(
 				`[Connection Manager] Network error for ${serverUrl}:`,
@@ -921,6 +974,97 @@ export class ConnectionManager {
 				error: error instanceof Error ? error.message : 'Network error',
 			};
 		}
+	}
+
+	// Reads a Streamable HTTP SSE response and returns the merged/batched JSON-RPC result for the given request id
+	private async readSseJsonRpcResponse(
+		response: Response,
+		requestId: number,
+		serverIdForSession?: string,
+	): Promise<{ result?: any; error?: { code?: number; message?: string } }> {
+		// Collect SSE lines and parse only JSON data events
+		const reader = (response.body as any)?.getReader?.();
+		if (!reader) {
+			// Fallback: try text() and split
+			const text = await response.text();
+			return this.parseSseTextForJsonRpc(text, requestId);
+		}
+		let buffer = '';
+		let done = false;
+		while (!done) {
+			const { value, done: rdone } = await reader.read();
+			done = rdone;
+			if (value) buffer += new TextDecoder().decode(value);
+			// Try to parse complete events whenever we have double newlines
+			const parts = buffer.split('\n\n');
+			buffer = parts.pop() || '';
+			for (const part of parts) {
+				const parsed = this.parseSseEvent(part);
+				if (!parsed) continue;
+				const { event, data } = parsed;
+				if (event === 'message' || event === undefined) {
+					try {
+						const obj = JSON.parse(data);
+						// Handle both single and batched JSON-RPC
+						if (Array.isArray(obj)) {
+							for (const item of obj) {
+								if (item.id === requestId && (item.result || item.error)) {
+									return { result: item.result, error: item.error };
+								}
+							}
+						} else if (
+							obj &&
+							obj.id === requestId &&
+							(obj.result || obj.error)
+						) {
+							return { result: obj.result, error: obj.error };
+						}
+					} catch {}
+				}
+			}
+		}
+		// If we reached here, we did not find a matching response
+		return { error: { message: 'Missing JSON-RPC response on SSE stream' } };
+	}
+
+	private parseSseEvent(
+		chunk: string,
+	): { event?: string; data: string } | null {
+		let event: string | undefined;
+		let data = '';
+		for (const line of chunk.split('\n')) {
+			if (line.startsWith('event:')) {
+				event = line.slice(6).trim();
+			} else if (line.startsWith('data:')) {
+				data += (data ? '\n' : '') + line.slice(5).trim();
+			}
+		}
+		if (!data) return null;
+		return { event, data };
+	}
+
+	private parseSseTextForJsonRpc(
+		text: string,
+		requestId: number,
+	): { result?: any; error?: { code?: number; message?: string } } {
+		const chunks = text.split('\n\n');
+		for (const chunk of chunks) {
+			const evt = this.parseSseEvent(chunk);
+			if (!evt) continue;
+			try {
+				const obj = JSON.parse(evt.data);
+				if (Array.isArray(obj)) {
+					for (const item of obj) {
+						if (item.id === requestId && (item.result || item.error)) {
+							return { result: item.result, error: item.error };
+						}
+					}
+				} else if (obj && obj.id === requestId && (obj.result || obj.error)) {
+					return { result: obj.result, error: obj.error };
+				}
+			} catch {}
+		}
+		return { error: { message: 'Missing JSON-RPC response on SSE stream' } };
 	}
 
 	private extractToolsFromCapabilities(
