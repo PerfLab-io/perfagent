@@ -88,6 +88,50 @@ export class ConnectionManager {
 	private authManager: AuthManager;
 	// Live connection status - in-memory only (per plan: NOT stored in KV)
 	private liveConnectionStatus = new Map<string, LiveConnectionStatus>();
+	// Streamable HTTP session ids by serverId (in-memory only)
+	private httpSessions = new Map<string, string>();
+
+	// Ensure a Streamable HTTP session by posting initialize, capture Mcp-Session-Id
+	private async ensureHttpSession(
+		serverId: string,
+		serverUrl: string,
+		accessToken: string,
+	): Promise<string | undefined> {
+		try {
+			const initReq: MCPRequest = {
+				jsonrpc: '2.0',
+				id: Date.now(),
+				method: 'initialize',
+				params: {
+					protocolVersion: '2024-11-05',
+					capabilities: {},
+					clientInfo: { name: 'PerfAgent', version: '1.0.0' },
+				},
+			};
+
+			const headers: Record<string, string> = {
+				'Content-Type': 'application/json',
+				Accept: 'application/json, text/event-stream',
+				'User-Agent': 'PerfAgent/1.0.0 MCP-Client',
+			};
+			if (accessToken && accessToken.trim()) {
+				headers.Authorization = `Bearer ${accessToken}`;
+			}
+
+			const resp = await fetch(serverUrl, {
+				method: 'POST',
+				headers,
+				body: JSON.stringify(initReq),
+			});
+
+			if (!resp.ok) return undefined;
+			const sess = resp.headers.get('Mcp-Session-Id') || undefined;
+			if (sess) this.httpSessions.set(serverId, sess);
+			return sess;
+		} catch {
+			return undefined;
+		}
+	}
 
 	constructor(authManager?: AuthManager) {
 		this.authManager = authManager || new AuthManager();
@@ -365,11 +409,24 @@ export class ConnectionManager {
 				);
 			} else {
 				// For HTTP servers, use direct POST request
+				// Ensure Streamable HTTP session if server supports it
+				let sessionId = this.httpSessions.get(serverId);
+				if (!sessionId) {
+					try {
+						sessionId = await (this as any).ensureHttpSession(
+							serverId,
+							server.url,
+							server.accessToken || '',
+						);
+					} catch {}
+				}
+
 				const result = await this.makeToolCallRequest(
 					server.url,
 					server.accessToken || '', // Use empty string if no token
 					toolName,
 					arguments_,
+					sessionId,
 				);
 				return result;
 			}
@@ -488,16 +545,22 @@ export class ConnectionManager {
 		accessToken: string,
 		toolName: string,
 		arguments_: any,
+		sessionId?: string,
 	): Promise<ConnectionResult> {
-		const response = await this.makeRequest(serverUrl, accessToken, {
-			jsonrpc: '2.0',
-			id: Date.now(),
-			method: 'tools/call',
-			params: {
-				name: toolName,
-				arguments: arguments_,
+		const response = await this.makeRequest(
+			serverUrl,
+			accessToken,
+			{
+				jsonrpc: '2.0',
+				id: Date.now(),
+				method: 'tools/call',
+				params: {
+					name: toolName,
+					arguments: arguments_,
+				},
 			},
-		});
+			sessionId,
+		);
 
 		return response;
 	}
@@ -610,6 +673,7 @@ export class ConnectionManager {
 		serverUrl: string,
 		accessToken: string,
 		request: MCPRequest,
+		sessionId?: string,
 	): Promise<ConnectionResult & { result?: any }> {
 		console.log(`[Connection Manager] Making request to ${serverUrl}`);
 		console.log(`[Connection Manager] Request method: ${request.method}`);
@@ -621,6 +685,11 @@ export class ConnectionManager {
 				Accept: 'application/json, text/event-stream',
 				'User-Agent': 'PerfAgent/1.0.0 MCP-Client',
 			};
+
+			// Attach Streamable HTTP session if available
+			if (sessionId) {
+				headers['Mcp-Session-Id'] = sessionId;
+			}
 
 			// Only add Authorization header if we have a token
 			if (accessToken && accessToken.trim()) {
@@ -771,6 +840,15 @@ export class ConnectionManager {
 							);
 						}
 					}
+				}
+
+				// If session was attached and server returns 404, clear and allow caller to re-init
+				if (response.status === 404 && sessionId) {
+					console.log(
+						'[Connection Manager] 404 with session; clearing cached Mcp-Session-Id',
+					);
+					// We don't know serverId here; clear all sessions as a safe fallback
+					this.httpSessions.clear();
 				}
 
 				return {
