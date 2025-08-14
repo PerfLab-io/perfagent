@@ -21,6 +21,8 @@ import { performance } from 'node:perf_hooks';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
+import { ensureFreshToken } from '@/lib/ai/mastra/oauth/tokens';
+import { TOKEN_EXPIRY_SKEW_MS } from '@/lib/ai/mastra/config';
 // Import removed - using flexible any[] type for tools to handle different MCP server formats
 
 interface ServerCapabilities {
@@ -345,6 +347,9 @@ export class ConnectionManager {
 				};
 			}
 
+			// Work with a mutable copy for potential token refresh
+			let effectiveServer: any = { ...server };
+
 			console.log(`[Connection Manager] Server record for ${serverId}:`, {
 				name: server.name,
 				url: server.url,
@@ -386,13 +391,13 @@ export class ConnectionManager {
 			}
 
 			// Determine transport with robust SSE detection
-			const rawPath = new URL(server.url).pathname;
+			const rawPath = new URL(effectiveServer.url).pathname;
 			const normalizedPath = rawPath.replace(/\/+$/, '').toLowerCase();
 			const isSseEndpoint =
 				normalizedPath === '/sse' || normalizedPath.endsWith('/events');
 
 			console.log(`[Connection Manager] Transport detection`, {
-				url: server.url,
+				url: effectiveServer.url,
 				rawPath,
 				normalizedPath,
 				isSseEndpoint,
@@ -400,9 +405,34 @@ export class ConnectionManager {
 			});
 
 			if (isSseEndpoint) {
+				// Ensure fresh token before opening SSE connection (reduce 403 risk)
+				try {
+					if (
+						effectiveServer.authStatus === 'authorized' &&
+						effectiveServer.accessToken
+					) {
+						const ensured = await ensureFreshToken(
+							effectiveServer,
+							serverId,
+							userId,
+							{ preemptiveWindowMs: TOKEN_EXPIRY_SKEW_MS, validate: true },
+						);
+						if (ensured?.updatedServerRecord) {
+							effectiveServer = {
+								...effectiveServer,
+								...ensured.updatedServerRecord,
+							};
+						}
+					}
+				} catch (e) {
+					console.log(
+						'[Connection Manager] Token ensure failed before SSE, proceeding with current token',
+						e,
+					);
+				}
 				// For SSE servers, we need to use the MCP client instead of direct HTTP
 				return await this.executeToolViaClient(
-					server,
+					effectiveServer,
 					userId,
 					toolName,
 					arguments_,
@@ -415,15 +445,15 @@ export class ConnectionManager {
 					try {
 						sessionId = await (this as any).ensureHttpSession(
 							serverId,
-							server.url,
-							server.accessToken || '',
+							effectiveServer.url,
+							effectiveServer.accessToken || '',
 						);
 					} catch {}
 				}
 
 				const result = await this.makeToolCallRequest(
-					server.url,
-					server.accessToken || '', // Use empty string if no token
+					effectiveServer.url,
+					effectiveServer.accessToken || '', // Use empty string if no token
 					toolName,
 					arguments_,
 					sessionId,
@@ -595,6 +625,10 @@ export class ConnectionManager {
 					const h = new Headers(init?.headers || {});
 					h.set('Authorization', `Bearer ${server.accessToken}`);
 					return fetch(input as any, { ...(init || {}), headers: h });
+				};
+				// Also set headers for transports that honor eventSourceInit.headers directly
+				eventSourceInit.headers = {
+					Authorization: `Bearer ${server.accessToken}`,
 				};
 			}
 
