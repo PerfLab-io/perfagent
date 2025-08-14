@@ -101,7 +101,9 @@ export class ToolExecutionService {
 				const message =
 					result.error instanceof Error
 						? result.error.message
-						: 'Unknown error';
+						: (result.error as any)?.message ||
+							(result.error as any) ||
+							'Unknown error';
 
 				// Track failed execution
 				const duration = performance.measure(
