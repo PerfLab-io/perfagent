@@ -18,6 +18,9 @@ import { mcpServers } from '@/drizzle/schema';
 import { eq, and } from 'drizzle-orm';
 import { telemetryService } from '@/lib/ai/mastra/monitoring/TelemetryService';
 import { performance } from 'node:perf_hooks';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 // Import removed - using flexible any[] type for tools to handle different MCP server formats
 
 interface ServerCapabilities {
@@ -31,6 +34,7 @@ interface ConnectionResult {
 	success: boolean;
 	capabilities?: ServerCapabilities;
 	tools?: any[]; // Use flexible array type to handle both ToolMetadata and raw MCP tools
+	result?: any; // For tool execution results
 	error?: string;
 	requiresAuth?: boolean;
 	authUrl?: string;
@@ -288,21 +292,7 @@ export class ConnectionManager {
 		);
 
 		try {
-			// Ensure authentication
-			const authResult = await this.authManager.ensureAuthenticated(
-				serverId,
-				userId,
-			);
-			if (authResult.status !== 'authenticated') {
-				return {
-					success: false,
-					requiresAuth: true,
-					authUrl: authResult.authUrl,
-					error: authResult.error || 'Authentication required',
-				};
-			}
-
-			// Get server record
+			// Get server record first to check auth status
 			const server = await this.getServerRecord(serverId, userId);
 			if (!server) {
 				return {
@@ -311,15 +301,78 @@ export class ConnectionManager {
 				};
 			}
 
-			// Execute the tool call
-			const result = await this.makeToolCallRequest(
-				server.url,
-				server.accessToken!,
-				toolName,
-				arguments_,
-			);
+			console.log(`[Connection Manager] Server record for ${serverId}:`, {
+				name: server.name,
+				url: server.url,
+				authStatus: server.authStatus,
+				hasAccessToken: !!server.accessToken,
+				tokenLength: server.accessToken?.length || 0,
+			});
 
-			return result;
+			// Only ensure authentication if the server actually requires it
+			if (
+				server.authStatus === 'required' ||
+				server.authStatus === 'authorized'
+			) {
+				const authResult = await this.authManager.ensureAuthenticated(
+					serverId,
+					userId,
+				);
+				console.log(
+					`[Connection Manager] Auth result for server ${serverId}:`,
+					{
+						status: authResult.status,
+						hasAuthUrl: !!authResult.authUrl,
+						error: authResult.error,
+					},
+				);
+
+				if (authResult.status !== 'authenticated') {
+					return {
+						success: false,
+						requiresAuth: true,
+						authUrl: authResult.authUrl,
+						error: authResult.error || 'Authentication required',
+					};
+				}
+			} else {
+				console.log(
+					`[Connection Manager] Server ${serverId} doesn't require authentication (status: ${server.authStatus})`,
+				);
+			}
+
+			// Determine transport with robust SSE detection
+			const rawPath = new URL(server.url).pathname;
+			const normalizedPath = rawPath.replace(/\/+$/, '').toLowerCase();
+			const isSseEndpoint =
+				normalizedPath === '/sse' || normalizedPath.endsWith('/events');
+
+			console.log(`[Connection Manager] Transport detection`, {
+				url: server.url,
+				rawPath,
+				normalizedPath,
+				isSseEndpoint,
+				transport: isSseEndpoint ? 'SSE' : 'HTTP',
+			});
+
+			if (isSseEndpoint) {
+				// For SSE servers, we need to use the MCP client instead of direct HTTP
+				return await this.executeToolViaClient(
+					server,
+					userId,
+					toolName,
+					arguments_,
+				);
+			} else {
+				// For HTTP servers, use direct POST request
+				const result = await this.makeToolCallRequest(
+					server.url,
+					server.accessToken || '', // Use empty string if no token
+					toolName,
+					arguments_,
+				);
+				return result;
+			}
 		} catch (error) {
 			console.error(
 				`[Connection Manager] Error executing tool ${toolName} on server ${serverId}:`,
@@ -449,28 +502,275 @@ export class ConnectionManager {
 		return response;
 	}
 
+	private async executeToolViaClient(
+		server: any,
+		userId: string,
+		toolName: string,
+		arguments_: any,
+	): Promise<ConnectionResult> {
+		console.log(
+			`[Connection Manager] Executing tool ${toolName} for SSE server ${server.name} using MCP SDK`,
+		);
+
+		let transport: SSEClientTransport | null = null;
+		let client: Client | null = null;
+
+		try {
+			// Create SSE transport for the SSE server
+			const headers: Record<string, string> = {};
+			if (server.accessToken) {
+				headers.Authorization = `Bearer ${server.accessToken}`;
+			}
+
+			// Build EventSource options with auth header injection for SSE
+			const eventSourceInit: any = { withCredentials: false };
+			if (server.accessToken) {
+				eventSourceInit.fetch = (input: any, init?: RequestInit) => {
+					const h = new Headers(init?.headers || {});
+					h.set('Authorization', `Bearer ${server.accessToken}`);
+					return fetch(input as any, { ...(init || {}), headers: h });
+				};
+			}
+
+			transport = new SSEClientTransport(new URL(server.url), {
+				requestInit: { headers },
+				eventSourceInit,
+			});
+
+			// Create MCP client
+			client = new Client(
+				{
+					name: 'PerfAgent',
+					version: '1.0.0',
+				},
+				{
+					capabilities: {},
+				},
+			);
+
+			// Connect to the server
+			await client.connect(transport);
+
+			// Execute the tool using the MCP SDK
+			const result = await client.callTool(
+				{
+					name: toolName,
+					arguments: arguments_,
+				},
+				CallToolResultSchema,
+				{
+					timeout: 60000, // 60 second timeout
+				},
+			);
+
+			console.log(
+				`[Connection Manager] Successfully executed tool ${toolName} via MCP SDK`,
+			);
+
+			// Update live connection status on success
+			this.updateLiveStatus(server.id, {
+				status: 'connected',
+				lastTested: new Date(),
+				lastSuccess: new Date(),
+			});
+
+			return {
+				success: true,
+				result: result,
+			};
+		} catch (error) {
+			console.error(
+				`[Connection Manager] Error executing tool ${toolName} via MCP SDK:`,
+				error,
+			);
+
+			// Update live connection status on failure
+			this.updateLiveStatus(server.id, {
+				status: 'disconnected',
+				lastTested: new Date(),
+				error: error instanceof Error ? error.message : 'Unknown error',
+			});
+
+			return {
+				success: false,
+				error: error instanceof Error ? error.message : 'Unknown error',
+			};
+		} finally {
+			// Ensure client and transport are properly closed
+			if (client) {
+				await client.close();
+			}
+			if (transport) {
+				await transport.close();
+			}
+		}
+	}
+
 	private async makeRequest(
 		serverUrl: string,
 		accessToken: string,
 		request: MCPRequest,
 	): Promise<ConnectionResult & { result?: any }> {
+		console.log(`[Connection Manager] Making request to ${serverUrl}`);
+		console.log(`[Connection Manager] Request method: ${request.method}`);
+		console.log(`[Connection Manager] Has access token: ${!!accessToken}`);
+
 		try {
+			const headers: Record<string, string> = {
+				'Content-Type': 'application/json',
+				Accept: 'application/json, text/event-stream',
+				'User-Agent': 'PerfAgent/1.0.0 MCP-Client',
+			};
+
+			// Only add Authorization header if we have a token
+			if (accessToken && accessToken.trim()) {
+				headers.Authorization = `Bearer ${accessToken}`;
+				console.log(
+					`[Connection Manager] Adding Authorization header with token length: ${accessToken.length}`,
+				);
+			} else {
+				console.log(
+					`[Connection Manager] No access token provided, skipping Authorization header`,
+				);
+			}
+
 			const response = await fetch(serverUrl, {
 				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					Authorization: `Bearer ${accessToken}`,
-				},
+				headers,
 				body: JSON.stringify(request),
 			});
 
+			console.log(
+				`[Connection Manager] Response status: ${response.status} ${response.statusText}`,
+			);
+			console.log(
+				`[Connection Manager] Response headers:`,
+				Object.fromEntries(response.headers.entries()),
+			);
+
 			if (!response.ok) {
 				if (response.status === 401) {
+					console.log(
+						`[Connection Manager] 401 Unauthorized - may need authentication`,
+					);
 					return {
 						success: false,
 						requiresAuth: true,
 						error: 'Authentication failed - token may be expired',
 					};
+				}
+
+				if (response.status === 406) {
+					console.log(
+						`[Connection Manager] Got 406 Not Acceptable, trying fallback`,
+					);
+
+					// Try with different Accept header if not already tried
+					if (headers.Accept !== '*/*') {
+						console.log(`[Connection Manager] Retrying with Accept: */*`);
+						const retryHeaders = { ...headers, Accept: '*/*' };
+
+						try {
+							const retryResponse = await fetch(serverUrl, {
+								method: 'POST',
+								headers: retryHeaders,
+								body: JSON.stringify(request),
+							});
+
+							console.log(
+								`[Connection Manager] Retry response status: ${retryResponse.status}`,
+							);
+
+							if (retryResponse.ok) {
+								console.log(
+									`[Connection Manager] Retry succeeded with Accept: */*`,
+								);
+								const mcpResponse: MCPResponse = await retryResponse.json();
+								if (mcpResponse.error) {
+									return {
+										success: false,
+										error: `MCP Error ${mcpResponse.error.code}: ${mcpResponse.error.message}`,
+									};
+								}
+								return {
+									success: true,
+									result: mcpResponse.result,
+								};
+							} else {
+								console.log(
+									`[Connection Manager] Retry also failed with status: ${retryResponse.status}`,
+								);
+
+								// Try a third attempt with minimal headers for very picky servers
+								if (retryResponse.status === 406) {
+									console.log(
+										`[Connection Manager] Trying minimal headers approach`,
+									);
+									const minimalHeaders: Record<string, string> = {
+										'Content-Type': 'application/json',
+									};
+
+									// Only add auth if we have it
+									if (accessToken && accessToken.trim()) {
+										minimalHeaders.Authorization = `Bearer ${accessToken}`;
+									}
+
+									try {
+										const minimalResponse = await fetch(serverUrl, {
+											method: 'POST',
+											headers: minimalHeaders,
+											body: JSON.stringify(request),
+										});
+
+										console.log(
+											`[Connection Manager] Minimal headers response status: ${minimalResponse.status}`,
+										);
+
+										if (minimalResponse.ok) {
+											console.log(
+												`[Connection Manager] Success with minimal headers`,
+											);
+											const mcpResponse: MCPResponse =
+												await minimalResponse.json();
+											if (mcpResponse.error) {
+												return {
+													success: false,
+													error: `MCP Error ${mcpResponse.error.code}: ${mcpResponse.error.message}`,
+												};
+											}
+											return {
+												success: true,
+												result: mcpResponse.result,
+											};
+										}
+									} catch (minimalError) {
+										console.log(
+											`[Connection Manager] Minimal headers request failed:`,
+											minimalError,
+										);
+									}
+								}
+
+								// Try to read the original 406 response for more info
+								try {
+									const originalResponseText = await response.text();
+									console.log(
+										`[Connection Manager] Original 406 response body:`,
+										originalResponseText,
+									);
+								} catch (e) {
+									console.log(
+										`[Connection Manager] Could not read original 406 response`,
+									);
+								}
+							}
+						} catch (retryError) {
+							console.log(
+								`[Connection Manager] Retry request failed:`,
+								retryError,
+							);
+						}
+					}
 				}
 
 				return {
