@@ -427,6 +427,7 @@ export class ConnectionManager {
 					toolName,
 					arguments_,
 					sessionId,
+					serverId,
 				);
 				return result;
 			}
@@ -546,6 +547,7 @@ export class ConnectionManager {
 		toolName: string,
 		arguments_: any,
 		sessionId?: string,
+		serverIdForSession?: string,
 	): Promise<ConnectionResult> {
 		const response = await this.makeRequest(
 			serverUrl,
@@ -560,6 +562,7 @@ export class ConnectionManager {
 				},
 			},
 			sessionId,
+			serverIdForSession,
 		);
 
 		return response;
@@ -674,6 +677,7 @@ export class ConnectionManager {
 		accessToken: string,
 		request: MCPRequest,
 		sessionId?: string,
+		serverIdForSession?: string,
 	): Promise<ConnectionResult & { result?: any }> {
 		console.log(`[Connection Manager] Making request to ${serverUrl}`);
 		console.log(`[Connection Manager] Request method: ${request.method}`);
@@ -847,8 +851,11 @@ export class ConnectionManager {
 					console.log(
 						'[Connection Manager] 404 with session; clearing cached Mcp-Session-Id',
 					);
-					// We don't know serverId here; clear all sessions as a safe fallback
-					this.httpSessions.clear();
+					if (serverIdForSession) {
+						this.httpSessions.delete(serverIdForSession);
+					} else {
+						this.httpSessions.clear();
+					}
 				}
 
 				return {
