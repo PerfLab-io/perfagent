@@ -415,7 +415,9 @@ export class ErrorHandler {
 				message.includes('unauthorized') ||
 				message.includes('authentication') ||
 				message.includes('invalid token') ||
-				message.includes('expired token')
+				message.includes('expired token') ||
+				message.includes('(401)') ||
+				message.includes(' 401')
 			);
 		}
 

@@ -38,6 +38,7 @@ interface ServerRecord {
 	tokenExpiresAt: string | null;
 	clientId: string | null;
 	authStatus: string;
+	enabled: boolean;
 }
 
 /**

@@ -693,6 +693,27 @@ export class ConnectionManager {
 				error,
 			);
 
+			// Detect auth failures surfaced by SSE transport (e.g., "Non-200 status code (401)")
+			try {
+				if (
+					error instanceof Error &&
+					(/\(401\)/.test(error.message) || /\b401\b/.test(error.message))
+				) {
+					await db
+						.update(mcpServers)
+						.set({
+							authStatus: 'required',
+							enabled: false,
+							accessToken: null,
+							refreshToken: null,
+							tokenExpiresAt: null,
+							clientId: null,
+							updatedAt: new Date().toISOString(),
+						})
+						.where(eq(mcpServers.id, server.id));
+				}
+			} catch {}
+
 			return this.handleAndFormatError(error, {
 				serverId: server.id,
 				userId,
@@ -783,6 +804,24 @@ export class ConnectionManager {
 						httpError,
 						errorContext,
 					);
+
+					// Mark server as requiring auth and disable to avoid repeated failures
+					if (serverIdForSession) {
+						try {
+							await db
+								.update(mcpServers)
+								.set({
+									authStatus: 'required',
+									enabled: false,
+									accessToken: null,
+									refreshToken: null,
+									tokenExpiresAt: null,
+									clientId: null,
+									updatedAt: new Date().toISOString(),
+								})
+								.where(eq(mcpServers.id, serverIdForSession));
+						} catch {}
+					}
 
 					return {
 						success: false,

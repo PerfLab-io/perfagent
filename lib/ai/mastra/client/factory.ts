@@ -27,7 +27,11 @@ export async function createUserMcpClient(userId: string) {
 		if (serverRecord) {
 			await db
 				.update(mcpServers)
-				.set({ authStatus: 'required', updatedAt: new Date().toISOString() })
+				.set({
+					authStatus: 'required',
+					enabled: false,
+					updatedAt: new Date().toISOString(),
+				})
 				.where(eq(mcpServers.id, serverRecord.id));
 		}
 
@@ -54,8 +58,13 @@ export async function createUserMcpClient(userId: string) {
 		if (server.authStatus === 'authorized' && server.accessToken) {
 			const ensured = await ensureFreshToken(server, server.id, userId, {
 				preemptiveWindowMs: 0,
-				validate: false,
+				validate: true,
 			});
+
+			// If token could not be ensured, skip this server to avoid failing the client
+			if (!ensured?.updatedServerRecord?.accessToken && !server.accessToken) {
+				continue;
+			}
 
 			const tokenToUse =
 				ensured?.updatedServerRecord?.accessToken || server.accessToken;

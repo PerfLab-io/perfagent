@@ -64,6 +64,7 @@ export async function testMcpServerConnection(
 					refreshToken: null,
 					tokenExpiresAt: null,
 					clientId: null,
+					enabled: false,
 					updatedAt: new Date().toISOString(),
 				})
 				.where(eq(mcpServers.id, serverId));
@@ -100,7 +101,11 @@ export async function testMcpServerConnection(
 			if (wwwAuth && wwwAuth.includes('Bearer')) {
 				await db
 					.update(mcpServers)
-					.set({ authStatus: 'required', updatedAt: new Date().toISOString() })
+					.set({
+						authStatus: 'required',
+						enabled: false,
+						updatedAt: new Date().toISOString(),
+					})
 					.where(eq(mcpServers.id, serverId));
 
 				const authUrl = await discoverOAuthAuthorizationUrl(
@@ -165,7 +170,11 @@ export async function testMcpServerConnection(
 
 		await db
 			.update(mcpServers)
-			.set({ authStatus: 'failed', updatedAt: new Date().toISOString() })
+			.set({
+				authStatus: 'failed',
+				enabled: false,
+				updatedAt: new Date().toISOString(),
+			})
 			.where(eq(mcpServers.id, serverId));
 
 		throw error;

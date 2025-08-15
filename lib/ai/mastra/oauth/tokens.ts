@@ -83,6 +83,7 @@ export async function refreshOAuthToken(
 			grant_type: 'refresh_token',
 			refresh_token: refreshToken,
 			client_id: clientIdToUse,
+			resource: serverUrl,
 		});
 
 		let response = await fetch(tokenEndpoint, {
@@ -107,6 +108,7 @@ export async function refreshOAuthToken(
 						grant_type: 'refresh_token',
 						refresh_token: refreshToken,
 						client_id: alt,
+						resource: serverUrl,
 					});
 
 					response = await fetch(tokenEndpoint, {
@@ -141,6 +143,7 @@ export async function refreshOAuthToken(
 						refreshToken: null,
 						tokenExpiresAt: null,
 						clientId: null,
+						enabled: false,
 						updatedAt: new Date().toISOString(),
 					})
 					.where(
@@ -231,7 +234,22 @@ export async function ensureFreshToken(
 		}
 	}
 
-	if (!currentAccessToken) return null;
+	if (!currentAccessToken) {
+		// proactively mark as auth required and disable server to avoid workflow failures
+		await db
+			.update(mcpServers)
+			.set({
+				authStatus: 'required',
+				enabled: false,
+				accessToken: null,
+				refreshToken: null,
+				tokenExpiresAt: null,
+				clientId: null,
+				updatedAt: new Date().toISOString(),
+			})
+			.where(and(eq(mcpServers.id, serverId), eq(mcpServers.userId, userId)));
+		return null;
+	}
 
 	return {
 		updatedServerRecord: serverRecord,

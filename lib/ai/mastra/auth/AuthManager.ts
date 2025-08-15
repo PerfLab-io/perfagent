@@ -224,6 +224,7 @@ export class AuthManager {
 			refreshToken: null,
 			tokenExpiresAt: null,
 			clientId: null,
+			enabled: false,
 		});
 
 		// Clear caches
