@@ -8,6 +8,32 @@ import { SSE_ESTABLISH_DELAY_MS, TOKEN_EXPIRY_SKEW_MS } from './config';
 import { listMcpResources as listMcpResourcesMod } from './resources';
 import { ensureFreshToken } from './oauth/tokens';
 
+function hasNonEmptyToolsetsData(toolsets: any): boolean {
+	return (
+		toolsets !== null &&
+		typeof toolsets === 'object' &&
+		Object.keys(toolsets).length > 0
+	);
+}
+
+function hasNonEmptyResourcesData(resources: any): boolean {
+	return (
+		resources !== null &&
+		typeof resources === 'object' &&
+		Array.isArray((resources as any).resources) &&
+		(resources as any).resources.length > 0
+	);
+}
+
+function hasNonEmptyPromptsData(prompts: any): boolean {
+	return (
+		prompts !== null &&
+		typeof prompts === 'object' &&
+		Array.isArray((prompts as any).prompts) &&
+		(prompts as any).prompts.length > 0
+	);
+}
+
 export async function getMcpServerInfo(userId: string, serverId: string) {
 	const cached = await mcpToolCache.getServerTools(serverId);
 	const server = await db
@@ -126,22 +152,11 @@ export async function getMcpServerInfo(userId: string, serverId: string) {
 			resources = r;
 			prompts = p;
 
-			const hasNonEmptyToolsets =
-				toolsets &&
-				typeof toolsets === 'object' &&
-				Object.keys(toolsets).length > 0;
+			const hasNonEmptyToolsets = hasNonEmptyToolsetsData(toolsets);
 
-			const hasNonEmptyResources =
-				resources &&
-				typeof resources === 'object' &&
-				Array.isArray((resources as any).resources) &&
-				(resources as any).resources.length > 0;
+			const hasNonEmptyResources = hasNonEmptyResourcesData(resources);
 
-			const hasNonEmptyPrompts =
-				prompts &&
-				typeof prompts === 'object' &&
-				Array.isArray((prompts as any).prompts) &&
-				(prompts as any).prompts.length > 0;
+			const hasNonEmptyPrompts = hasNonEmptyPromptsData(prompts);
 
 			if (hasNonEmptyToolsets || hasNonEmptyResources || hasNonEmptyPrompts)
 				break;
@@ -160,15 +175,9 @@ export async function getMcpServerInfo(userId: string, serverId: string) {
 		}
 
 		const cacheable =
-			(toolsets && Object.keys(toolsets).length > 0) ||
-			(resources &&
-				typeof resources === 'object' &&
-				Array.isArray((resources as any).resources) &&
-				(resources as any).resources.length > 0) ||
-			(prompts &&
-				typeof prompts === 'object' &&
-				Array.isArray((prompts as any).prompts) &&
-				(prompts as any).prompts.length > 0);
+			hasNonEmptyToolsetsData(toolsets) ||
+			hasNonEmptyResourcesData(resources) ||
+			hasNonEmptyPromptsData(prompts);
 
 		if (cacheable) {
 			const cacheEntry: ToolCacheEntry = {
