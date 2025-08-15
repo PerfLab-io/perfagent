@@ -1,8 +1,26 @@
+import { refreshOAuthToken as refreshOAuthTokenExt } from '@/lib/ai/mastra/oauth/tokens';
 /**
- * Token validation and refresh functionality extracted from existing OAuth implementation
- * Handles token validation via MCP initialize requests and token refresh flows
+ * Refreshes an expired OAuth access token using the refresh token
  */
-import { refreshOAuthToken } from '@/lib/ai/mastra/mcpClient';
+async function refreshOAuthToken(
+	serverUrl: string,
+	refreshToken: string,
+	serverId: string,
+	userId: string,
+	storedClientId?: string,
+): Promise<{
+	accessToken: string;
+	refreshToken?: string;
+	expiresAt?: Date;
+} | null> {
+	return await refreshOAuthTokenExt(
+		serverUrl,
+		refreshToken,
+		serverId,
+		userId,
+		storedClientId,
+	);
+}
 
 interface OAuthTokens {
 	accessToken: string;

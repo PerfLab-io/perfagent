@@ -7,7 +7,7 @@ import { mcpServers } from '@/drizzle/schema';
 import { and, eq } from 'drizzle-orm';
 import { OAUTH_CONFIG } from '../config';
 import { ensureFreshToken } from '../oauth/tokens';
-import { OAuthRequiredError } from '../mcpClient';
+import { OAuthRequiredError } from '../oauth/error';
 
 export async function createUserMcpClient(userId: string) {
 	const servers = await db
@@ -23,18 +23,25 @@ export async function createUserMcpClient(userId: string) {
 		_context,
 	) => {
 		const serverRecord = servers.find((s) => s.url === serverUrl);
+
 		if (serverRecord) {
 			await db
 				.update(mcpServers)
 				.set({ authStatus: 'required', updatedAt: new Date().toISOString() })
 				.where(eq(mcpServers.id, serverRecord.id));
 		}
+
 		throw new OAuthRequiredError(authUrl);
 	};
 
 	const serverConfig: Record<string, any> = {};
+
 	for (const server of servers) {
-		const config: any = { url: new URL(server.url), timeout: 60_000 };
+		const config: any = {
+			url: new URL(server.url),
+			timeout: 60_000,
+		};
+
 		if (server.authStatus !== 'authorized' || !server.accessToken) {
 			config.authorization = {
 				redirectUris: OAUTH_CONFIG.redirectUris,
@@ -43,17 +50,21 @@ export async function createUserMcpClient(userId: string) {
 				onAuthorizationNeeded,
 			};
 		}
+
 		if (server.authStatus === 'authorized' && server.accessToken) {
 			const ensured = await ensureFreshToken(server, server.id, userId, {
 				preemptiveWindowMs: 0,
 				validate: false,
 			});
+
 			const tokenToUse =
 				ensured?.updatedServerRecord?.accessToken || server.accessToken;
 			const authHeaders = { Authorization: `Bearer ${tokenToUse}` };
+
 			config.requestInit = { headers: authHeaders };
 			config.eventSourceInit = { headers: authHeaders };
 		}
+
 		serverConfig[server.name] = config;
 	}
 

@@ -3,10 +3,8 @@
  * Orchestrates authentication, caching, and server communication
  */
 import { AuthManager } from '@/lib/ai/mastra/auth/AuthManager';
-import {
-	getMcpServerInfo,
-	testMcpServerConnection,
-} from '@/lib/ai/mastra/mcpClient';
+import { getMcpServerInfo } from '@/lib/ai/mastra/capabilities';
+import { testMcpServerConnection } from '@/lib/ai/mastra/connectivity';
 import {
 	mcpToolCache,
 	mcpOAuthCache,

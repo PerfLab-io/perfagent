@@ -1,7 +1,7 @@
 import { type CoreMessage, type DataStreamWriter, coreMessageSchema } from 'ai';
 import { createStep, createWorkflow } from '@mastra/core/workflows';
 import { z } from 'zod';
-import { createUserMcpClient } from '@/lib/ai/mastra/mcpClient';
+import { createUserMcpClient } from '@/lib/ai/mastra/client/factory';
 import dedent from 'dedent';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 

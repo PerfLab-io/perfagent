@@ -13,10 +13,8 @@ import { verifySession } from '@/lib/session.server';
 import { db } from '@/drizzle/db';
 import { mcpServers } from '@/drizzle/schema';
 import { eq, and } from 'drizzle-orm';
-import {
-	getMcpServerInfo,
-	testMcpServerConnection,
-} from '@/lib/ai/mastra/mcpClient';
+import { getMcpServerInfo } from '@/lib/ai/mastra/capabilities';
+import { testMcpServerConnection } from '@/lib/ai/mastra/connectivity';
 import { exchangeOAuthCode } from '@/lib/ai/mastra/oauthExchange';
 import { telemetryService } from '@/lib/ai/mastra/monitoring/TelemetryService';
 import { performance } from 'node:perf_hooks';

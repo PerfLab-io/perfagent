@@ -9,7 +9,7 @@ import {
 	ensureFreshToken,
 } from './oauth/tokens';
 import { discoverOAuthAuthorizationUrl } from './oauth/discovery';
-import { OAuthRequiredError } from './mcpClient';
+import { OAuthRequiredError } from './oauth/error';
 import { REQUEST_TIMEOUT_MS } from './config';
 
 export async function testMcpServerConnection(
