@@ -377,7 +377,7 @@ export class ErrorHandler {
 				MCP_ERROR_CODES.FORBIDDEN,
 				MCP_ERROR_CODES.METHOD_NOT_FOUND,
 				MCP_ERROR_CODES.INVALID_REQUEST,
-			].includes(error.code);
+			].includes(error.code as any);
 		}
 
 		if (this.isHTTPError(error)) {
@@ -576,7 +576,7 @@ export class ErrorHandler {
 				MCP_ERROR_CODES.METHOD_NOT_FOUND,
 				MCP_ERROR_CODES.INVALID_PARAMS,
 			];
-			return clientErrorCodes.includes(error.code as MCPErrorCode);
+			return clientErrorCodes.includes(error.code as any);
 		}
 
 		return false;

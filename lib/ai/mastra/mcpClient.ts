@@ -31,17 +31,6 @@ export class OAuthRequiredError extends Error {
 	}
 }
 
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
-	const controller = new AbortController();
-	const timeout = setTimeout(() => controller.abort(), timeoutMs);
-	return Promise.race([
-		promise,
-		new Promise<never>((_, reject) =>
-			reject(new Error(`Request timed out after ${timeoutMs}ms`)),
-		),
-	]).finally(() => clearTimeout(timeout)) as Promise<T>;
-}
-
 // Reusable JSON-RPC initialize payload builder
 function buildInitializeBody() {
 	return {
@@ -62,6 +51,7 @@ function buildInitializeBody() {
 /**
  * Lists all resources available from the connected MCP servers
  */
+// TODO: remove this
 export async function listMcpResources(client: MCPClient) {
 	return await listMcpResourcesMod(client);
 }
@@ -69,6 +59,7 @@ export async function listMcpResources(client: MCPClient) {
 /**
  * Lists all prompts available from the connected MCP servers
  */
+// TODO: remove this
 export async function listMcpPrompts(client: MCPClient) {
 	return await listMcpPromptsMod(client);
 }
@@ -76,6 +67,7 @@ export async function listMcpPrompts(client: MCPClient) {
 /**
  * Reads a specific resource from an MCP server
  */
+// TODO: remove this
 export async function readMcpResource(
 	client: MCPClient,
 	serverName: string,
@@ -87,6 +79,7 @@ export async function readMcpResource(
 /**
  * Gets a specific prompt from an MCP server
  */
+// TODO: remove this
 export async function getMcpPrompt(
 	client: MCPClient,
 	serverName: string,
@@ -98,6 +91,7 @@ export async function getMcpPrompt(
 /**
  * Registers an elicitation handler for a specific server
  */
+// TODO: Remove this
 export async function registerElicitationHandler(
 	client: MCPClient,
 	serverName: string,
@@ -114,6 +108,7 @@ export async function registerElicitationHandler(
 /**
  * Handles OAuth authorization code after user completes authorization
  */
+// TODO: Remove this
 export async function handleOAuthAuthorizationCode(
 	_userId: string,
 	serverName: string,
@@ -140,6 +135,7 @@ export async function handleOAuthAuthorizationCode(
 /**
  * Stores OAuth tokens for a server (for persistence across sessions)
  */
+// TODO: Remove this
 export async function storeOAuthTokens(
 	userId: string,
 	serverId: string,
@@ -161,6 +157,7 @@ export async function storeOAuthTokens(
 /**
  * Retrieves stored OAuth tokens for a server
  */
+// TODO: Remove this
 export async function getStoredOAuthTokens(userId: string, serverId: string) {
 	const server = await db
 		.select({
@@ -212,6 +209,7 @@ export async function refreshOAuthToken(
 /**
  * Validates an access token by making a simple server request
  */
+// TODO: Remove this
 async function validateAccessToken(
 	serverUrl: string,
 	accessToken: string,
@@ -224,6 +222,7 @@ async function validateAccessToken(
  * Optionally performs a refresh when needed.
  * Returns updated headers and serverRecord if a valid token is available; otherwise null.
  */
+// TODO: Remove this
 async function ensureFreshToken(
 	serverRecord: any,
 	serverId: string,
@@ -245,6 +244,7 @@ export { testMcpServerConnection } from './connectivity';
 /**
  * Gets all tools from the tool catalog
  */
+// TODO: Remove this
 export function getAllCatalogTools() {
 	return toolCatalog.getAllTools();
 }
@@ -252,6 +252,7 @@ export function getAllCatalogTools() {
 /**
  * Gets tools by server from the catalog
  */
+// TODO: Remove this
 export function getCatalogToolsByServer(serverId: string) {
 	return toolCatalog.getToolsByServer(serverId);
 }
@@ -259,6 +260,7 @@ export function getCatalogToolsByServer(serverId: string) {
 /**
  * Gets catalog statistics
  */
+// TODO: Remove this
 export function getCatalogStats() {
 	return toolCatalog.getStats();
 }
@@ -266,6 +268,7 @@ export function getCatalogStats() {
 /**
  * Searches tools in the catalog
  */
+// TODO: Remove this
 export function searchCatalogTools(query: string) {
 	return toolCatalog.searchTools(query);
 }

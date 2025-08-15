@@ -3,7 +3,6 @@
  * Orchestrates authentication, caching, and server communication
  */
 import { AuthManager } from '@/lib/ai/mastra/auth/AuthManager';
-// Import the working OAuth functions that handle CF Observability properly
 import {
 	getMcpServerInfo,
 	testMcpServerConnection,
@@ -23,8 +22,6 @@ import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import { ensureFreshToken } from '@/lib/ai/mastra/oauth/tokens';
 import { TOKEN_EXPIRY_SKEW_MS } from '@/lib/ai/mastra/config';
-import { Readable } from 'node:stream';
-// Import removed - using flexible any[] type for tools to handle different MCP server formats
 
 interface ServerCapabilities {
 	tools?: any;
@@ -44,7 +41,7 @@ interface ConnectionResult {
 	fromCache?: boolean;
 }
 
-// Live connection status - in-memory only (per plan: NOT stored in KV)
+// Live connection status - in-memory only
 interface LiveConnectionStatus {
 	status: 'connected' | 'disconnected' | 'testing' | 'unknown';
 	lastTested: Date;
@@ -53,7 +50,6 @@ interface LiveConnectionStatus {
 	pingSupported?: boolean;
 }
 
-// Ping test result for optional MCP ping
 interface PingResult {
 	supported: boolean;
 	success: boolean;
@@ -89,12 +85,9 @@ interface MCPResponse {
  */
 export class ConnectionManager {
 	private authManager: AuthManager;
-	// Live connection status - in-memory only (per plan: NOT stored in KV)
 	private liveConnectionStatus = new Map<string, LiveConnectionStatus>();
-	// Streamable HTTP session ids by serverId (in-memory only)
 	private httpSessions = new Map<string, string>();
 
-	// Ensure a Streamable HTTP session by posting initialize, capture Mcp-Session-Id
 	private async ensureHttpSession(
 		serverId: string,
 		serverUrl: string,
@@ -117,6 +110,7 @@ export class ConnectionManager {
 				Accept: 'application/json, text/event-stream',
 				'User-Agent': 'PerfAgent/1.0.0 MCP-Client',
 			};
+
 			if (accessToken && accessToken.trim()) {
 				headers.Authorization = `Bearer ${accessToken}`;
 			}
@@ -128,8 +122,11 @@ export class ConnectionManager {
 			});
 
 			if (!resp.ok) return undefined;
+
 			const sess = resp.headers.get('Mcp-Session-Id') || undefined;
+
 			if (sess) this.httpSessions.set(serverId, sess);
+
 			return sess;
 		} catch {
 			return undefined;
@@ -155,20 +152,17 @@ export class ConnectionManager {
 		performance.mark('listResourcesStart');
 
 		try {
-			// Check KV cache first (capabilities only - 2h TTL per plan)
 			const cached = await mcpToolCache.getServerTools(serverId);
 			if (cached) {
 				console.log(
 					`[Connection Manager] Using cached capabilities for server ${serverId}`,
 				);
-				// Update live connection status (successful cache hit indicates recent success)
 				this.updateLiveStatus(serverId, {
 					status: 'connected',
 					lastTested: new Date(cached.cachedAt),
 					lastSuccess: new Date(cached.cachedAt),
 				});
 
-				// Track resource listing from cache
 				const resourceCount =
 					(cached.tools?.length || 0) +
 					(Array.isArray(cached.capabilities?.resources)
@@ -177,10 +171,12 @@ export class ConnectionManager {
 					(Array.isArray(cached.capabilities?.prompts)
 						? cached.capabilities.prompts.length
 						: 0);
+
 				const duration = performance.measure(
 					'listResources',
 					'listResourcesStart',
 				).duration;
+
 				telemetryService.trackClientListResources(resourceCount, duration);
 				performance.clearMarks('listResourcesStart');
 				performance.clearMeasures('listResources');
@@ -193,14 +189,16 @@ export class ConnectionManager {
 				};
 			}
 
-			// Test live connection first
 			const connectionHealthy = await this.testLiveConnection(serverId, userId);
+
 			if (!connectionHealthy) {
 				const status = this.liveConnectionStatus.get(serverId);
+
 				const duration = performance.measure(
 					'listResources',
 					'listResourcesStart',
 				).duration;
+
 				telemetryService.trackClientListResources(0, duration);
 				performance.clearMarks('listResourcesStart');
 				performance.clearMeasures('listResources');
@@ -214,11 +212,9 @@ export class ConnectionManager {
 				};
 			}
 
-			// Use existing getMcpServerInfo - preserves CF Observability logic
 			const result = await getMcpServerInfo(userId, serverId);
 
 			if (result && result.server) {
-				// Extract tools from toolsets structure
 				const tools: any[] = [];
 				if (result.toolsets && typeof result.toolsets === 'object') {
 					Object.values(result.toolsets).forEach((toolset: any) => {
@@ -228,22 +224,20 @@ export class ConnectionManager {
 					});
 				}
 
-				// Count total resources (tools + resources + prompts)
 				const resourceCount =
 					tools.length +
 					(Array.isArray(result.resources) ? result.resources.length : 0) +
 					(Array.isArray(result.prompts) ? result.prompts.length : 0);
 
-				// Track resource listing success
 				const duration = performance.measure(
 					'listResources',
 					'listResourcesStart',
 				).duration;
+
 				telemetryService.trackClientListResources(resourceCount, duration);
 				performance.clearMarks('listResourcesStart');
 				performance.clearMeasures('listResources');
 
-				// Cache capabilities only (NOT connection status per plan)
 				const cacheEntry: ToolCacheEntry = {
 					tools,
 					capabilities: {
@@ -257,7 +251,6 @@ export class ConnectionManager {
 
 				await mcpToolCache.cacheServerTools(serverId, cacheEntry);
 
-				// Update live status on success
 				this.updateLiveStatus(serverId, {
 					status: 'connected',
 					lastTested: new Date(),
@@ -275,18 +268,17 @@ export class ConnectionManager {
 					fromCache: false,
 				};
 			} else {
-				// Update live status on failure
 				this.updateLiveStatus(serverId, {
 					status: 'disconnected',
 					lastTested: new Date(),
 					error: 'Failed to get server info',
 				});
 
-				// Track resource listing failure
 				const duration = performance.measure(
 					'listResources',
 					'listResourcesStart',
 				).duration;
+
 				telemetryService.trackClientListResources(0, duration);
 				performance.clearMarks('listResourcesStart');
 				performance.clearMeasures('listResources');
@@ -304,15 +296,15 @@ export class ConnectionManager {
 				error,
 			);
 
-			// Track resource listing error
 			const duration = performance.measure(
 				'listResources',
 				'listResourcesStart',
 			).duration;
+
 			telemetryService.trackClientListResources(0, duration);
 			performance.clearMarks('listResourcesStart');
 			performance.clearMeasures('listResources');
-			// Update live status on error
+
 			this.updateLiveStatus(serverId, {
 				status: 'disconnected',
 				lastTested: new Date(),
@@ -339,8 +331,8 @@ export class ConnectionManager {
 		);
 
 		try {
-			// Get server record first to check auth status
 			const server = await this.getServerRecord(serverId, userId);
+
 			if (!server) {
 				return {
 					success: false,
@@ -348,7 +340,6 @@ export class ConnectionManager {
 				};
 			}
 
-			// Work with a mutable copy for potential token refresh
 			let effectiveServer: any = { ...server };
 
 			console.log(`[Connection Manager] Server record for ${serverId}:`, {
@@ -359,7 +350,6 @@ export class ConnectionManager {
 				tokenLength: server.accessToken?.length || 0,
 			});
 
-			// Only ensure authentication if the server actually requires it
 			if (
 				server.authStatus === 'required' ||
 				server.authStatus === 'authorized'
@@ -368,6 +358,7 @@ export class ConnectionManager {
 					serverId,
 					userId,
 				);
+
 				console.log(
 					`[Connection Manager] Auth result for server ${serverId}:`,
 					{
@@ -431,6 +422,7 @@ export class ConnectionManager {
 						e,
 					);
 				}
+
 				// For SSE servers, we need to use the MCP client instead of direct HTTP
 				return await this.executeToolViaClient(
 					effectiveServer,
@@ -442,6 +434,7 @@ export class ConnectionManager {
 				// For HTTP servers, use direct POST request
 				// Ensure Streamable HTTP session if server supports it
 				let sessionId = this.httpSessions.get(serverId);
+
 				if (!sessionId) {
 					try {
 						sessionId = await (this as any).ensureHttpSession(
@@ -460,6 +453,7 @@ export class ConnectionManager {
 					sessionId,
 					serverId,
 				);
+
 				return result;
 			}
 		} catch (error) {
@@ -549,7 +543,6 @@ export class ConnectionManager {
 			return response;
 		}
 
-		// After successful initialize, get tools list
 		const toolsResponse = await this.makeRequest(serverUrl, accessToken, {
 			jsonrpc: '2.0',
 			id: 2,
@@ -627,6 +620,7 @@ export class ConnectionManager {
 					h.set('Authorization', `Bearer ${server.accessToken}`);
 					return fetch(input as any, { ...(init || {}), headers: h });
 				};
+
 				// Also set headers for transports that honor eventSourceInit.headers directly
 				eventSourceInit.headers = {
 					Authorization: `Bearer ${server.accessToken}`,
@@ -638,7 +632,6 @@ export class ConnectionManager {
 				eventSourceInit,
 			});
 
-			// Create MCP client
 			client = new Client(
 				{
 					name: 'PerfAgent',
@@ -649,10 +642,8 @@ export class ConnectionManager {
 				},
 			);
 
-			// Connect to the server
 			await client.connect(transport);
 
-			// Execute the tool using the MCP SDK
 			const result = await client.callTool(
 				{
 					name: toolName,
@@ -668,7 +659,6 @@ export class ConnectionManager {
 				`[Connection Manager] Successfully executed tool ${toolName} via MCP SDK`,
 			);
 
-			// Update live connection status on success
 			this.updateLiveStatus(server.id, {
 				status: 'connected',
 				lastTested: new Date(),
@@ -685,7 +675,6 @@ export class ConnectionManager {
 				error,
 			);
 
-			// Update live connection status on failure
 			this.updateLiveStatus(server.id, {
 				status: 'disconnected',
 				lastTested: new Date(),
@@ -697,7 +686,6 @@ export class ConnectionManager {
 				error: error instanceof Error ? error.message : 'Unknown error',
 			};
 		} finally {
-			// Ensure client and transport are properly closed
 			if (client) {
 				await client.close();
 			}
@@ -941,28 +929,33 @@ export class ConnectionManager {
 			// Handle JSON vs SSE response per Streamable HTTP
 			const contentType =
 				response.headers.get('content-type')?.toLowerCase() || '';
+
 			if (contentType.includes('text/event-stream')) {
 				const sseResult = await this.readSseJsonRpcResponse(
 					response,
 					request.id,
 					serverIdForSession,
 				);
+
 				if ((sseResult as any).error) {
 					return {
 						success: false,
 						error: (sseResult as any).error?.message || 'MCP Error',
 					};
 				}
+
 				return { success: true, result: (sseResult as any).result };
 			}
 
 			const mcpResponse: MCPResponse = await response.json();
+
 			if (mcpResponse.error) {
 				return {
 					success: false,
 					error: `MCP Error ${mcpResponse.error.code}: ${mcpResponse.error.message}`,
 				};
 			}
+
 			return { success: true, result: mcpResponse.result };
 		} catch (error) {
 			console.error(
@@ -984,27 +977,37 @@ export class ConnectionManager {
 	): Promise<{ result?: any; error?: { code?: number; message?: string } }> {
 		// Collect SSE lines and parse only JSON data events
 		const reader = (response.body as any)?.getReader?.();
+
 		if (!reader) {
 			// Fallback: try text() and split
 			const text = await response.text();
 			return this.parseSseTextForJsonRpc(text, requestId);
 		}
+
 		let buffer = '';
 		let done = false;
+
 		while (!done) {
 			const { value, done: rdone } = await reader.read();
 			done = rdone;
+
 			if (value) buffer += new TextDecoder().decode(value);
+
 			// Try to parse complete events whenever we have double newlines
 			const parts = buffer.split('\n\n');
 			buffer = parts.pop() || '';
+
 			for (const part of parts) {
 				const parsed = this.parseSseEvent(part);
+
 				if (!parsed) continue;
+
 				const { event, data } = parsed;
+
 				if (event === 'message' || event === undefined) {
 					try {
 						const obj = JSON.parse(data);
+
 						// Handle both single and batched JSON-RPC
 						if (Array.isArray(obj)) {
 							for (const item of obj) {
@@ -1023,6 +1026,7 @@ export class ConnectionManager {
 				}
 			}
 		}
+
 		// If we reached here, we did not find a matching response
 		return { error: { message: 'Missing JSON-RPC response on SSE stream' } };
 	}
@@ -1032,6 +1036,7 @@ export class ConnectionManager {
 	): { event?: string; data: string } | null {
 		let event: string | undefined;
 		let data = '';
+
 		for (const line of chunk.split('\n')) {
 			if (line.startsWith('event:')) {
 				event = line.slice(6).trim();
@@ -1039,7 +1044,9 @@ export class ConnectionManager {
 				data += (data ? '\n' : '') + line.slice(5).trim();
 			}
 		}
+
 		if (!data) return null;
+
 		return { event, data };
 	}
 
@@ -1048,11 +1055,15 @@ export class ConnectionManager {
 		requestId: number,
 	): { result?: any; error?: { code?: number; message?: string } } {
 		const chunks = text.split('\n\n');
+
 		for (const chunk of chunks) {
 			const evt = this.parseSseEvent(chunk);
+
 			if (!evt) continue;
+
 			try {
 				const obj = JSON.parse(evt.data);
+
 				if (Array.isArray(obj)) {
 					for (const item of obj) {
 						if (item.id === requestId && (item.result || item.error)) {
@@ -1064,6 +1075,7 @@ export class ConnectionManager {
 				}
 			} catch {}
 		}
+
 		return { error: { message: 'Missing JSON-RPC response on SSE stream' } };
 	}
 
@@ -1083,6 +1095,7 @@ export class ConnectionManager {
 		} else if (typeof capabilities.tools === 'object') {
 			// Handle case where tools is an object with server names as keys
 			const tools: any[] = [];
+
 			Object.values(capabilities.tools).forEach((toolset: any) => {
 				if (Array.isArray(toolset)) {
 					tools.push(
@@ -1094,6 +1107,7 @@ export class ConnectionManager {
 					);
 				}
 			});
+
 			return tools;
 		}
 
@@ -1125,7 +1139,6 @@ export class ConnectionManager {
 		serverId: string,
 		userId: string,
 	): Promise<boolean> {
-		// Update status to testing
 		this.updateLiveStatus(serverId, {
 			status: 'testing',
 			lastTested: new Date(),
@@ -1161,18 +1174,21 @@ export class ConnectionManager {
 					lastSuccess: new Date(),
 					pingSupported: pingResult.supported,
 				});
+
 				return true;
 			} else {
 				const error =
 					thoroughResult.status === 'auth_required'
 						? 'Authentication required'
 						: `Connection failed with status: ${thoroughResult.status}`;
+
 				this.updateLiveStatus(serverId, {
 					status: 'disconnected',
 					lastTested: new Date(),
 					error,
 					pingSupported: pingResult.supported,
 				});
+
 				return false;
 			}
 		} catch (error) {
@@ -1180,11 +1196,13 @@ export class ConnectionManager {
 				`[Connection Manager] Error testing connection to server ${serverId}:`,
 				error,
 			);
+
 			this.updateLiveStatus(serverId, {
 				status: 'disconnected',
 				lastTested: new Date(),
 				error: error instanceof Error ? error.message : 'Unknown error',
 			});
+
 			return false;
 		}
 	}

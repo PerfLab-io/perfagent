@@ -15,8 +15,10 @@ export async function getMcpServerInfo(userId: string, serverId: string) {
 		.from(mcpServers)
 		.where(and(eq(mcpServers.id, serverId), eq(mcpServers.userId, userId)))
 		.limit(1);
+
 	if (cached) {
 		if (server.length === 0) return null;
+
 		return {
 			server: server[0],
 			toolsets: cached.capabilities?.tools || {},
@@ -24,7 +26,9 @@ export async function getMcpServerInfo(userId: string, serverId: string) {
 			prompts: cached.capabilities?.prompts || {},
 		};
 	}
+
 	if (server.length === 0) return null;
+
 	let serverRecord = server[0];
 
 	// do not proceed when authorization is required
@@ -33,6 +37,7 @@ export async function getMcpServerInfo(userId: string, serverId: string) {
 			`Server ${serverRecord.name} requires OAuth authorization before accessing capabilities`,
 		);
 	}
+
 	const urlPath = new URL(serverRecord.url).pathname;
 	const isSseEndpoint = urlPath.endsWith('/sse');
 
@@ -42,8 +47,10 @@ export async function getMcpServerInfo(userId: string, serverId: string) {
 			// For SSE endpoints, validate with an initialize preflight to avoid transport auth hangs
 			validate: isSseEndpoint,
 		});
+
 		if (ensured) serverRecord = ensured.updatedServerRecord;
 	}
+
 	const serverConfig: any = {
 		url: new URL(serverRecord.url),
 		timeout: 60_000,
@@ -55,18 +62,22 @@ export async function getMcpServerInfo(userId: string, serverId: string) {
 			maxDelayMs: 5000,
 		},
 	};
+
 	if (serverRecord.authStatus === 'authorized' && serverRecord.accessToken) {
 		const authHeaders = { Authorization: `Bearer ${serverRecord.accessToken}` };
+
 		serverConfig.requestInit = { headers: authHeaders };
 		serverConfig.eventSourceInit = {
 			headers: authHeaders,
 			withCredentials: false,
 		};
 	}
+
 	const client = new MCPClient({
 		id: `user-${userId}-${Date.now()}`,
 		servers: { [serverRecord.name]: serverConfig },
 	});
+
 	try {
 		const callWithTimeout = async <T>(
 			p: Promise<T>,
@@ -83,11 +94,14 @@ export async function getMcpServerInfo(userId: string, serverId: string) {
 		let toolsets: any = {};
 		let resources: any = {};
 		let prompts: any = {};
+
 		for (let attempt = 0; attempt < maxAttempts; attempt++) {
 			if (serverRecord.authStatus === 'authorized') {
 				const delay = SSE_ESTABLISH_DELAY_MS * (attempt + 1);
+
 				await new Promise((r) => setTimeout(r, delay));
 			}
+
 			const timeoutMs = 8000;
 			const [t, r, p] = await Promise.all([
 				callWithTimeout<any>(
@@ -107,23 +121,28 @@ export async function getMcpServerInfo(userId: string, serverId: string) {
 					{},
 				),
 			]);
+
 			toolsets = t;
 			resources = r;
 			prompts = p;
+
 			const hasNonEmptyToolsets =
 				toolsets &&
 				typeof toolsets === 'object' &&
 				Object.keys(toolsets).length > 0;
+
 			const hasNonEmptyResources =
 				resources &&
 				typeof resources === 'object' &&
 				Array.isArray((resources as any).resources) &&
 				(resources as any).resources.length > 0;
+
 			const hasNonEmptyPrompts =
 				prompts &&
 				typeof prompts === 'object' &&
 				Array.isArray((prompts as any).prompts) &&
 				(prompts as any).prompts.length > 0;
+
 			if (hasNonEmptyToolsets || hasNonEmptyResources || hasNonEmptyPrompts)
 				break;
 		}
@@ -135,9 +154,11 @@ export async function getMcpServerInfo(userId: string, serverId: string) {
 					serverRecord.url,
 					toolsets,
 				);
+
 				void catalog;
 			} catch {}
 		}
+
 		const cacheable =
 			(toolsets && Object.keys(toolsets).length > 0) ||
 			(resources &&
@@ -148,6 +169,7 @@ export async function getMcpServerInfo(userId: string, serverId: string) {
 				typeof prompts === 'object' &&
 				Array.isArray((prompts as any).prompts) &&
 				(prompts as any).prompts.length > 0);
+
 		if (cacheable) {
 			const cacheEntry: ToolCacheEntry = {
 				tools: [],
@@ -155,9 +177,12 @@ export async function getMcpServerInfo(userId: string, serverId: string) {
 				cachedAt: new Date().toISOString(),
 				serverUrl: serverRecord.url,
 			};
+
 			await mcpToolCache.cacheServerTools(serverId, cacheEntry);
 		}
+
 		await client.disconnect();
+
 		return { server: serverRecord, toolsets, resources, prompts };
 	} finally {
 		await client.disconnect();

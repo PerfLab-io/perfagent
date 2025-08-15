@@ -4,7 +4,6 @@
  * No real server dependencies - uses mock MCP servers with spec-compliant responses
  */
 
-import { ConnectionManager } from '../connection/ConnectionManager';
 import { errorHandler } from '../connection/ErrorHandler';
 import { MCP_ERROR_CODES } from '../connection/ErrorHandler';
 
