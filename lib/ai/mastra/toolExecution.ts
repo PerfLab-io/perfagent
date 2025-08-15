@@ -8,7 +8,6 @@ import {
 	type LiveConnectionStatus,
 } from './connection/ConnectionManager';
 import { errorHandler } from './connection/ErrorHandler';
-import { mcpToolCache } from './cache/MCPCache';
 import { db } from '@/drizzle/db';
 import { mcpServers } from '@/drizzle/schema';
 import { eq, and } from 'drizzle-orm';
@@ -77,19 +76,65 @@ export class ToolExecutionService {
 				request.serverId,
 			);
 
-			// Execute with retry logic and error handling
+			// Derive preflight conditions but let centralized error handling deal with outcomes
+			const isDisconnected = connectionStatus?.status === 'disconnected';
+			const lastTestedMs =
+				connectionStatus?.lastTested instanceof Date
+					? connectionStatus.lastTested.getTime()
+					: connectionStatus?.lastTested
+						? new Date((connectionStatus as any).lastTested).getTime()
+						: undefined;
+			const isRecentDisconnected =
+				isDisconnected && lastTestedMs !== undefined
+					? Date.now() - lastTestedMs < 15000
+					: false;
+
+			// Execute with retry logic and centralized error handling
 			const result = await errorHandler.executeWithRetry(
-				() =>
-					this.connectionManager.executeToolCall(
+				async () => {
+					// If we recently detected a disconnect, surface a synthetic error to the handler
+					if (isDisconnected) {
+						if (isRecentDisconnected) {
+							const err: any = {
+								status: 503,
+								message:
+									'Server is currently disconnected (preflight) – please retry shortly.',
+							};
+							throw err;
+						}
+
+						// If the status is stale, perform a quick health check before execution
+						try {
+							const health = await this.connectionManager.testConnection(
+								request.serverId,
+								request.userId,
+							);
+							if (!health.success) {
+								const err: any = {
+									status: 503,
+									message: health.error || 'Connection test failed',
+								};
+								throw err;
+							}
+						} catch (e) {
+							// Bubble up to centralized handler
+							throw e;
+						}
+					}
+
+					return this.connectionManager.executeToolCall(
 						request.serverId,
 						request.userId,
 						request.toolName,
 						request.arguments,
-					),
+					);
+				},
 				{
 					serverId: request.serverId,
 					userId: request.userId,
 					method: 'executeToolCall',
+					// If it's a recent disconnect, skip retries to avoid long waits
+					...(isRecentDisconnected ? { maxRetries: 0 } : {}),
 				},
 			);
 
