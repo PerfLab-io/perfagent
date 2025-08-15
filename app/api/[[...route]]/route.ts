@@ -18,6 +18,7 @@ import { testMcpServerConnection } from '@/lib/ai/mastra/connectivity';
 import { exchangeOAuthCode } from '@/lib/ai/mastra/oauthExchange';
 import { telemetryService } from '@/lib/ai/mastra/monitoring/TelemetryService';
 import { performance } from 'node:perf_hooks';
+import { getUserEnabledServers } from '@/lib/ai/mastra/client/factory';
 
 export const runtime = 'nodejs';
 
@@ -785,49 +786,67 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 							break;
 						case 'mcpWorkflow':
 							if (sessionData) {
-								const mcpWorkflow = mastra.getWorkflow('mcpWorkflow');
-								const run = mcpWorkflow.createRun();
+								const servers = await getUserEnabledServers(sessionData.userId);
 
-								const unsubscribe = run.watch((event) => {
-									console.log('========== MCP workflow event', event);
-								});
+								if (servers.length === 0) {
+									const stream = await mastra
+										.getAgent('largeAssistant')
+										.stream(messages);
 
-								const stream = run.streamVNext({
-									inputData: {
-										messages,
-										userId: sessionData.userId,
-										action: 'discover',
-										dataStream: dataStreamWriter,
-									},
-								});
+									stream.mergeIntoDataStream(dataStreamWriter, {
+										sendReasoning: true,
+										sendSources: true,
+									});
+								} else {
+									const mcpWorkflow = mastra.getWorkflow('mcpWorkflow');
+									const run = mcpWorkflow.createRun();
 
-								for await (const chunk of stream) {
-									dataStreamWriter.writeData(chunk);
+									const unsubscribe = run.watch((event) => {
+										console.log('========== MCP workflow event', event);
+									});
+
+									const stream = run.streamVNext({
+										inputData: {
+											messages,
+											userId: sessionData.userId,
+											action: 'discover',
+											dataStream: dataStreamWriter,
+										},
+									});
+
+									for await (const chunk of stream) {
+										dataStreamWriter.writeData(chunk);
+									}
+
+									unsubscribe();
 								}
-
-								unsubscribe();
 							} else {
 								// If no session, use regular assistant
 								const stream = await mastra.getAgent('largeAssistant').stream([
 									...messages,
 									{
-										role: 'assistant',
-										content:
-											'External tool integration requires authentication. Please log in to access MCP tools.',
+										role: 'system',
+										content: dedent`You are a helpful assistant that can help the user with their request.
+												External tool integration requires authentication. Please ask the user to log in to access MCP tools.
+												`,
 									},
 								]);
+
 								stream.mergeIntoDataStream(dataStreamWriter);
 							}
+
 							break;
 						default:
 							// Use standard large assistant for general queries
 							const stream = await mastra
 								.getAgent('largeAssistant')
 								.stream(messages);
+
 							stream.mergeIntoDataStream(dataStreamWriter, {
 								sendReasoning: true,
 								sendSources: true,
 							});
+
 							break;
 					}
 				}

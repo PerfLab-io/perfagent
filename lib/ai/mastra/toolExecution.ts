@@ -14,6 +14,7 @@ import { mcpServers } from '@/drizzle/schema';
 import { eq, and } from 'drizzle-orm';
 import { telemetryService } from './monitoring/TelemetryService';
 import { performance } from 'node:perf_hooks';
+import { getUserEnabledServers } from './client/factory';
 
 interface ToolExecutionRequest {
 	serverId: string;
@@ -184,10 +185,7 @@ export class ToolExecutionService {
 		performance.mark('toolDiscoveryStart');
 
 		// Get all user's enabled servers
-		const servers = await db
-			.select()
-			.from(mcpServers)
-			.where(and(eq(mcpServers.userId, userId), eq(mcpServers.enabled, true)));
+		const servers = await getUserEnabledServers(userId);
 
 		const tools: ToolInfo[] = [];
 		const connectionStates: Record<string, LiveConnectionStatus> = {};
@@ -421,10 +419,7 @@ export class ToolExecutionService {
 			`[Tool Execution] Getting server health status for user ${userId}`,
 		);
 
-		const servers = await db
-			.select()
-			.from(mcpServers)
-			.where(and(eq(mcpServers.userId, userId), eq(mcpServers.enabled, true)));
+		const servers = await getUserEnabledServers(userId);
 
 		return servers.map((server) => {
 			const connectionStatus = this.connectionManager.getLiveConnectionStatus(

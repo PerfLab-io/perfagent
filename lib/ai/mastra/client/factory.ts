@@ -9,11 +9,17 @@ import { OAUTH_CONFIG } from '../config';
 import { ensureFreshToken } from '../oauth/tokens';
 import { OAuthRequiredError } from '../oauth/error';
 
-export async function createUserMcpClient(userId: string) {
+export async function getUserEnabledServers(userId: string) {
 	const servers = await db
 		.select()
 		.from(mcpServers)
 		.where(and(eq(mcpServers.userId, userId), eq(mcpServers.enabled, true)));
+
+	return servers;
+}
+
+export async function createUserMcpClient(userId: string) {
+	const servers = await getUserEnabledServers(userId);
 
 	if (servers.length === 0) return null;
 
