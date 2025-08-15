@@ -691,12 +691,14 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 						performance.clearMeasures();
 
 						const agent = mastra.getAgent('smallAssistant');
+
 						const stream = await agent.stream([
 							...messages,
 							{
-								role: 'assistant',
-								content:
-									'Tool call denied by user. I should ask the user if I should try with a different tool or ask for clarification.',
+								role: 'system',
+								content: dedent`You are a helpful assistant that can help the user with their request.
+									The user has denied the tool call. Ask if the user needs clarification with their request or if they wish to carry on with a different task.
+									`,
 							},
 						]);
 						stream.mergeIntoDataStream(dataStreamWriter);
