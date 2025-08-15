@@ -20,6 +20,8 @@ import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import { ensureFreshToken } from '@/lib/ai/mastra/oauth/tokens';
 import { TOKEN_EXPIRY_SKEW_MS } from '@/lib/ai/mastra/config';
+import { errorHandler } from '@/lib/ai/mastra/connection/ErrorHandler';
+import type { ErrorContext } from '@/lib/ai/mastra/connection/ErrorHandler';
 
 interface ServerCapabilities {
 	tools?: any;
@@ -85,6 +87,27 @@ export class ConnectionManager {
 	private authManager: AuthManager;
 	private liveConnectionStatus = new Map<string, LiveConnectionStatus>();
 	private httpSessions = new Map<string, string>();
+
+	private handleAndFormatError(
+		error: unknown,
+		context: ErrorContext,
+	): ConnectionResult {
+		const formatted = errorHandler.getContextAwareErrorMessage(error, context);
+		const result = errorHandler.handleError(error, context);
+
+		// Update live status centrally
+		this.updateLiveStatus(context.serverId, {
+			status: 'disconnected',
+			lastTested: new Date(),
+			error: formatted,
+		});
+
+		return {
+			success: false,
+			error: formatted,
+			requiresAuth: !!result.requiresAuth,
+		};
+	}
 
 	private async ensureHttpSession(
 		serverId: string,
@@ -303,15 +326,11 @@ export class ConnectionManager {
 			performance.clearMarks('listResourcesStart');
 			performance.clearMeasures('listResources');
 
-			this.updateLiveStatus(serverId, {
-				status: 'disconnected',
-				lastTested: new Date(),
-				error: error instanceof Error ? error.message : 'Unknown error',
+			return this.handleAndFormatError(error, {
+				serverId,
+				userId,
+				method: 'getServerCapabilities',
 			});
-			return {
-				success: false,
-				error: error instanceof Error ? error.message : 'Unknown error',
-			};
 		}
 	}
 
@@ -459,10 +478,11 @@ export class ConnectionManager {
 				`[Connection Manager] Error executing tool ${toolName} on server ${serverId}:`,
 				error,
 			);
-			return {
-				success: false,
-				error: error instanceof Error ? error.message : 'Unknown error',
-			};
+			return this.handleAndFormatError(error, {
+				serverId,
+				userId,
+				method: `tools/call:${toolName}`,
+			});
 		}
 	}
 
@@ -673,16 +693,12 @@ export class ConnectionManager {
 				error,
 			);
 
-			this.updateLiveStatus(server.id, {
-				status: 'disconnected',
-				lastTested: new Date(),
-				error: error instanceof Error ? error.message : 'Unknown error',
+			return this.handleAndFormatError(error, {
+				serverId: server.id,
+				userId,
+				serverUrl: server.url,
+				method: `tools/call:${toolName}`,
 			});
-
-			return {
-				success: false,
-				error: error instanceof Error ? error.message : 'Unknown error',
-			};
 		} finally {
 			if (client) {
 				await client.close();
@@ -703,6 +719,13 @@ export class ConnectionManager {
 		console.log(`[Connection Manager] Making request to ${serverUrl}`);
 		console.log(`[Connection Manager] Request method: ${request.method}`);
 		console.log(`[Connection Manager] Has access token: ${!!accessToken}`);
+
+		const errorContext: ErrorContext = {
+			serverId: serverIdForSession || 'unknown',
+			userId: 'unknown',
+			serverUrl,
+			method: request.method,
+		};
 
 		try {
 			const headers: Record<string, string> = {
@@ -747,10 +770,24 @@ export class ConnectionManager {
 					console.log(
 						`[Connection Manager] 401 Unauthorized - may need authentication`,
 					);
+					const httpError: any = {
+						status: response.status,
+						message: response.statusText,
+						headers: Object.fromEntries(response.headers.entries()),
+						response: { status: response.status },
+					};
+
+					const errRes = errorHandler.handleError(httpError, errorContext);
+
+					const msg = errorHandler.getContextAwareErrorMessage(
+						httpError,
+						errorContext,
+					);
+
 					return {
 						success: false,
-						requiresAuth: true,
-						error: 'Authentication failed - token may be expired',
+						error: msg,
+						requiresAuth: !!errRes.requiresAuth,
 					};
 				}
 
@@ -918,9 +955,24 @@ export class ConnectionManager {
 					}
 				}
 
+				const httpError: any = {
+					status: response.status,
+					message: response.statusText,
+					headers: Object.fromEntries(response.headers.entries()),
+					response: { status: response.status },
+				};
+
+				const errRes = errorHandler.handleError(httpError, errorContext);
+
+				const msg = errorHandler.getContextAwareErrorMessage(
+					httpError,
+					errorContext,
+				);
+
 				return {
 					success: false,
-					error: `HTTP ${response.status}: ${response.statusText}`,
+					error: msg,
+					requiresAuth: !!errRes.requiresAuth,
 				};
 			}
 
@@ -936,9 +988,16 @@ export class ConnectionManager {
 				);
 
 				if ((sseResult as any).error) {
+					const mcpError = (sseResult as any).error;
+					const errRes = errorHandler.handleError(mcpError, errorContext);
+					const msg = errorHandler.getContextAwareErrorMessage(
+						mcpError,
+						errorContext,
+					);
 					return {
 						success: false,
-						error: (sseResult as any).error?.message || 'MCP Error',
+						error: msg,
+						requiresAuth: !!errRes.requiresAuth,
 					};
 				}
 
@@ -948,9 +1007,20 @@ export class ConnectionManager {
 			const mcpResponse: MCPResponse = await response.json();
 
 			if (mcpResponse.error) {
+				const errRes = errorHandler.handleError(
+					mcpResponse.error,
+					errorContext,
+				);
+
+				const msg = errorHandler.getContextAwareErrorMessage(
+					mcpResponse.error,
+					errorContext,
+				);
+
 				return {
 					success: false,
-					error: `MCP Error ${mcpResponse.error.code}: ${mcpResponse.error.message}`,
+					error: msg,
+					requiresAuth: !!errRes.requiresAuth,
 				};
 			}
 
@@ -960,9 +1030,13 @@ export class ConnectionManager {
 				`[Connection Manager] Network error for ${serverUrl}:`,
 				error,
 			);
+			const errRes = errorHandler.handleError(error, errorContext);
+			const msg = errorHandler.getContextAwareErrorMessage(error, errorContext);
+
 			return {
 				success: false,
-				error: error instanceof Error ? error.message : 'Network error',
+				error: msg,
+				requiresAuth: !!errRes.requiresAuth,
 			};
 		}
 	}
@@ -971,6 +1045,7 @@ export class ConnectionManager {
 	private async readSseJsonRpcResponse(
 		response: Response,
 		requestId: number,
+		// TODO: Remove this(?) or why is it here? And should it be used?
 		serverIdForSession?: string,
 	): Promise<{ result?: any; error?: { code?: number; message?: string } }> {
 		// Collect SSE lines and parse only JSON data events
@@ -1195,10 +1270,16 @@ export class ConnectionManager {
 				error,
 			);
 
+			const message = errorHandler.getContextAwareErrorMessage(error, {
+				serverId,
+				userId,
+				method: 'testLiveConnection',
+			});
+
 			this.updateLiveStatus(serverId, {
 				status: 'disconnected',
 				lastTested: new Date(),
-				error: error instanceof Error ? error.message : 'Unknown error',
+				error: message,
 			});
 
 			return false;
