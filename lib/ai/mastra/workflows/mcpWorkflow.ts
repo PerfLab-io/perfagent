@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { createUserMcpClient } from '@/lib/ai/mastra/client/factory';
 import dedent from 'dedent';
 import { zodToJsonSchema } from 'zod-to-json-schema';
+import { errorHandler } from '@/lib/ai/mastra/connection/ErrorHandler';
 
 // Message schema
 const messageSchema = coreMessageSchema;
@@ -64,6 +65,102 @@ type TriggerSchema = {
 	toolCallRequest?: z.infer<typeof toolCallRequestSchema>;
 	dataStream: DataStreamWriter;
 };
+
+// Centralized error handler that writes to the data stream and asks the agent
+async function handleAndReportError(params: {
+	phase: 'discover' | 'execute';
+	err: unknown;
+	mastra: any;
+	messages: CoreMessage[];
+	dataStream: DataStreamWriter;
+	runId: string;
+	context?: {
+		userId?: string;
+		serverId?: string;
+		serverName?: string;
+		serverUrl?: string;
+		method?: string;
+		stage?: string;
+		toolName?: string;
+	};
+	severity?: 'soft' | 'hard';
+}) {
+	const {
+		phase,
+		err,
+		mastra,
+		messages,
+		dataStream,
+		runId,
+		context = {},
+		severity = 'hard',
+	} = params;
+
+	const ctx = {
+		serverId: context.serverId || 'unknown',
+		userId: context.userId || 'unknown',
+		serverUrl: context.serverUrl,
+		method: context.method,
+	};
+
+	const userMessage = errorHandler.getContextAwareErrorMessage(err, ctx);
+	const recovery = errorHandler.getErrorRecoveryRecommendation(err, ctx);
+
+	const baseData: any = {
+		id: phase === 'discover' ? 'mcp-discovery' : 'tool-execution',
+		type: phase === 'discover' ? 'mcp-discovery' : 'tool-execution',
+		timestamp: Date.now(),
+		title: phase === 'discover' ? 'Tool Discovery' : 'Tool Execution',
+		message: `${userMessage}${recovery ? ` — ${recovery.message}` : ''}`,
+		...(phase === 'execute'
+			? { toolName: context.toolName, serverName: context.serverName }
+			: {}),
+		...(severity === 'hard'
+			? { error: err instanceof Error ? err.message : String(err) }
+			: {}),
+	};
+
+	if (phase === 'discover') {
+		dataStream.writeData({
+			type: 'text',
+			runId,
+			status: severity === 'soft' ? 'in-progress' : 'error',
+			content: { type: 'mcp-discovery', data: baseData },
+		});
+	} else {
+		dataStream.writeData({
+			type: 'tool-execution',
+			runId,
+			status: 'complete',
+			content: { type: 'tool-execution', data: baseData },
+		});
+	}
+
+	const stageText = context.stage ? ` during ${context.stage}` : '';
+	const assistPrompt = dedent`
+		You are a helpful assistant.
+
+		A ${phase} error occurred${stageText}.
+
+		Details for the user:
+		- What failed: ${context.method || context.toolName || phase}
+		- Server: ${context.serverName || context.serverId || 'unknown'}
+		- Reason: ${userMessage}
+		- Recommendation: ${recovery?.message || 'Please try again.'}
+		- Suggested action: ${recovery?.action || 'retry'}
+
+		Provide a short, clear message explaining the issue and what the user can do next. Keep it concise.
+	`;
+
+	try {
+		const agentStream = await mastra
+			.getAgent('largeAssistant')
+			.stream([...messages, { role: 'system', content: assistPrompt }]);
+		agentStream.mergeIntoDataStream(dataStream);
+	} catch {
+		// If agent rendering fails, we already wrote a stream event above
+	}
+}
 
 // Main MCP workflow - handles both discovery and execution based on action
 const mcpWorkflow = createWorkflow({
@@ -142,6 +239,20 @@ const mcpWorkflow = createWorkflow({
 								'getToolsets() failed; continuing with empty set',
 								e,
 							);
+							await handleAndReportError({
+								phase: 'discover',
+								err: e,
+								mastra,
+								messages,
+								dataStream,
+								runId,
+								context: {
+									userId,
+									stage: 'getToolsets',
+									method: 'getToolsets',
+								},
+								severity: 'soft',
+							});
 							toolsets = {};
 						}
 						const totalServers = Object.keys(toolsets).length;
@@ -213,7 +324,20 @@ const mcpWorkflow = createWorkflow({
 							console.log('MCP agent response:', response.object);
 							recommendedTool = response.object.selectedTool;
 						} catch (error) {
-							console.error('Error getting tool recommendation:', error);
+							await handleAndReportError({
+								phase: 'discover',
+								err: error,
+								mastra,
+								messages,
+								dataStream,
+								runId,
+								context: {
+									userId,
+									stage: 'tool-recommendation',
+									method: 'mcpAgent.generate',
+								},
+								severity: 'soft',
+							});
 						}
 
 						dataStream.writeData({
@@ -296,45 +420,16 @@ const mcpWorkflow = createWorkflow({
 							recommendedTool: recommendedTool,
 						};
 					} catch (error) {
-						dataStream.writeData({
-							type: 'text',
+						await handleAndReportError({
+							phase: 'discover',
+							err: error,
+							mastra,
+							messages,
+							dataStream,
 							runId,
-							status: 'error',
-							content: {
-								type: 'mcp-discovery',
-								data: {
-									id: 'mcp-discovery',
-									type: 'mcp-discovery',
-									timestamp: Date.now(),
-									title: 'Tool Discovery',
-									message: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-								},
-							},
+							context: { userId, stage: 'discovery' },
+							severity: 'hard',
 						});
-
-						const agentPrompt = dedent`
-							You are a helpful assistant that can help the user with their request.
-
-							You have encoutered an error while trying to discover tools.
-
-							Please help the user understand the error and suggest a solution.
-
-							You should output a message with a clear, well-structured, and concise message to help the user understand the error and suggest a solution.
-
-							Here is the error:
-
-							${error instanceof Error ? error.message : error || 'Unknown error'}
-							`;
-
-						const agentStream = await mastra.getAgent('largeAssistant').stream([
-							...messages,
-							{
-								role: 'system',
-								content: agentPrompt,
-							},
-						]);
-
-						agentStream.mergeIntoDataStream(dataStream);
 
 						// Gracefully return empty discovery to avoid failing the workflow
 						return {
@@ -402,17 +497,93 @@ const mcpWorkflow = createWorkflow({
 							.limit(1);
 
 						if (!server) {
-							throw new Error(
-								`Server ${toolCallRequest.serverName} not found for user`,
-							);
+							await handleAndReportError({
+								phase: 'execute',
+								err: new Error(
+									`Server ${toolCallRequest.serverName} not found for user`,
+								),
+								mastra,
+								messages,
+								dataStream,
+								runId,
+								context: {
+									userId,
+									serverName: toolCallRequest.serverName,
+									toolName: toolCallRequest.toolName,
+									method: 'executeTool',
+									stage: 'server-lookup',
+								},
+								severity: 'hard',
+							});
+
+							const toolResult: z.infer<typeof toolCallResultSchema> = {
+								success: false,
+								error: `Server ${toolCallRequest.serverName} not found for user`,
+								metadata: {
+									toolName: toolCallRequest.toolName,
+									serverName: toolCallRequest.serverName,
+									executedAt: new Date().toISOString(),
+								},
+							};
+
+							return {
+								action: 'execute' as const,
+								result: toolResult,
+							};
 						}
 
-						const result = await toolExecutionService.executeTool({
-							serverId: server.id,
-							userId,
-							toolName: toolCallRequest.toolName,
-							arguments: toolCallRequest.arguments,
-						});
+						const execResult = await errorHandler.executeWithRetry(
+							() =>
+								toolExecutionService.executeTool({
+									serverId: server.id,
+									userId,
+									toolName: toolCallRequest.toolName,
+									arguments: toolCallRequest.arguments,
+								}),
+							{
+								serverId: server.id,
+								userId,
+								method: toolCallRequest.toolName,
+							},
+						);
+
+						if ((execResult as any)?.error) {
+							const errRes = (execResult as any).error;
+							await handleAndReportError({
+								phase: 'execute',
+								err: errRes,
+								mastra,
+								messages,
+								dataStream,
+								runId,
+								context: {
+									userId,
+									serverId: server.id,
+									serverName: toolCallRequest.serverName,
+									toolName: toolCallRequest.toolName,
+									method: toolCallRequest.toolName,
+									stage: 'executeTool',
+								},
+								severity: 'hard',
+							});
+
+							const toolResult: z.infer<typeof toolCallResultSchema> = {
+								success: false,
+								error: errRes.userMessage || 'Unknown error',
+								metadata: {
+									toolName: toolCallRequest.toolName,
+									serverName: toolCallRequest.serverName,
+									executedAt: new Date().toISOString(),
+								},
+							};
+
+							return {
+								action: 'execute' as const,
+								result: toolResult,
+							};
+						}
+
+						const result = execResult as any;
 
 						const toolResult: z.infer<typeof toolCallResultSchema> = {
 							success: true,
@@ -471,6 +642,23 @@ const mcpWorkflow = createWorkflow({
 							followUpRecommendations: [], // TODO: Implement follow-up recommendations
 						};
 					} catch (error) {
+						await handleAndReportError({
+							phase: 'execute',
+							err: error,
+							mastra,
+							messages,
+							dataStream,
+							runId,
+							context: {
+								userId,
+								serverName: toolCallRequest.serverName,
+								toolName: toolCallRequest.toolName,
+								method: toolCallRequest.toolName,
+								stage: 'executeTool',
+							},
+							severity: 'hard',
+						});
+
 						const toolResult: z.infer<typeof toolCallResultSchema> = {
 							success: false,
 							error: error instanceof Error ? error.message : 'Unknown error',
@@ -480,25 +668,6 @@ const mcpWorkflow = createWorkflow({
 								executedAt: new Date().toISOString(),
 							},
 						};
-
-						dataStream.writeData({
-							type: 'tool-execution',
-							runId,
-							status: 'complete',
-							content: {
-								type: 'tool-execution',
-								data: {
-									id: 'tool-execution',
-									type: 'tool-execution',
-									timestamp: Date.now(),
-									title: 'Tool Execution',
-									toolName: toolCallRequest.toolName,
-									serverName: toolCallRequest.serverName,
-									message: `Error executing ${toolCallRequest.toolName}: ${toolResult.error}`,
-									...(toolResult.error ? { error: toolResult.error } : {}),
-								},
-							},
-						});
 
 						return {
 							action: 'execute' as const,
