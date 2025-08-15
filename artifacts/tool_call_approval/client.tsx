@@ -85,6 +85,10 @@ export const toolCallApprovalArtifact = new Artifact<
 		}
 
 		const { toolCall, status, title } = metadata;
+		const safeArgs =
+			toolCall && toolCall.arguments && typeof toolCall.arguments === 'object'
+				? toolCall.arguments
+				: {};
 
 		const handleApprove = async () => {
 			console.log('Approve button clicked');
@@ -232,9 +236,9 @@ export const toolCallApprovalArtifact = new Artifact<
 								<div className="space-y-2">
 									<h5 className="text-sm font-medium">Arguments:</h5>
 									<div className="bg-muted/50 rounded-lg p-3">
-										{Object.keys(toolCall.arguments).length > 0 ? (
+										{Object.keys(safeArgs).length > 0 ? (
 											<pre className="overflow-x-auto text-xs">
-												{JSON.stringify(toolCall.arguments, null, 2)}
+												{JSON.stringify(safeArgs, null, 2)}
 											</pre>
 										) : (
 											<p className="text-muted-foreground text-xs">

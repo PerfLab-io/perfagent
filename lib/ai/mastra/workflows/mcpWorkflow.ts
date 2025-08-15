@@ -134,7 +134,16 @@ const mcpWorkflow = createWorkflow({
 							throw new Error('Failed to create MCP client');
 						}
 
-						const toolsets = await mcpClient.getToolsets();
+						let toolsets: any = {};
+						try {
+							toolsets = await mcpClient.getToolsets();
+						} catch (e) {
+							console.warn(
+								'getToolsets() failed; continuing with empty set',
+								e,
+							);
+							toolsets = {};
+						}
 						const totalServers = Object.keys(toolsets).length;
 
 						const totalTools = Object.values(toolsets).reduce(
@@ -166,15 +175,18 @@ const mcpWorkflow = createWorkflow({
 
 						const mcpAgent = mastra.getAgent('mcpAgent');
 						const parsedToolsets = JSON.stringify(
-							Object.keys(toolsets).map((serverName) => ({
+							Object.keys(toolsets || {}).map((serverName) => ({
 								serverName,
-								tools: Object.keys(toolsets[serverName]).map((toolName) => ({
-									toolName,
-									description: toolsets[serverName][toolName].description,
-									inputSchema: zodToJsonSchema(
-										toolsets[serverName][toolName].inputSchema,
-									),
-								})),
+								tools: Object.keys(toolsets?.[serverName] || {}).map(
+									(toolName) => ({
+										toolName,
+										description:
+											toolsets?.[serverName]?.[toolName]?.description,
+										inputSchema: zodToJsonSchema(
+											toolsets?.[serverName]?.[toolName]?.inputSchema,
+										),
+									}),
+								),
 							})),
 						);
 
@@ -221,23 +233,36 @@ const mcpWorkflow = createWorkflow({
 							},
 						});
 
-						if (!recommendedTool) {
-							throw new Error('No tool recommendation from MCP agent');
-						}
-						dataStream.writeData({
-							type: 'tool-call-approval',
-							runId,
-							status: 'started',
-							content: {
+						// Recommendation is optional; proceed without throwing
+						const safeToolCall = recommendedTool
+							? {
+									toolName: recommendedTool.toolName,
+									serverName: recommendedTool.serverName,
+									reason: recommendedTool.reason,
+									arguments:
+										recommendedTool.arguments &&
+										typeof recommendedTool.arguments === 'object'
+											? recommendedTool.arguments
+											: {},
+								}
+							: null;
+
+						if (safeToolCall) {
+							dataStream.writeData({
 								type: 'tool-call-approval',
-								data: {
-									toolCall: recommendedTool,
-									status: 'pending',
-									title: 'Tool Call Approval',
-									timestamp: Date.now(),
-								},
-							},
-						});
+								runId,
+								status: 'started',
+								content: {
+									type: 'tool-call-approval',
+									data: {
+										toolCall: safeToolCall,
+										status: 'pending',
+										title: 'Tool Call Approval',
+										timestamp: Date.now(),
+									},
+								} as any,
+							} as any);
+						}
 
 						const agentPrompt = recommendedTool
 							? dedent`
@@ -287,7 +312,36 @@ const mcpWorkflow = createWorkflow({
 							},
 						});
 
-						throw error;
+						const agentPrompt = dedent`
+							You are a helpful assistant that can help the user with their request.
+
+							You have encoutered an error while trying to discover tools.
+
+							Please help the user understand the error and suggest a solution.
+
+							You should output a message with a clear, well-structured, and concise message to help the user understand the error and suggest a solution.
+
+							Here is the error:
+
+							${error instanceof Error ? error.message : error || 'Unknown error'}
+							`;
+
+						const agentStream = await mastra.getAgent('largeAssistant').stream([
+							...messages,
+							{
+								role: 'system',
+								content: agentPrompt,
+							},
+						]);
+
+						agentStream.mergeIntoDataStream(dataStream);
+
+						// Gracefully return empty discovery to avoid failing the workflow
+						return {
+							action: 'discover' as const,
+							discovery: { totalServers: 0, totalTools: 0 },
+							recommendedTool: undefined,
+						};
 					}
 				} else if (action === 'execute') {
 					const triggerData = inputData as TriggerSchema;
@@ -394,17 +448,17 @@ const mcpWorkflow = createWorkflow({
 							.stream([
 								...messages,
 								{
-									role: 'assistant',
+									role: 'user',
 									content: dedent`
-										I just executed the ${toolCallRequest.toolName} tool from ${toolCallRequest.serverName} server.
+										I have the result from the ${toolCallRequest.toolName} tool from ${toolCallRequest.serverName} server.
 										
 										Tool result:
 
 										${typeof result === 'string' ? result : JSON.stringify(result, null, 2)}
 
-										I should format the result in a way that is easy to understand without ommiting any important details.
+										Please format the result in a way that is easy to understand without ommiting any important details.
 
-										The result might be extensive, so I should format it using the best possible markdown formatting to display dense or extensive information.
+										The result might be extensive, so please format it using the best possible markdown formatting to display dense or extensive information.
 									`,
 								},
 							]);
