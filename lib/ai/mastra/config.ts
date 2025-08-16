@@ -1,9 +1,10 @@
 export const OAUTH_CONFIG = {
 	redirectUris: [
-		'http://localhost:3000/api/mcp/oauth/callback',
-		'https://agent.perflab.io/api/mcp/oauth/callback',
-	] as string[],
-	scopes: ['read', 'write'] as string[],
+		process.env.NODE_ENV === 'development'
+			? 'http://localhost:3000/api/mcp/oauth/callback'
+			: 'https://agent.perflab.io/api/mcp/oauth/callback',
+	],
+	scopes: ['read', 'write'] as const,
 	clientName: 'PerfAgent - AI Web Performance Analysis Tool',
 };
 
