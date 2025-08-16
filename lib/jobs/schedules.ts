@@ -4,8 +4,10 @@ import type { EnqueuedJob } from '@/lib/jobs/registry';
 const QSTASH_BASE = 'https://qstash.upstash.io/v2';
 
 function getAppUrl() {
-	const url = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL;
-	if (!url) throw new Error('Missing NEXT_PUBLIC_APP_URL or VERCEL_URL');
+	const url =
+		process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;
+	if (!url)
+		throw new Error('Missing VERCEL_PROJECT_PRODUCTION_URL or VERCEL_URL');
 	return url.startsWith('http') ? url : `https://${url}`;
 }
 
