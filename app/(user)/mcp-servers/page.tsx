@@ -43,7 +43,7 @@ export default async function MCPServersPage() {
 	try {
 		await requireUserWithRole('admin');
 	} catch (error) {
-		return redirect('/login');
+		return redirect('/');
 	}
 
 	return (
