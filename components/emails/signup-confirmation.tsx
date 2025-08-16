@@ -19,8 +19,7 @@ export const SignupEmail = ({
 	email = 'user@example.com',
 }: SignupEmailProps) => {
 	// Create unsubscribe URL using environment variables
-	const baseUrl =
-		process.env.VERCEL_PROJECT_PRODUCTION_URL || 'http://localhost:3000';
+	const baseUrl = `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL || 'http://localhost:3000'}`;
 	const unsubscribeUrl = `${baseUrl}/unsubscribe?email=${encodeURIComponent(email)}`;
 
 	return (
