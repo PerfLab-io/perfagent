@@ -11,7 +11,7 @@ async function getServers(): Promise<MCPServer[]> {
 	try {
 		const cookieStore = await cookies();
 		const response = await fetch(
-			`${process.env.VERCEL_PROJECT_PRODUCTION_URL || 'http://localhost:3000'}/api/mcp/servers`,
+			`https://${process.env.VERCEL_PROJECT_PRODUCTION_URL || 'http://localhost:3000'}/api/mcp/servers`,
 			{
 				cache: 'no-store',
 				headers: {
