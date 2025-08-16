@@ -4,6 +4,8 @@ import { AddServerDialog } from '@/components/mcp-servers/add-server-dialog';
 import { ServerCardList } from '@/components/mcp-servers/server-card-list';
 import { ServerCardSkeleton } from '@/components/mcp-servers/server-card-skeleton';
 import type { MCPServer } from '@/lib/stores/mcp-servers-store';
+import { requireUserWithRole } from '@/lib/session.server';
+import { redirect } from 'next/navigation';
 
 async function getServers(): Promise<MCPServer[]> {
 	try {
@@ -37,7 +39,13 @@ async function ServerListSection() {
 	return <ServerCardList initialServers={servers} />;
 }
 
-export default function MCPServersPage() {
+export default async function MCPServersPage() {
+	try {
+		await requireUserWithRole('admin');
+	} catch (error) {
+		return redirect('/login');
+	}
+
 	return (
 		<div className="mx-auto w-3xl space-y-6 px-4 sm:px-6">
 			<div className="flex items-center justify-between">
