@@ -182,7 +182,7 @@ export async function subscribeToNewsletter(formData: FormData) {
 
 		// In local environment, log to console instead of sending emails
 		if (isLocalEnvironment) {
-			const unsubscribeUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/unsubscribe?email=${encodeURIComponent(email)}`;
+			const unsubscribeUrl = `${process.env.VERCEL_PROJECT_PRODUCTION_URL || 'http://localhost:3000'}/unsubscribe?email=${encodeURIComponent(email)}`;
 
 			console.log('🔷 Local environment detected - Email would be sent with:');
 			console.log({

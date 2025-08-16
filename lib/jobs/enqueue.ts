@@ -5,8 +5,10 @@ import type { EnqueuedJob } from '@/lib/jobs/registry';
 const client = new Client({ token: serverEnv.QSTASH_TOKEN });
 
 function getAppUrl() {
-	const url = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL;
-	if (!url) throw new Error('Missing NEXT_PUBLIC_APP_URL or VERCEL_URL');
+	const url =
+		process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;
+	if (!url)
+		throw new Error('Missing VERCEL_PROJECT_PRODUCTION_URL or VERCEL_URL');
 	return url.startsWith('http') ? url : `https://${url}`;
 }
 
