@@ -1,26 +1,22 @@
 import type React from 'react';
 import '@/app/globals.css';
-import './chat.css';
 import { SidebarInset } from '@/components/ui/sidebar';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/app-sidebar';
 import { SiteHeader } from '@/components/site-header';
-import { Metadata } from 'next';
 import { cookies } from 'next/headers';
 import { requireUserWithRole, SessionData } from '@/lib/session.server';
 import { redirect } from 'next/navigation';
 
-export const metadata: Metadata = {
-	title: 'PerfAgent - Agent insights for web performance',
-	description:
-		"PerfAgent is an AI-powered web performance insights tool that helps you understand your website's performance and identify opportunities for improvement.",
-};
-
-export default async function AiChatLayout({
-	children,
-}: {
+interface AuthenticatedLayoutProps {
 	children: React.ReactNode;
-}) {
+	className?: string;
+}
+
+export default async function AuthenticatedLayout({
+	children,
+	className,
+}: AuthenticatedLayoutProps) {
 	let user: SessionData | null = null;
 	try {
 		user = await requireUserWithRole('agent-user');
@@ -28,26 +24,27 @@ export default async function AiChatLayout({
 		console.error(error);
 		return redirect('/login');
 	}
+
 	// Read the sidebar cookie from the server
 	const cookieStore = await cookies();
 	const sidebarCookie = cookieStore.get('sidebar:state');
 	const sidebarOpen = sidebarCookie?.value === 'false' ? false : true;
 
 	return (
-		<>
-			<SidebarProvider open={sidebarOpen} user={user}>
-				<AppSidebar variant="inset" />
-				<SidebarInset>
-					<SiteHeader />
-					<div className="flex h-full flex-1 flex-col">
-						<div className="@container/main flex flex-1 flex-col gap-2">
-							<div className="flex h-full flex-col gap-4 py-4 md:gap-6 md:py-6">
-								{children}
-							</div>
+		<SidebarProvider open={sidebarOpen} user={user}>
+			<AppSidebar variant="inset" />
+			<SidebarInset>
+				<SiteHeader />
+				<div className="flex h-full flex-1 flex-col">
+					<div className="@container/main flex flex-1 flex-col gap-2">
+						<div
+							className={`flex h-full flex-col gap-4 py-4 md:gap-6 md:py-6 ${className || ''}`}
+						>
+							{children}
 						</div>
 					</div>
-				</SidebarInset>
-			</SidebarProvider>
-		</>
+				</div>
+			</SidebarInset>
+		</SidebarProvider>
 	);
 }

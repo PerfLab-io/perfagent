@@ -647,30 +647,30 @@ export function LowFpsPerformanceViz() {
 	};
 
 	return (
-		<div className="relative flex min-h-[600px] w-full items-center justify-center overflow-hidden bg-peppermint-950 p-8 pt-20">
+		<div className="bg-peppermint-950 relative flex min-h-[600px] w-full items-center justify-center overflow-hidden p-8 pt-20">
 			{/* Scan lines effect */}
 			<div className="scan-lines pointer-events-none absolute inset-0"></div>
 
 			{/* Main container */}
 			<div
 				ref={containerRef}
-				className="relative w-full max-w-5xl overflow-hidden rounded-lg border-2 border-dotted border-peppermint-700 bg-peppermint-950 shadow-2xl transition-all duration-1000"
+				className="border-peppermint-700 bg-peppermint-950 relative w-full max-w-5xl overflow-hidden rounded-lg border-2 border-dotted shadow-2xl transition-all duration-1000"
 			>
 				{/* Header bar */}
-				<div className="relative z-20 flex h-8 w-full items-center border-b border-dotted border-peppermint-400 bg-peppermint-900 px-3">
+				<div className="border-peppermint-400 bg-peppermint-900 relative z-20 flex h-8 w-full items-center border-b border-dotted px-3">
 					<svg className="glow-merino mr-2 h-3 w-3" viewBox="0 0 12 12">
 						<circle cx="6" cy="6" r="6" fill="url(#dotPatternWindowControl)" />
 					</svg>
-					<div className="font-mono text-xs tracking-wider text-peppermint-300">
+					<div className="text-peppermint-300 font-mono text-xs tracking-wider">
 						PERFAGENT - PERFORMANCE ANALYSIS
 					</div>
 				</div>
 
 				<div className="relative flex h-[550px] w-full overflow-hidden">
 					{/* Left sidebar - Terminal */}
-					<div className="h-full w-2/3 overflow-hidden border-r border-dotted border-peppermint-700 bg-peppermint-950 p-3 font-mono text-xs md:w-1/4 lg:w-1/4">
+					<div className="border-peppermint-700 bg-peppermint-950 h-full w-2/3 overflow-hidden border-r border-dotted p-3 font-mono text-xs md:w-1/4 lg:w-1/4">
 						<div
-							className="mb-2 font-bold text-peppermint-400"
+							className="text-peppermint-400 mb-2 font-bold"
 							data-section-header="metrics"
 							style={{ opacity: 0 }}
 						>
@@ -684,44 +684,44 @@ export function LowFpsPerformanceViz() {
 							style={{ opacity: 0 }}
 						></div>
 						<div
-							className="terminal-line mt-1 text-peppermint-300"
+							className="terminal-line text-peppermint-300 mt-1"
 							data-terminal-line
 							data-text=">> Measuring LCP: 2.4s"
 							style={{ opacity: 0 }}
 						></div>
 						<div
-							className="terminal-line mt-1 text-peppermint-300"
+							className="terminal-line text-peppermint-300 mt-1"
 							data-terminal-line
 							data-text=">> Measuring INP: 550ms"
 							style={{ opacity: 0 }}
 						></div>
 						<div
-							className="terminal-line mt-1 text-peppermint-300"
+							className="terminal-line text-peppermint-300 mt-1"
 							data-terminal-line
 							data-text=">> Measuring CLS: 0.12"
 							style={{ opacity: 0 }}
 						></div>
 						<div
-							className="terminal-line mt-1 text-peppermint-300"
+							className="terminal-line text-peppermint-300 mt-1"
 							data-terminal-line
 							data-text=">> Measuring TTFB: 0.7s"
 							style={{ opacity: 0 }}
 						></div>
 						<div
-							className="terminal-line mt-1 text-peppermint-300"
+							className="terminal-line text-peppermint-300 mt-1"
 							data-terminal-line
 							data-text=">> Measuring FCP: 1.2s"
 							style={{ opacity: 0 }}
 						></div>
 						<div
-							className="terminal-line mt-1 text-peppermint-300"
+							className="terminal-line text-peppermint-300 mt-1"
 							data-terminal-line
 							data-text=">> Analysis complete."
 							style={{ opacity: 0 }}
 						></div>
 
 						<div
-							className="mt-4 font-bold text-peppermint-400"
+							className="text-peppermint-400 mt-4 font-bold"
 							data-section-header="vitals"
 							style={{ opacity: 0 }}
 						>
@@ -736,7 +736,7 @@ export function LowFpsPerformanceViz() {
 							<div className="vital-container">
 								<span
 									data-vital-score
-									className="font-bold text-peppermint-400"
+									className="text-peppermint-400 font-bold"
 									style={{ opacity: 0 }}
 								>
 									Good
@@ -764,7 +764,7 @@ export function LowFpsPerformanceViz() {
 							<div className="vital-container">
 								<span
 									data-vital-score
-									className="font-bold text-merino-500"
+									className="text-merino-500 font-bold"
 									style={{ opacity: 0 }}
 								>
 									Needs Improvement
@@ -773,32 +773,32 @@ export function LowFpsPerformanceViz() {
 						</div>
 
 						<div
-							className="mt-4 font-bold text-peppermint-400"
+							className="text-peppermint-400 mt-4 font-bold"
 							data-section-header="chat"
 							style={{ opacity: 0 }}
 						>
 							CHAT.MODE
 						</div>
 						<div
-							className="terminal-line mt-2 text-peppermint-300"
+							className="terminal-line text-peppermint-300 mt-2"
 							data-terminal-line
 							data-command-line
 							data-text=">> Optimizations identified..."
 							style={{ opacity: 0 }}
 						></div>
 						<div
-							className="terminal-line mt-1 text-peppermint-300"
+							className="terminal-line text-peppermint-300 mt-1"
 							data-terminal-line
 							data-command-line
 							data-text=">> Proceed?"
 							style={{ opacity: 0 }}
 						></div>
 						<div
-							className="terminal-line mt-1 flex items-center text-peppermint-300"
+							className="terminal-line text-peppermint-300 mt-1 flex items-center"
 							style={{ opacity: 0 }}
 						>
 							<span className="mr-1">&gt;&gt;</span>
-							<span className="cursor-blink inline-block border border-peppermint-500 bg-peppermint-900 px-2 py-0.5 text-peppermint-300">
+							<span className="cursor-blink border-peppermint-500 bg-peppermint-900 text-peppermint-300 inline-block border px-2 py-0.5">
 								YES
 							</span>
 							<span className="mx-2">|</span>
@@ -1279,7 +1279,7 @@ export function LowFpsPerformanceViz() {
 
 						{/* Overlay UI elements */}
 						<div
-							className="absolute right-4 top-4 border border-dashed border-peppermint-500 bg-peppermint-950/80 p-2 font-mono text-xs text-peppermint-400 opacity-0 transition-opacity duration-1000"
+							className="border-peppermint-500 bg-peppermint-950/80 text-peppermint-400 absolute top-4 right-4 border border-dashed p-2 font-mono text-xs opacity-0 transition-opacity duration-1000"
 							style={{ borderSpacing: '2px' }}
 							data-anim="final"
 						>

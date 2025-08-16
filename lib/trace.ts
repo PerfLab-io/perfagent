@@ -1,12 +1,19 @@
 import * as Trace from '@perflab/trace_engine/models/trace/trace.js';
 import { MetaData } from '@perflab/trace_engine/models/trace/types/File';
+import { yieldToMain } from '@/lib/utils';
 
 export async function analyzeEvents(
 	traceEvents: Trace.Types.Events.Event[],
 	metadata: MetaData,
 ) {
 	const model = Trace.TraceModel.Model.createWithAllHandlers();
+
+	await yieldToMain();
+
 	await model.parse(traceEvents);
+
+	await yieldToMain();
+
 	const parsedTrace = model.parsedTrace();
 	const insights = model.traceInsights();
 
@@ -21,6 +28,9 @@ export async function analyzeEvents(
 
 export async function analyzeTrace(contents: string) {
 	const { traceEvents, metadata } = loadTraceEventsFromFileContents(contents);
+
+	await yieldToMain();
+
 	return analyzeEvents(traceEvents, metadata);
 }
 

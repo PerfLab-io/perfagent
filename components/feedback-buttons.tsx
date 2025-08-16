@@ -123,7 +123,7 @@ export function FeedbackButtons({
 				/>
 			</Button>
 
-			{error && <span className="text-xs text-destructive">{error}</span>}
+			{error && <span className="text-destructive text-xs">{error}</span>}
 		</div>
 	);
 }

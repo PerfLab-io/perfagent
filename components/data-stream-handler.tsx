@@ -6,6 +6,8 @@ import { initialArtifactData, useArtifact } from '@/lib/hooks/use-artifact';
 import { JSONValue, UIMessage } from 'ai';
 import { researchUpdateArtifact } from '@/artifacts/research_update/client';
 import { textArtifact } from '@/artifacts/text/client';
+import { toolCallApprovalArtifact } from '@/artifacts/tool_call_approval/client';
+import { toolExecutionArtifact } from '@/artifacts/tool_execution/client';
 import { Artifact, UIArtifact } from '@/components/artifact';
 import { ChevronDown, ChevronUp, ExternalLink, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -24,7 +26,12 @@ export type DataStreamDelta<T extends JSONValue = NonNullable<JSONValue>> = {
 
 // We'll populate this from outside to avoid circular dependencies
 export const artifactDefinitions: Array<Artifact<any, any, any>> = [];
-artifactDefinitions.push(textArtifact, researchUpdateArtifact);
+artifactDefinitions.push(
+	textArtifact,
+	researchUpdateArtifact,
+	toolCallApprovalArtifact,
+	toolExecutionArtifact,
+);
 
 export function DataStreamHandler({
 	chatId,
@@ -95,41 +102,108 @@ export function DataStreamHandler({
 			}
 
 			const deltaType = delta.type as string;
+			console.log('DataStreamHandler - Processing delta:', {
+				deltaType,
+				delta,
+			});
 
 			// Find the artifact definition for this type
 			const artifactDefinition = artifactDefinitions.find(
 				(definition) => definition.kind === deltaType,
 			);
 
+			console.log(
+				'DataStreamHandler - Found artifact definition:',
+				!!artifactDefinition,
+				artifactDefinition?.kind,
+			);
+
 			if (!artifactDefinition) {
+				console.log(
+					'DataStreamHandler - No artifact definition found for type:',
+					deltaType,
+				);
 				continue;
 			}
 
 			// Update the artifact
 			setArtifact((draftArtifact) => {
 				if (delta.status === 'started') {
+					// Special handling for artifact replacement scenarios
+					const isReplacingApprovalWithExecution =
+						deltaType === 'tool-execution' &&
+						draftArtifact.kind === 'tool-call-approval';
+
+					if (isReplacingApprovalWithExecution) {
+						console.log(
+							'DataStreamHandler - Replacing tool approval with execution artifact',
+						);
+						// Completely replace the approval artifact with execution
+						return {
+							documentId: delta.runId as string,
+							content: '',
+							kind: deltaType,
+							title: '',
+							timestamp: Date.now(),
+							status: 'streaming',
+							isVisible: true,
+							boundingBox: {
+								top: 0,
+								left: 0,
+								width: 0,
+								height: 0,
+							},
+						};
+					}
+
+					// Standard new artifact creation
 					return {
 						...draftArtifact,
 						documentId: delta.runId as string,
 						kind: deltaType,
 						isVisible: true,
+						status: 'streaming',
 					};
 				}
 
+				// Set status to idle when complete, or streaming when in-progress
+				const newStatus =
+					delta.status === 'complete' || delta.status === 'completed'
+						? 'idle'
+						: 'streaming';
 				return {
 					...draftArtifact,
-					status: delta.status === 'complete' ? 'idle' : 'streaming',
+					status: newStatus,
 				};
 			});
 
-			if (delta.status === 'started' && !metadata) {
-				artifactDefinition.initialize?.({
-					documentId: delta.runId as string,
-					setMetadata,
-				});
+			if (delta.status === 'started') {
+				// Check if we need to initialize or reset metadata
+				const isReplacingApprovalWithExecution =
+					deltaType === 'tool-execution' &&
+					artifact.kind === 'tool-call-approval';
+
+				if (!metadata || isReplacingApprovalWithExecution) {
+					// Clear any existing metadata when replacing artifacts
+					if (isReplacingApprovalWithExecution) {
+						console.log(
+							'DataStreamHandler - Clearing metadata for artifact replacement',
+						);
+						setMetadata(undefined);
+					}
+
+					artifactDefinition.initialize?.({
+						documentId: delta.runId as string,
+						setMetadata,
+					});
+				}
 			}
 
 			if (artifactDefinition.onStreamPart) {
+				console.log(
+					'DataStreamHandler - Calling onStreamPart for:',
+					artifactDefinition.kind,
+				);
 				// Call the onStreamPart method of the artifact definition
 				artifactDefinition.onStreamPart({
 					streamPart: delta as DataStreamDelta,
@@ -180,7 +254,13 @@ function PureArtifactComponent(props: ArtifactProps) {
 			<div className="mb-1 flex w-full items-center justify-between">
 				<div className="text-merino-400 dark:text-merino-800 text-xs">
 					<span>
-						{artifactDefinition.kind === 'text' ? 'Text' : 'Research'}
+						{artifactDefinition.kind === 'text'
+							? 'Text'
+							: artifactDefinition.kind === 'tool-call-approval'
+								? 'Tool Call Approval'
+								: artifactDefinition.kind === 'tool-execution'
+									? 'Tool Execution'
+									: 'Research'}
 					</span>
 				</div>
 				<button

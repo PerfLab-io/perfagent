@@ -1,6 +1,6 @@
 import { Agent } from '@mastra/core/agent';
 import { perflab } from '../../modelProvider';
-import { routerSystemPrompt } from '../../prompts';
+import { routerSystemPrompt, createMcpAwareRouterPrompt } from '../../prompts';
 import { z } from 'zod';
 
 export const routerAgent = new Agent({
@@ -9,12 +9,30 @@ export const routerAgent = new Agent({
 	model: perflab.languageModel('topics_model'),
 });
 
+/**
+ * Creates an MCP-aware version of the router agent
+ * @param toolsets - Available MCP toolsets for prompts
+ * @param tools - Available MCP tools for AI SDK execution
+ * @returns Agent instance with MCP-aware prompt and tools
+ */
+export function createMcpAwareRouterAgent(
+	toolsets?: Record<string, any>,
+	tools?: Record<string, any>,
+): Agent {
+	return new Agent({
+		name: 'PerfAgent router (MCP-enabled)',
+		instructions: createMcpAwareRouterPrompt(toolsets),
+		model: perflab.languageModel('topics_model'),
+		tools: tools || {},
+	});
+}
+
 export const routerOutputSchema = z.object({
 	workflow: z
-		.enum(['cwvInsightsWorkflow', 'researchWorkflow'])
+		.enum(['cwvInsightsWorkflow', 'researchWorkflow', 'mcpWorkflow'])
 		.nullable()
 		.describe(
-			'The workflow to use in case the user message requires any form of deeper analysis. Null if a simple response is sufficient.',
+			'The workflow to use in case the user message requires any form of deeper analysis. Null if a simple response is sufficient. Use mcpWorkflow for external tool integrations.',
 		),
 	certainty: z
 		.number()

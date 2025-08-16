@@ -16,7 +16,6 @@ export async function verifyOtpAction({
 	target: string;
 }) {
 	try {
-		// Validate the input
 		if (!code || !type || !target) {
 			return {
 				success: false,
@@ -31,7 +30,6 @@ export async function verifyOtpAction({
 			};
 		}
 
-		// Verify the OTP code
 		const isValid = await isCodeValid({
 			code,
 			type: type as VerificationTypes,
@@ -45,18 +43,15 @@ export async function verifyOtpAction({
 			};
 		}
 
-		// Create a temporary session cookie for the verified email
 		const tempSessionId = crypto.randomUUID();
 		const expirationDate = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
 
-		// Create a temporary session payload with the verified email
 		const tempSessionData = {
 			id: tempSessionId,
 			email: target, // The verified email
 			expirationDate: expirationDate.toISOString(),
 		};
 
-		// Set secure temporary session cookie
 		const cookieStore = await cookies();
 		cookieStore.set('temp-session-id', JSON.stringify(tempSessionData), {
 			httpOnly: true,

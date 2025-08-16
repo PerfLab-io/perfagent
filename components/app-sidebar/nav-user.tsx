@@ -101,7 +101,7 @@ export function NavUser({ user }: { user: SessionData }) {
 							</div>
 						</DropdownMenuLabel>
 						<DropdownMenuSeparator />
-						<DropdownMenuGroup>
+						{/* <DropdownMenuGroup>
 							<DropdownMenuItem>
 								<UserCircleIcon />
 								Account
@@ -115,7 +115,7 @@ export function NavUser({ user }: { user: SessionData }) {
 								Notifications
 							</DropdownMenuItem>
 						</DropdownMenuGroup>
-						<DropdownMenuSeparator />
+						<DropdownMenuSeparator /> */}
 						<DropdownMenuItem onClick={handleLogout}>
 							<LogOutIcon />
 							Log out

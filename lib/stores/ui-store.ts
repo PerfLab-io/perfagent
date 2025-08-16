@@ -26,6 +26,10 @@ interface UIState {
 	// Editing state
 	isEditing: boolean;
 	setIsEditing: (value: boolean) => void;
+
+	// Editable state
+	isEditable: boolean;
+	setIsEditable: (value: boolean) => void;
 }
 
 export const useUIStore = create<UIState>()(
@@ -69,12 +73,14 @@ export const useUIStore = create<UIState>()(
 			setSidebarOpenMobile: (value) => set({ sidebarOpenMobile: value }),
 
 			// Page title
-			pageTitle: 'Agent Insight #20',
+			pageTitle: 'Loading...',
 			setPageTitle: (title) => set({ pageTitle: title }),
 
 			// Editing state
 			isEditing: false,
 			setIsEditing: (value) => set({ isEditing: value }),
+			isEditable: false,
+			setIsEditable: (value) => set({ isEditable: value }),
 		}),
 		{
 			name: 'ui-state',

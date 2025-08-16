@@ -5,11 +5,20 @@ import { Hono } from 'hono';
 import { handle } from 'hono/vercel';
 import { stream } from 'hono/streaming';
 import { zValidator } from '@hono/zod-validator';
-import { UserInteractionsData } from '@perflab/trace_engine/models/trace/handlers/UserInteractionsHandler';
 import { mastra } from '@/lib/ai/mastra';
 import { langfuse } from '@/lib/tools/langfuse';
 import { routerOutputSchema } from '@/lib/ai/mastra/agents/router';
 import dedent from 'dedent';
+import { verifySession } from '@/lib/session.server';
+import { db } from '@/drizzle/db';
+import { mcpServers } from '@/drizzle/schema';
+import { eq, and } from 'drizzle-orm';
+import { getMcpServerInfo } from '@/lib/ai/mastra/capabilities';
+import { testMcpServerConnection } from '@/lib/ai/mastra/connectivity';
+import { exchangeOAuthCode } from '@/lib/ai/mastra/oauthExchange';
+import { telemetryService } from '@/lib/ai/mastra/monitoring/TelemetryService';
+import { performance } from 'node:perf_hooks';
+import { getUserEnabledServers } from '@/lib/ai/mastra/client/factory';
 
 export const runtime = 'nodejs';
 
@@ -23,31 +32,682 @@ const requestSchema = z.object({
 	traceFile: z.any().default(null),
 	inpInteractionAnimation: z.string().or(z.null()).default(null),
 	aiContext: z.string().or(z.null()).default(null),
+	toolApproval: z
+		.object({
+			approved: z.boolean(),
+			toolCall: z.object({
+				toolName: z.string(),
+				arguments: z.record(z.any()),
+				serverName: z.string(),
+				reason: z.string(),
+			}),
+		})
+		.optional(),
 });
 
 // Create Hono app for chat API
 const chat = new Hono().basePath('/api');
+
+// MCP Server management endpoints
+// GET /api/mcp/servers - List user's MCP servers
+chat.get('/mcp/servers', async (c) => {
+	try {
+		const sessionData = await verifySession();
+		if (!sessionData) {
+			return c.json({ error: 'Authentication required' }, 401);
+		}
+
+		const servers = await db
+			.select()
+			.from(mcpServers)
+			.where(eq(mcpServers.userId, sessionData.userId));
+
+		return c.json(servers);
+	} catch (error) {
+		console.error('Error fetching MCP servers:', error);
+		return c.json({ error: 'Failed to fetch servers' }, 500);
+	}
+});
+
+// POST /api/mcp/servers - Create a new MCP server
+const createServerSchema = z.object({
+	name: z.string().min(1),
+	url: z.string().url(),
+});
+
+chat.post('/mcp/servers', zValidator('json', createServerSchema), async (c) => {
+	try {
+		const sessionData = await verifySession();
+		if (!sessionData) {
+			return c.json({ error: 'Authentication required' }, 401);
+		}
+
+		const { name, url } = c.req.valid('json');
+		const serverId = crypto.randomUUID();
+
+		await db.insert(mcpServers).values({
+			id: serverId,
+			userId: sessionData.userId,
+			name,
+			url,
+			enabled: true,
+			authStatus: 'unknown', // Will be tested after creation
+			createdAt: new Date().toISOString(),
+			updatedAt: new Date().toISOString(),
+		});
+
+		// Test the connection to detect OAuth requirements
+		try {
+			await testMcpServerConnection(sessionData.userId, serverId);
+		} catch (error) {
+			// If connection test fails, still return success but with unknown status
+			console.log('Server connection test failed:', error);
+		}
+
+		return c.json({ id: serverId, name, url, enabled: true });
+	} catch (error) {
+		console.error('Error creating MCP server:', error);
+		return c.json({ error: 'Failed to create server' }, 500);
+	}
+});
+
+// PATCH /api/mcp/servers/:id - Update a server
+const updateServerSchema = z.object({
+	name: z.string().min(1).optional(),
+	enabled: z.boolean().optional(),
+});
+
+chat.patch(
+	'/mcp/servers/:id',
+	zValidator('json', updateServerSchema),
+	async (c) => {
+		try {
+			const sessionData = await verifySession();
+			if (!sessionData) {
+				return c.json({ error: 'Authentication required' }, 401);
+			}
+
+			const serverId = c.req.param('id');
+			const updates = c.req.valid('json');
+
+			// Verify ownership
+			const server = await db
+				.select()
+				.from(mcpServers)
+				.where(
+					and(
+						eq(mcpServers.id, serverId),
+						eq(mcpServers.userId, sessionData.userId),
+					),
+				)
+				.limit(1);
+
+			if (server.length === 0) {
+				return c.json({ error: 'Server not found' }, 404);
+			}
+
+			await db
+				.update(mcpServers)
+				.set({
+					...updates,
+					updatedAt: new Date().toISOString(),
+				})
+				.where(eq(mcpServers.id, serverId));
+
+			return c.json({ success: true });
+		} catch (error) {
+			console.error('Error updating MCP server:', error);
+			return c.json({ error: 'Failed to update server' }, 500);
+		}
+	},
+);
+
+// GET /api/mcp/server-info/:id - Get server capabilities
+chat.get('/mcp/server-info/:id', async (c) => {
+	try {
+		const sessionData = await verifySession();
+		if (!sessionData) {
+			return c.json({ error: 'Authentication required' }, 401);
+		}
+
+		const serverId = c.req.param('id');
+		const serverInfo = await getMcpServerInfo(sessionData.userId, serverId);
+
+		if (!serverInfo) {
+			return c.json({ error: 'Server not found' }, 404);
+		}
+
+		return c.json(serverInfo);
+	} catch (error) {
+		console.error('Error fetching server info:', error);
+		return c.json({ error: 'Failed to fetch server info' }, 500);
+	}
+});
+
+// DELETE /api/mcp/servers/:id - Delete a server
+chat.delete('/mcp/servers/:id', async (c) => {
+	try {
+		const sessionData = await verifySession();
+		if (!sessionData) {
+			return c.json({ error: 'Authentication required' }, 401);
+		}
+
+		const serverId = c.req.param('id');
+
+		// Verify ownership before deletion
+		const server = await db
+			.select()
+			.from(mcpServers)
+			.where(
+				and(
+					eq(mcpServers.id, serverId),
+					eq(mcpServers.userId, sessionData.userId),
+				),
+			)
+			.limit(1);
+
+		if (server.length === 0) {
+			return c.json({ error: 'Server not found' }, 404);
+		}
+
+		await db.delete(mcpServers).where(eq(mcpServers.id, serverId));
+
+		return c.json({ success: true });
+	} catch (error) {
+		console.error('Error deleting MCP server:', error);
+		return c.json({ error: 'Failed to delete server' }, 500);
+	}
+});
+
+// POST /api/mcp/servers/:id/test - Test connection to MCP server
+chat.post('/mcp/servers/:id/test', async (c) => {
+	try {
+		const sessionData = await verifySession();
+		if (!sessionData) {
+			return c.json({ error: 'Authentication required' }, 401);
+		}
+
+		const serverId = c.req.param('id');
+
+		try {
+			const result = await testMcpServerConnection(
+				sessionData.userId,
+				serverId,
+			);
+
+			// Track successful test
+			const testResult = result.status === 'connected' ? 'success' : 'failed';
+			telemetryService.trackServerTest(testResult, serverId);
+
+			return c.json(result);
+		} catch (testError) {
+			// Track failed test
+			telemetryService.trackServerTest('failed', serverId);
+			throw testError;
+		}
+	} catch (error) {
+		console.error('Error testing MCP server connection:', error);
+
+		// Track error if not already tracked
+		const errorCategory = telemetryService.classifyError(error);
+		telemetryService.trackCriticalError(errorCategory, 'server_test');
+
+		return c.json(
+			{
+				error: 'Connection test failed',
+				message: error instanceof Error ? error.message : 'Unknown error',
+			},
+			500,
+		);
+	}
+});
+
+// OAuth callback endpoints
+
+// GET /api/mcp/oauth/callback - Handle OAuth authorization callback
+const oauthCallbackSchema = z.object({
+	code: z.string(),
+	state: z.string(),
+	iss: z.string().optional(), // issuer parameter
+});
+
+chat.get(
+	'/mcp/oauth/callback',
+	zValidator('query', oauthCallbackSchema),
+	async (c) => {
+		performance.mark('oauthAuthorizationStart');
+
+		try {
+			const { code, state, iss } = c.req.valid('query');
+
+			// Don't require authentication - validate using state and issuer instead
+
+			// Find the server by matching the issuer and auth status
+			// Since we don't have session data, we need to find all servers requiring auth that match the issuer
+			const servers = await db
+				.select()
+				.from(mcpServers)
+				.where(eq(mcpServers.authStatus, 'required'));
+
+			let matchingServer = null;
+			if (iss) {
+				// Try to match by issuer URL
+				matchingServer = servers.find((server) => {
+					try {
+						const serverUrl = new URL(server.url);
+						const issuerUrl = new URL(iss);
+						return serverUrl.origin === issuerUrl.origin;
+					} catch {
+						return false;
+					}
+				});
+			}
+
+			// If no issuer match, take the first server requiring auth (for backward compatibility)
+			if (!matchingServer && servers.length > 0) {
+				matchingServer = servers[0];
+			}
+
+			if (!matchingServer) {
+				const duration = performance.measure(
+					'oauthAuthorization',
+					'oauthAuthorizationStart',
+				).duration;
+				telemetryService.trackClientAuthorize('failed', duration);
+				performance.clearMarks('oauthAuthorizationStart');
+				performance.clearMeasures('oauthAuthorization');
+
+				return c.html(`
+					<html>
+						<body>
+							<h1>Authorization Error</h1>
+							<p>No matching server found for this authorization callback.</p>
+							<p><a href="/mcp-servers">Return to MCP Servers</a></p>
+						</body>
+					</html>
+				`);
+			}
+
+			const serverRecord = matchingServer;
+
+			try {
+				console.log(
+					`[OAuth] Processing authorization callback for ${serverRecord.name}`,
+				);
+				console.log(`[OAuth] Code: ${code}, State: ${state}`);
+
+				// Exchange authorization code for tokens
+				const tokenData = await exchangeOAuthCode(
+					serverRecord.url,
+					code,
+					state,
+				);
+
+				// Calculate token expiration time
+				const tokenExpiresAt = tokenData.expiresIn
+					? new Date(Date.now() + tokenData.expiresIn * 1000)
+					: undefined;
+
+				// Update server with tokens and mark as authorized
+				await db
+					.update(mcpServers)
+					.set({
+						authStatus: 'authorized',
+						accessToken: tokenData.accessToken,
+						refreshToken: tokenData.refreshToken || null,
+						tokenExpiresAt: tokenExpiresAt?.toISOString() || null,
+						clientId: tokenData.clientId || null, // Save the successful client_id
+						updatedAt: new Date().toISOString(),
+					})
+					.where(eq(mcpServers.id, serverRecord.id));
+
+				console.log(
+					`[OAuth] Successfully authorized ${serverRecord.name} with tokens`,
+				);
+
+				// Track successful OAuth authorization with timing
+				const duration = performance.measure(
+					'oauthAuthorization',
+					'oauthAuthorizationStart',
+				).duration;
+				telemetryService.trackClientAuthorize('success', duration);
+
+				// Also track the original server auth event
+				const authMethod = serverRecord.clientId ? 'oauth' : 'api_key';
+				telemetryService.trackServerAuth('success', authMethod);
+
+				// Clear performance marks and measures
+				performance.clearMarks('oauthAuthorizationStart');
+				performance.clearMeasures('oauthAuthorization');
+
+				// Redirect to the MCP servers page with success message
+				return c.html(`
+					<html>
+						<body>
+							<h1>Authorization Successful</h1>
+							<p>Successfully authorized access to ${serverRecord.name}!</p>
+							<p><a href="/mcp-servers">Return to MCP Servers</a></p>
+							<script>
+								// Auto-redirect after 3 seconds
+								setTimeout(() => {
+									window.location.href = '/mcp-servers';
+								}, 3000);
+							</script>
+						</body>
+					</html>
+				`);
+			} catch (error) {
+				console.error('OAuth callback error:', error);
+				console.error(
+					'[OAuth] Hint: Some servers require public client (no client_id) for token exchange. The exchange logic now automatically retries without client_id when invalid_client is detected.',
+				);
+
+				// Track failed OAuth authorization with timing
+				const duration = performance.measure(
+					'oauthAuthorization',
+					'oauthAuthorizationStart',
+				).duration;
+				telemetryService.trackClientAuthorize('failed', duration);
+
+				// Also track the original server auth failure
+				telemetryService.trackServerAuth('failed', 'oauth');
+
+				// Clear performance marks and measures
+				performance.clearMarks('oauthAuthorizationStart');
+				performance.clearMeasures('oauthAuthorization');
+
+				// Update server status to failed
+				await db
+					.update(mcpServers)
+					.set({
+						authStatus: 'failed',
+						updatedAt: new Date().toISOString(),
+					})
+					.where(eq(mcpServers.id, serverRecord.id));
+
+				return c.html(`
+					<html>
+						<body>
+							<h1>Authorization Failed</h1>
+							<p>Failed to authorize access to ${serverRecord.name}.</p>
+							<p>Error: ${error instanceof Error ? error.message : 'Unknown error'}</p>
+							<p><a href="/mcp-servers">Return to MCP Servers</a></p>
+						</body>
+					</html>
+				`);
+			}
+		} catch (error) {
+			console.error('OAuth callback error:', error);
+
+			// Track general failure with timing
+			const duration = performance.measure(
+				'oauthAuthorization',
+				'oauthAuthorizationStart',
+			).duration;
+			telemetryService.trackClientAuthorize('failed', duration);
+
+			// Clear performance marks and measures
+			performance.clearMarks('oauthAuthorizationStart');
+			performance.clearMeasures('oauthAuthorization');
+
+			return c.html(`
+				<html>
+					<body>
+						<h1>Authorization Error</h1>
+						<p>An unexpected error occurred during authorization.</p>
+						<p><a href="/mcp-servers">Return to MCP Servers</a></p>
+					</body>
+				</html>
+			`);
+		}
+	},
+);
+
+// Also handle POST requests for OAuth callback (some OAuth servers use POST)
+chat.post('/mcp/oauth/callback', async (c) => {
+	try {
+		// Don't require authentication - validate using state and issuer instead
+
+		// Try to get parameters from query string first
+		const url = new URL(c.req.url);
+		let code = url.searchParams.get('code');
+		let state = url.searchParams.get('state');
+		let iss = url.searchParams.get('iss');
+
+		// If not in query params, try to parse from body
+		if (!code || !state) {
+			try {
+				const body = await c.req.text();
+				if (!code) code = body.match(/code=([^&]+)/)?.[1] || null;
+				if (!state) state = body.match(/state=([^&]+)/)?.[1] || null;
+				if (!iss) iss = body.match(/iss=([^&]+)/)?.[1] || null;
+			} catch (error) {
+				console.log('Failed to parse body:', error);
+			}
+		}
+
+		if (!code || !state) {
+			return c.json({ error: 'Missing code or state parameter' }, 400);
+		}
+
+		// Find the server by matching the issuer and auth status
+		const servers = await db
+			.select()
+			.from(mcpServers)
+			.where(eq(mcpServers.authStatus, 'required'));
+
+		let matchingServer = null;
+		if (iss) {
+			const decodedIss = decodeURIComponent(iss);
+			matchingServer = servers.find((server) => {
+				try {
+					const serverUrl = new URL(server.url);
+					const issuerUrl = new URL(decodedIss);
+					return serverUrl.origin === issuerUrl.origin;
+				} catch {
+					return false;
+				}
+			});
+		}
+
+		if (!matchingServer && servers.length > 0) {
+			matchingServer = servers[0];
+		}
+
+		if (!matchingServer) {
+			return c.html(`
+				<html>
+					<body>
+						<h1>Authorization Error</h1>
+						<p>No matching server found for this authorization callback.</p>
+						<p><a href="/mcp-servers">Return to MCP Servers</a></p>
+					</body>
+				</html>
+			`);
+		}
+
+		const serverRecord = matchingServer;
+
+		try {
+			console.log(
+				`[OAuth] Processing authorization callback for ${serverRecord.name}`,
+			);
+			console.log(`[OAuth] Code: ${code}, State: ${state}`);
+
+			// Exchange authorization code for tokens
+			const tokenData = await exchangeOAuthCode(serverRecord.url, code, state);
+
+			// Calculate token expiration time
+			const tokenExpiresAt = tokenData.expiresIn
+				? new Date(Date.now() + tokenData.expiresIn * 1000)
+				: undefined;
+
+			// Update server with tokens and mark as authorized
+			await db
+				.update(mcpServers)
+				.set({
+					authStatus: 'authorized',
+					accessToken: tokenData.accessToken,
+					refreshToken: tokenData.refreshToken || null,
+					tokenExpiresAt: tokenExpiresAt?.toISOString() || null,
+					clientId: tokenData.clientId || null, // Save the successful client_id
+					updatedAt: new Date().toISOString(),
+				})
+				.where(eq(mcpServers.id, serverRecord.id));
+
+			console.log(
+				`[OAuth] Successfully authorized ${serverRecord.name} with tokens`,
+			);
+
+			// Track successful OAuth authorization
+			const authMethod = serverRecord.clientId ? 'oauth' : 'api_key';
+			telemetryService.trackServerAuth('success', authMethod);
+
+			// Redirect to the MCP servers page with success message
+			return c.html(`
+				<html>
+					<body>
+						<h1>Authorization Successful</h1>
+						<p>Successfully authorized access to ${serverRecord.name}!</p>
+						<p><a href="/mcp-servers">Return to MCP Servers</a></p>
+						<script>
+							// Auto-redirect after 3 seconds
+							setTimeout(() => {
+								window.location.href = '/mcp-servers';
+							}, 3000);
+						</script>
+					</body>
+				</html>
+			`);
+		} catch (error) {
+			console.error('OAuth callback error:', error);
+
+			// Track failed OAuth authorization
+			telemetryService.trackServerAuth('failed', 'oauth');
+
+			// Update server status to failed
+			await db
+				.update(mcpServers)
+				.set({
+					authStatus: 'failed',
+					updatedAt: new Date().toISOString(),
+				})
+				.where(eq(mcpServers.id, serverRecord.id));
+
+			return c.html(`
+				<html>
+					<body>
+						<h1>Authorization Failed</h1>
+						<p>Failed to authorize access to ${serverRecord.name}.</p>
+						<p>Error: ${error instanceof Error ? error.message : 'Unknown error'}</p>
+						<p><a href="/mcp-servers">Return to MCP Servers</a></p>
+					</body>
+				</html>
+			`);
+		}
+	} catch (error) {
+		console.error('OAuth callback error:', error);
+		return c.html(`
+			<html>
+				<body>
+					<h1>Authorization Error</h1>
+					<p>An unexpected error occurred during authorization.</p>
+					<p>Error: ${error instanceof Error ? error.message : 'Unknown error'}</p>
+					<p><a href="/mcp-servers">Return to MCP Servers</a></p>
+				</body>
+			</html>
+		`);
+	}
+});
 
 // POST endpoint for chat
 chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 	try {
 		const body = c.req.valid('json');
 		const messages = convertToCoreMessages(body.messages);
-		const files = body.files;
 		const insights: ReturnType<typeof analyseInsightsForCWV> = body.insights;
-		const userInteractions: UserInteractionsData = body.userInteractions;
-		const model = body.model;
-		const traceFile = body.traceFile;
 		const inpInteractionAnimation = body.inpInteractionAnimation;
 		const aiContext = body.aiContext;
+		const toolApproval = body.toolApproval;
 
 		if (messages.length === 0) {
 			return c.json({ error: 'No messages provided' }, 400);
 		}
 
+		const sessionData = await verifySession();
+
 		const dataStream = createDataStream({
 			execute: async (dataStreamWriter) => {
 				dataStreamWriter.writeData('initialized call');
+
+				if (toolApproval && sessionData) {
+					performance.mark('toolApprovalStart');
+					const mcpWorkflow = mastra.getWorkflow('mcpWorkflow');
+					const run = mcpWorkflow.createRun();
+
+					const unsubscribe = run.watch((event) => {
+						console.log('========== MCP workflow execution event', event);
+					});
+
+					if (toolApproval.approved) {
+						// Track tool approval
+						const responseTime = performance.measure(
+							'toolApproval',
+							'toolApprovalStart',
+						).duration;
+						telemetryService.trackToolApproval('approved', responseTime);
+						await run.start({
+							inputData: {
+								messages,
+								userId: sessionData.userId,
+								action: 'execute',
+								toolCallRequest: toolApproval.toolCall,
+								dataStream: dataStreamWriter,
+							},
+						});
+					} else {
+						// Track tool rejection
+						const responseTime = performance.measure(
+							'toolApproval',
+							'toolApprovalStart',
+						).duration;
+						telemetryService.trackToolApproval('rejected', responseTime);
+
+						dataStreamWriter.writeData({
+							type: 'tool-call-approval',
+							runId: run.runId,
+							status: 'completed',
+							content: {
+								type: 'tool-call-approval',
+								data: {
+									toolCall: toolApproval.toolCall,
+									status: 'denied',
+									title: 'Tool Call Denied',
+									timestamp: Date.now(),
+								},
+							},
+						});
+
+						performance.clearMarks();
+						performance.clearMeasures();
+
+						const agent = mastra.getAgent('smallAssistant');
+
+						const stream = await agent.stream([
+							...messages,
+							{
+								role: 'system',
+								content: dedent`You are a helpful assistant that can help the user with their request.
+									The user has denied the tool call. Ask if the user needs clarification with their request or if they wish to carry on with a different task.
+									`,
+							},
+						]);
+						stream.mergeIntoDataStream(dataStreamWriter);
+					}
+
+					unsubscribe();
+					return;
+				}
 
 				const routerAgent = mastra.getAgent('routerAgent');
 
@@ -57,7 +717,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 
 				const smallAssistant = mastra.getAgent('smallAssistant');
 
-				if (object.certainty < 0.5) {
+				if (object.certainty < 0.5 && object.workflow !== 'mcpWorkflow') {
 					const stream = await smallAssistant.stream([
 						...messages,
 						{
@@ -83,7 +743,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 									console.log('========== event', event);
 								});
 
-								const _run = await run.start({
+								await run.start({
 									inputData: {
 										// @ts-expect-error - TODO: fix this type error
 										insights,
@@ -115,7 +775,7 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 								console.log('========== event', event);
 							});
 
-							const _run = await run.start({
+							await run.start({
 								inputData: {
 									messages,
 									dataStream: dataStreamWriter,
@@ -124,19 +784,75 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 
 							unsubscribe();
 							break;
+						case 'mcpWorkflow':
+							if (sessionData) {
+								const servers = await getUserEnabledServers(sessionData.userId);
+
+								if (servers.length === 0) {
+									const stream = await mastra
+										.getAgent('largeAssistant')
+										.stream(messages);
+
+									stream.mergeIntoDataStream(dataStreamWriter, {
+										sendReasoning: true,
+										sendSources: true,
+									});
+								} else {
+									const mcpWorkflow = mastra.getWorkflow('mcpWorkflow');
+									const run = mcpWorkflow.createRun();
+
+									const unsubscribe = run.watch((event) => {
+										console.log('========== MCP workflow event', event);
+									});
+
+									const stream = run.streamVNext({
+										inputData: {
+											messages,
+											userId: sessionData.userId,
+											action: 'discover',
+											dataStream: dataStreamWriter,
+										},
+									});
+
+									for await (const chunk of stream) {
+										dataStreamWriter.writeData(chunk);
+									}
+
+									unsubscribe();
+								}
+							} else {
+								// If no session, use regular assistant
+								const stream = await mastra.getAgent('largeAssistant').stream([
+									...messages,
+									{
+										role: 'system',
+										content: dedent`You are a helpful assistant that can help the user with their request.
+												External tool integration requires authentication. Please ask the user to log in to access MCP tools.
+												`,
+									},
+								]);
+
+								stream.mergeIntoDataStream(dataStreamWriter);
+							}
+
+							break;
 						default:
+							// Use standard large assistant for general queries
 							const stream = await mastra
 								.getAgent('largeAssistant')
 								.stream(messages);
+
 							stream.mergeIntoDataStream(dataStreamWriter, {
 								sendReasoning: true,
 								sendSources: true,
 							});
+
 							break;
 					}
 				}
 			},
 			onError: (error) => {
+				console.error('Error in chat API:', error);
 				return error instanceof Error ? error.message : String(error);
 			},
 		});
@@ -151,13 +867,20 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 		}
 
 		return stream(c, (stream) =>
-			stream.pipe(dataStream.pipeThrough(new TextEncoderStream())),
+			stream
+				.pipe(dataStream.pipeThrough(new TextEncoderStream()))
+				.catch((error) => {
+					console.error('Error in chat API:', error);
+					throw error;
+				})
+				.finally(async () => {
+					// Cleanup completed
+				}),
 		);
 	} catch (error) {
 		console.error('Error in chat API:', error);
 
 		if (error instanceof Error && error.name === 'AbortError') {
-			// Return a specific status code for aborted requests
 			console.log('Returning aborted response');
 			// @ts-expect-error - 499 status code is not standard, but it refers for user cancellation
 			return c.json({ error: 'Request aborted' }, 499);
@@ -198,3 +921,5 @@ chat.post('/suggest', zValidator('json', requestSchema), async (c) => {
 
 export const GET = handle(chat);
 export const POST = handle(chat);
+export const PATCH = handle(chat);
+export const DELETE = handle(chat);

@@ -14,7 +14,7 @@ export default function UnsubscribeLayout({
 }) {
 	return (
 		<Suspense>
-			<div className="min-h-screen bg-peppermint-950 dark:bg-peppermint-100">
+			<div className="bg-peppermint-950 dark:bg-peppermint-100 min-h-screen">
 				{children}
 			</div>
 		</Suspense>

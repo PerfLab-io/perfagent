@@ -10,7 +10,7 @@ import {
 	bigserial,
 	boolean,
 } from 'drizzle-orm/pg-core';
-import { sql } from 'drizzle-orm';
+import { sql, eq, isNotNull } from 'drizzle-orm';
 import { relations } from 'drizzle-orm';
 
 export const prismaMigrations = pgTable('_prisma_migrations', {
@@ -534,6 +534,7 @@ export const userRelations = relations(user, ({ one, many }) => ({
 	organizations: many(organizationMember),
 	sentInvites: many(organizationInvite, { relationName: 'invitedBy' }),
 	receivedInvites: many(organizationInvite, { relationName: 'invitedUser' }),
+	mcpServers: many(mcpServers),
 }));
 
 export const userImageRelations = relations(userImage, ({ one }) => ({
@@ -672,3 +673,76 @@ export const organizationInviteRelations = relations(
 		}),
 	}),
 );
+
+export const mcpServers = pgTable(
+	'mcp_servers',
+	{
+		id: text().primaryKey().notNull(),
+		userId: text('user_id').notNull(),
+		name: text().notNull(),
+		url: text().notNull(),
+		enabled: boolean().default(true).notNull(),
+		// OAuth authentication status
+		authStatus: text('auth_status').default('unknown').notNull(), // 'unknown', 'required', 'authorized', 'failed'
+		// OAuth token storage (encrypted)
+		accessToken: text('access_token'),
+		refreshToken: text('refresh_token'),
+		tokenExpiresAt: timestamp('token_expires_at', {
+			precision: 3,
+			mode: 'string',
+		}),
+		// OAuth client_id used for this server (for dynamic client registration)
+		clientId: text('client_id'),
+		createdAt: timestamp('created_at', { precision: 3, mode: 'string' })
+			.default(sql`CURRENT_TIMESTAMP`)
+			.notNull(),
+		updatedAt: timestamp('updated_at', {
+			precision: 3,
+			mode: 'string',
+		}).notNull(),
+	},
+	(table) => [
+		// Original userId index
+		index('mcp_servers_userId_idx').using(
+			'btree',
+			table.userId.asc().nullsLast().op('text_ops'),
+		),
+		// Composite index for user + enabled servers (most frequent query)
+		index('mcp_servers_user_enabled_idx').using(
+			'btree',
+			table.userId.asc().nullsLast().op('text_ops'),
+			table.enabled.asc().nullsLast(),
+		),
+		// Index for auth status filtering
+		index('mcp_servers_auth_status_idx').using(
+			'btree',
+			table.authStatus.asc().nullsLast().op('text_ops'),
+		),
+		// Index for token expiration checks
+		index('mcp_servers_token_expiry_idx').using(
+			'btree',
+			table.tokenExpiresAt.asc().nullsLast(),
+		),
+		// Composite index for auth operations (user + server + auth status)
+		index('mcp_servers_user_auth_idx').using(
+			'btree',
+			table.userId.asc().nullsLast().op('text_ops'),
+			table.id.asc().nullsLast().op('text_ops'),
+			table.authStatus.asc().nullsLast().op('text_ops'),
+		),
+		foreignKey({
+			columns: [table.userId],
+			foreignColumns: [user.id],
+			name: 'mcp_servers_userId_fkey',
+		})
+			.onUpdate('cascade')
+			.onDelete('cascade'),
+	],
+);
+
+export const mcpServersRelations = relations(mcpServers, ({ one }) => ({
+	user: one(user, {
+		fields: [mcpServers.userId],
+		references: [user.id],
+	}),
+}));

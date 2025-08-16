@@ -1,4 +1,11 @@
-import { preamble } from '@perflab/trace_engine/panels/ai_assistance/standalone';
+import {
+	generateToolAwarePrompt,
+	generateToolSummary,
+	generateDynamicContextualPrompt,
+	generateCategoryBasedRecommendations,
+	generateToolExecutionPlan,
+} from './mastra/toolAwarePrompts';
+
 export const grounding = `
 **Knowledge Constraints:**
 - **Use Only Provided Information**: You must **only** use information given in this system prompt and from the outputs of your available tools to formulate responses. **Ignore any internal or prior knowledge** not present in these sources. If you have an answer from memory that isn’t supported by the provided info, do **not** use it.
@@ -619,6 +626,11 @@ ${grounding}
 
 -- Today's date is ${new Date().toLocaleDateString()}
 
+## Available Tools and Capabilities
+
+You may have access to external tools and services through connected MCP (Model Context Protocol) servers that can enhance your analysis capabilities.
+When answering questions, consider what tools you have available and whether any of your available external tools could provide additional insights or perform specific tasks that would benefit the user's request.
+
 ## Main goals
 
 When asked, and only when specifically asked, You should state that you can help with the following:
@@ -628,6 +640,7 @@ When asked, and only when specifically asked, You should state that you can help
 - Suggest Optimization Strategies
 - Explain Web Performance Metrics
 - Research and provide insights on web performance topics
+- Execute external tools to enhance analysis (when available)
 
 For any other casual message or greeting, you should not mention your main goals but simply answer politely and help the user with their question.
 You can provide a short description for each of the above goals better explain what each one means. And offer the user to choose which one they are interested in to better assist them.
@@ -676,6 +689,18 @@ You are a sentiment analysis and smart router that will analyse user messages an
 You have the following workflows available:
 - cwvInsightsWorkflow: A workflow that will analyse a trace file or user's (app, website, page, portal, etc.) metrics data and provide insights about the performance. This workflow is not required for general questions about performance, only for use when user's message is related to 'their' (app, website, page, portal, etc.) metrics or trace data.
 - researchWorkflow: A workflow that will research a given topic and provide a report about the findings.
+- mcpWorkflow: A workflow that discovers available external tools and facilitates user-approved tool execution. Use this when the user's request could benefit from external tool integrations or when they explicitly mention needing external services/APIs.
+
+**MCP Workflow Guidelines:**
+Choose mcpWorkflow when:
+- User asks for external data or services (APIs, databases, external analysis tools)
+- User mentions specific external platforms or services they want to integrate with
+- User needs functionality that requires external tool capabilities beyond what is available in the grounding data
+- User explicitly asks about available tools or integrations
+- The request would benefit from tool discovery and user-controlled execution
+- The request seem specific and it does not match the grounding or other workflows
+
+For other cases, prefer direct responses or other workflows as appropriate.
 
 Example possible outcome:
 { // I may need the insights workflow: User asks about his own performance metrics but there's a medium level of uncertainty if you should use the cwvInsightsWorkflow or the researchWorkflow, so you preffer to choose the cwvInsightsWorkflow
@@ -754,3 +779,247 @@ type ResearchPlan = {
 
 ${grounding}
 `;
+
+/**
+ * Enhances a system prompt with MCP tool awareness when toolsets are available
+ * @param basePrompt - The base system prompt to enhance
+ * @param toolsets - Available MCP toolsets (optional)
+ * @returns Enhanced prompt with MCP context or original prompt
+ */
+export function enhancePromptWithMcpContext(
+	basePrompt: string,
+	toolsets?: Record<string, any>,
+): string {
+	if (!toolsets || Object.keys(toolsets).length === 0) {
+		return basePrompt;
+	}
+
+	// Extract tool information from toolsets
+	const availableTools: string[] = [];
+	const toolCategories = new Set<string>();
+
+	for (const [serverName, toolset] of Object.entries(toolsets)) {
+		if (toolset?.tools) {
+			for (const tool of toolset.tools) {
+				if (tool.name && tool.description) {
+					availableTools.push(`- **${tool.name}**: ${tool.description}`);
+
+					// Categorize tools based on description keywords
+					const desc = tool.description.toLowerCase();
+					if (desc.includes('code') || desc.includes('development')) {
+						toolCategories.add('code analysis');
+					} else if (desc.includes('test') || desc.includes('performance')) {
+						toolCategories.add('performance testing');
+					} else if (desc.includes('website') || desc.includes('web')) {
+						toolCategories.add('website analysis');
+					} else if (desc.includes('data') || desc.includes('process')) {
+						toolCategories.add('data processing');
+					} else {
+						toolCategories.add('general utilities');
+					}
+				}
+			}
+		}
+	}
+
+	if (availableTools.length === 0) {
+		return basePrompt;
+	}
+
+	// Create MCP context section
+	const mcpContext = `
+## Connected External Tools
+
+You currently have access to the following external tools through MCP servers:
+
+${availableTools.join('\n')}
+
+**Important Guidelines for Tool Usage:**
+- Consider using these tools when they can provide specific analysis or data that would enhance your web performance insights
+- These tools can help with tasks like code analysis, performance testing, data processing, and website optimization
+- When a user's question could benefit from external tool analysis, suggest or use the appropriate tools
+- Always explain what tools you're using and why they're relevant to the user's performance question
+- Tool results should be integrated into your web performance analysis and recommendations
+
+**Tool Categories Available:** ${Array.from(toolCategories).join(', ')}
+
+`;
+
+	// Insert the MCP context after the main heading but before the main goals
+	const enhancedPrompt = basePrompt.replace(
+		/## Main goals/,
+		`${mcpContext}## Main goals`,
+	);
+
+	return enhancedPrompt;
+}
+
+/**
+ * Creates an MCP-aware system prompt for the large model
+ * @param toolsets - Available MCP toolsets (optional)
+ * @returns Enhanced system prompt with MCP context
+ */
+export function createMcpAwareLargeModelPrompt(
+	toolsets?: Record<string, any>,
+): string {
+	// Temporarily simplified to debug resource listing issue
+	const toolSummary = generateToolSummary();
+
+	// If we have tools from the catalog, use a simplified system
+	if (toolSummary) {
+		const enhancedPrompt = largeModelSystemPrompt.replace(
+			/## Available Tools and Capabilities\n\nYou may have access to external tools and services through connected MCP \(Model Context Protocol\) servers that can enhance your analysis capabilities\.\nWhen answering questions, consider what tools you have available and whether any of your available external tools could provide additional insights or perform specific tasks that would benefit the user's request\./,
+			`## Available Tools and Capabilities
+
+${toolSummary}
+
+**MCP Resource Access Instructions:**
+- When listing files or resources from MCP servers, provide the complete individual resource list
+- Do NOT summarize or group resources by file type
+- List each resource separately with its URI and details
+- Present the actual resource names and paths, not just file type summaries
+- If a user asks for files from a chat or resource list, show the individual file names and URIs
+
+**Integration with Performance Analysis:**
+- Use external tools to gather additional data that can enhance your web performance insights
+- These tools complement your core web performance analysis capabilities
+- When suggesting optimizations, consider if external tools can provide more specific data or validation`,
+		);
+
+		return enhancedPrompt;
+	}
+
+	// Fallback to the old system if no tools are available from catalog
+	return enhancePromptWithMcpContext(largeModelSystemPrompt, toolsets);
+}
+
+/**
+ * Creates an MCP-aware system prompt for the router
+ * @param toolsets - Available MCP toolsets (optional)
+ * @returns Enhanced router prompt with MCP context
+ */
+export function createMcpAwareRouterPrompt(
+	toolsets?: Record<string, any>,
+): string {
+	// Get tool-aware prompt from the catalog
+	const toolAwareSection = generateToolAwarePrompt({
+		includeUsageInstructions: false, // Router doesn't need detailed usage instructions
+		includeSafetyGuidelines: false,
+		includeExamples: false,
+		filterBySafetyLevel: ['safe', 'caution'],
+		maxToolsPerCategory: 3, // Keep it concise for router
+	});
+
+	// If we have tools from the catalog, enhance the router prompt
+	if (toolAwareSection) {
+		const toolSummary = generateToolSummary();
+
+		const enhancedPrompt = routerSystemPrompt.replace(
+			/\*\*MCP Tool Considerations:\*\*\nWhen external MCP tools are available, consider that:\n- Simple questions can often be answered directly using available tools without needing full workflows\n- Some analysis or even initial research questions might be better handled with those external tools first rather than reaching out to workflows right away\n- If the user's request could be fulfilled with available external tools, lean towards null workflow with higher certainty for direct tool usage\n- Always consider whether MCP tools can provide more specific and immediate value than general research workflows/,
+			`**External Tools Available:**
+${toolSummary}
+
+**Available External Tools:**
+${toolAwareSection}
+
+**MCP Tool Considerations:**
+When external MCP tools are available, consider that:
+- Simple questions can often be answered directly using available tools without needing full workflows
+- Some analysis or research questions might be better handled with external tools first
+- If the user's request could be fulfilled with available external tools, lean towards null workflow with higher certainty for direct tool usage
+- Consider tool categories: external tools may provide specialized analysis that workflows can't match
+- Always prioritize external tools for specific technical analysis over general research workflows`,
+		);
+
+		return enhancedPrompt;
+	}
+
+	// Fallback to the old system if no tools are available from catalog
+	return enhancePromptWithMcpContext(routerSystemPrompt, toolsets);
+}
+
+/**
+ * Creates a context-aware prompt that adapts to user queries
+ * @param userQuery - The user's query to generate context for
+ * @param basePrompt - The base system prompt to enhance
+ * @returns Enhanced prompt with contextual tool recommendations
+ */
+export function createContextAwarePrompt(
+	userQuery: string,
+	basePrompt: string,
+): string {
+	// Generate dynamic contextual recommendations
+	const contextualPrompt = generateDynamicContextualPrompt(userQuery, false);
+	const categoryRecommendations =
+		generateCategoryBasedRecommendations(userQuery);
+	const executionPlan = generateToolExecutionPlan(userQuery);
+
+	if (!contextualPrompt && !categoryRecommendations) {
+		return basePrompt;
+	}
+
+	// Construct the enhanced prompt
+	const contextualSection = [];
+
+	if (contextualPrompt) {
+		contextualSection.push(contextualPrompt);
+	}
+
+	if (categoryRecommendations) {
+		contextualSection.push('### Query-Specific Tool Recommendations');
+		contextualSection.push('');
+		contextualSection.push(categoryRecommendations);
+	}
+
+	if (executionPlan.plan.length > 0) {
+		contextualSection.push('### Recommended Execution Plan');
+		contextualSection.push('');
+		contextualSection.push(
+			`**Estimated Duration:** ${executionPlan.estimatedDuration}`,
+		);
+		contextualSection.push(
+			`**Risk Level:** ${executionPlan.riskLevel.toUpperCase()}`,
+		);
+		contextualSection.push('');
+		contextualSection.push('**Steps:**');
+		executionPlan.plan.forEach((step) => {
+			contextualSection.push(
+				`${step.step}. **${step.action}** (${step.toolCategory})`,
+			);
+			contextualSection.push(`   Rationale: ${step.rationale}`);
+			if (step.tools.length > 0) {
+				contextualSection.push(`   Suggested tools: ${step.tools.join(', ')}`);
+			}
+		});
+		contextualSection.push('');
+	}
+
+	// Insert the contextual section after the main capabilities section
+	const enhancedPrompt = basePrompt.replace(
+		/(## Available Tools and Capabilities[\s\S]*?)(\n## Main goals)/,
+		`$1\n\n${contextualSection.join('\n')}$2`,
+	);
+
+	return enhancedPrompt;
+}
+
+/**
+ * Enhanced MCP-aware
+ * @param toolsets - Available MCP toolsets (optional)
+ * @param userQuery - User's current query for context (optional)
+ * @returns Fully enhanced system prompt with Gemini CLI patterns
+ */
+export function createAdvancedMcpAwareLargeModelPrompt(
+	toolsets?: Record<string, any>,
+	userQuery?: string,
+): string {
+	// Start with the enhanced tool-aware prompt
+	let enhancedPrompt = createMcpAwareLargeModelPrompt(toolsets);
+
+	// If we have a user query, add contextual enhancements
+	if (userQuery) {
+		enhancedPrompt = createContextAwarePrompt(userQuery, enhancedPrompt);
+	}
+
+	return enhancedPrompt;
+}

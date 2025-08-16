@@ -11,7 +11,8 @@ const buttonVariants = cva(
 	{
 		variants: {
 			variant: {
-				default: 'bg-primary text-primary-foreground hover:bg-primary/90',
+				default:
+					'bg-primary border border-transparent text-primary-foreground hover:bg-primary/45 hover:border-primary-foreground',
 				destructive:
 					'bg-destructive text-destructive-foreground hover:bg-destructive/90',
 				outline:
@@ -24,11 +25,11 @@ const buttonVariants = cva(
 				link: 'text-primary underline-offset-4 hover:underline',
 				// Updated question variant to use our color scheme
 				question:
-					'bg-card hover:bg-border hover:text-card text-midnight-950 dark:text-peppermint-950 border border-border/20 shadow-xs justify-start gap-2 px-5 py-4 text-base font-normal',
+					'bg-card hover:bg-border hover:text-card text-midnight-950 dark:text-peppermint-950 border border-border/20 shadow-xs justify-start gap-2 px-5 py-4 font-normal',
 			},
 			size: {
 				default: 'h-10 px-4 py-2',
-				sm: 'h-9 rounded-md px-3',
+				sm: 'h-8 rounded-md px-2 text-xs',
 				lg: 'h-11 rounded-md px-8',
 				icon: 'h-10 w-10',
 				iconSmall: 'h-6 w-6 rounded-sm',

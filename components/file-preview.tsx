@@ -105,7 +105,7 @@ export function FilePreview({
 	const containerClasses = useMemo(
 		() =>
 			cn(
-				'flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm',
+				'border-border bg-background flex items-center gap-2 rounded-lg border px-3 py-2 text-sm',
 				'transition-all duration-300 ease-out',
 				visible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0',
 			),
@@ -131,13 +131,13 @@ export function FilePreview({
 
 			<div className="max-w-[200px] flex-1 truncate">
 				<div className="truncate font-medium">{file.name}</div>
-				<div className="text-xs text-foreground">{formattedSize}</div>
+				<div className="text-foreground text-xs">{formattedSize}</div>
 			</div>
 
 			<button
 				onClick={onRemove}
 				onKeyDown={handleKeyDown}
-				className="rounded p-1 text-foreground transition-colors hover:bg-neutral-100 hover:text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary/50 dark:hover:bg-neutral-800"
+				className="text-foreground hover:text-foreground focus:ring-primary/50 rounded p-1 transition-colors hover:bg-neutral-100 focus:ring-2 focus:outline-hidden dark:hover:bg-neutral-800"
 				aria-label={removeButtonLabel}
 				title={removeButtonLabel}
 				tabIndex={0}

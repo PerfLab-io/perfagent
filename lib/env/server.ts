@@ -11,6 +11,11 @@ export const serverEnv = createEnv({
 		LANGFUSE_PUBLIC_KEY: z.string().min(1),
 		LANGFUSE_BASEURL: z.string().min(1),
 		DB_URL: z.string().min(1),
+		KV_REST_API_URL: z.string().min(1),
+		KV_REST_API_TOKEN: z.string().min(1),
+		QSTASH_TOKEN: z.string().min(1),
+		QSTASH_CURRENT_SIGNING_KEY: z.string().min(1),
+		QSTASH_NEXT_SIGNING_KEY: z.string().min(1),
 	},
 	experimental__runtimeEnv: process.env,
 });

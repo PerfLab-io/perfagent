@@ -3,7 +3,6 @@
 import { resend } from '@/lib/resend';
 import { emailSchema } from '@/lib/validations/email';
 
-// Check if we're in a local/development environment
 const isLocalEnvironment = process.env.NODE_ENV === 'development';
 
 // Waitlist audience name - should match the one in subscribe.ts
@@ -33,7 +32,6 @@ async function getWaitlistAudienceId() {
 			throw new Error('Failed to list audiences');
 		}
 
-		// Check if our waitlist audience already exists
 		const waitlistAudience = audiences.data.find(
 			(audience) => audience.name === WAITLIST_AUDIENCE_NAME,
 		);
@@ -126,7 +124,6 @@ async function removeFromWaitlist(email: string) {
 export async function unsubscribeFromWaitlist(formData: FormData) {
 	try {
 		const email = formData.get('email') as string;
-		// Validate email with Zod schema
 		const validatedFields = emailSchema.safeParse({ email });
 
 		if (!validatedFields.success) {

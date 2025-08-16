@@ -545,7 +545,7 @@ const researchReport = createStep({
 		const triggerData = getInitData() as TriggerSchema;
 		const { dataStream, messages } = triggerData;
 		const { analysisResults, totalSteps } = inputData;
-		
+
 		const researchPlan = getStepResult(researchPlanning);
 		const searchWebResult = getStepResult(searchWeb);
 		const { searchResults } = searchWebResult;

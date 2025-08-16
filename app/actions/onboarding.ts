@@ -33,7 +33,6 @@ export async function createAccountAction({
 	agreeToTerms: boolean;
 }) {
 	try {
-		// Validate inputs with Zod
 		const validationResult = onboardingSchema.safeParse({
 			username,
 			name,
@@ -52,7 +51,6 @@ export async function createAccountAction({
 
 		const validatedData = validationResult.data;
 
-		// Verify that user has a valid temporary session
 		const tempSession = await verifyTempSession();
 		if (!tempSession) {
 			return {
@@ -63,7 +61,6 @@ export async function createAccountAction({
 
 		const email = tempSession.email;
 
-		// Check if user already exists with this email
 		const existingUser = await db
 			.select()
 			.from(user)
@@ -77,7 +74,6 @@ export async function createAccountAction({
 			};
 		}
 
-		// Check if username is already taken
 		const existingUsername = await db
 			.select()
 			.from(user)
@@ -91,10 +87,8 @@ export async function createAccountAction({
 			};
 		}
 
-		// Hash the password
 		const passwordHash = await bcrypt.hash(validatedData.password, 12);
 
-		// Create the user
 		const userId = crypto.randomUUID();
 		const newUser = await db
 			.insert(user)
@@ -115,13 +109,11 @@ export async function createAccountAction({
 			};
 		}
 
-		// Create password entry
 		await db.insert(passwordTable).values({
 			userId: userId,
 			hash: passwordHash,
 		});
 
-		// Find the specific roles
 		const userRole = await db
 			.select()
 			.from(role)
@@ -134,7 +126,6 @@ export async function createAccountAction({
 			.where(eq(role.name, 'agent-user'))
 			.limit(1);
 
-		// Assign roles if they exist
 		if (userRole.length > 0) {
 			await db.insert(roleToUser).values({
 				a: userRole[0].id,
@@ -149,10 +140,8 @@ export async function createAccountAction({
 			});
 		}
 
-		// Create a real session for the new user
 		await createSession(userId);
 
-		// Remove the temporary session cookie
 		await deleteTempSession();
 
 		await resend.emails.send({

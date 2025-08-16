@@ -1,8 +1,8 @@
 'use client';
 
 import { MessageSquarePlusIcon, type LucideIcon } from 'lucide-react';
+import { usePathname } from 'next/navigation';
 
-import { Button } from '@/components/ui/button';
 import {
 	SidebarGroup,
 	SidebarGroupContent,
@@ -10,6 +10,7 @@ import {
 	SidebarMenuButton,
 	SidebarMenuItem,
 } from '@/components/ui/sidebar';
+import Link from 'next/link';
 
 export function NavMain({
 	items,
@@ -20,17 +21,23 @@ export function NavMain({
 		icon?: LucideIcon;
 	}[];
 }) {
+	const pathname = usePathname();
+
 	return (
 		<SidebarGroup>
 			<SidebarGroupContent className="flex flex-col gap-2">
 				<SidebarMenu>
 					<SidebarMenuItem className="flex items-center gap-2">
 						<SidebarMenuButton
+							asChild
 							tooltip="New Agent Insight"
-							className="bg-sidebar-accent border-sidebar-accent-foreground group flex items-center justify-between border border-dashed hover:border-solid"
+							variant={pathname === '/chat' ? 'current' : 'default'}
+							className="group flex items-center justify-between"
 						>
-							<span>New Agent Insight</span>
-							<MessageSquarePlusIcon />
+							<Link href="/chat">
+								<span>New Agent Insight</span>
+								<MessageSquarePlusIcon />
+							</Link>
 						</SidebarMenuButton>
 					</SidebarMenuItem>
 				</SidebarMenu>
