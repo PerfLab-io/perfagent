@@ -86,11 +86,12 @@ const data = {
 		},
 	],
 	navSecondary: [
-		{
-			title: 'MCP Servers',
-			url: '/mcp-servers',
-			icon: ServerIcon,
-		},
+		// TODO: Add MCP Servers back in
+		// {
+		// 	title: 'MCP Servers',
+		// 	url: '/mcp-servers',
+		// 	icon: ServerIcon,
+		// },
 		// {
 		// 	title: 'Settings',
 		// 	url: '#',
