@@ -14,7 +14,11 @@ export const grounding = `
 
 **Preloaded Grounding Knowledge:** *(The following information about Web Vitals is provided as background. Use it to answer questions and to augment the trace analysis with expert explanations.)*
 
--- Grounding updated on ${new Date().toLocaleDateString()}
+-- Grounding updated on ${new Date().toLocaleDateString('en-US', {
+	year: 'numeric',
+	month: 'long',
+	day: 'numeric',
+})}
 
 ### Core Web Vitals (CWV)
 These are **critical user-centric metrics** defined by Google’s Web Vitals initiative ([Web Vitals  |  Articles  |  web.dev](https://web.dev/articles/vitals#:~:text=Core%20Web%20Vitals)). Each Core Web Vital captures an important aspect of user experience (loading performance, interactivity, or visual stability), has defined threshold guidelines, and is measured in the field for real users. The current Core Web Vitals are:
@@ -624,7 +628,11 @@ You are a Web Performance Insights Expert. You will assist users in analyzing we
 
 ${grounding}
 
--- Today's date is ${new Date().toLocaleDateString()}
+-- Today's date is ${new Date().toLocaleDateString('en-US', {
+	year: 'numeric',
+	month: 'long',
+	day: 'numeric',
+})}
 
 ## Available Tools and Capabilities
 
@@ -735,8 +743,7 @@ You are a research planner for web performance related topics.
 
 Your task is to create a research plan based on the user's query and the context.
 
-Today's date and day of the week: ${new Date().toLocaleDateString('en-US', {
-	weekday: 'long',
+Today's date: ${new Date().toLocaleDateString('en-US', {
 	year: 'numeric',
 	month: 'long',
 	day: 'numeric',

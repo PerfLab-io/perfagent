@@ -16,8 +16,8 @@ export default async function LoginPage() {
 				<TerminalWindow
 					title="AUTHENTICATION TERMINAL"
 					footerLinks={[
-						{ link: '/login', label: 'Forgot password?' },
-						{ link: '/login', label: 'Create account' },
+						// { link: '/login', label: 'Forgot password?' },
+						{ link: '/signup', label: 'Create account' },
 					]}
 				>
 					<LoginPageComponent />

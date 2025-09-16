@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Mail, ArrowRight, AlertCircle } from 'lucide-react';
 import { signupAction } from '@/app/actions/signup';
@@ -9,7 +10,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { signupSchema, type SignupFormValues } from '@/lib/validations/email';
 
 export function SignupForm() {
-	const [success, setSuccess] = useState(false);
+	const router = useRouter();
 	const [isPending, startTransition] = useTransition();
 	const [serverError, setServerError] = useState<string | null>(null);
 
@@ -17,7 +18,6 @@ export function SignupForm() {
 		register,
 		handleSubmit,
 		formState: { errors },
-		getValues,
 	} = useForm<SignupFormValues>({
 		resolver: zodResolver(signupSchema),
 		defaultValues: {
@@ -32,43 +32,15 @@ export function SignupForm() {
 			const result = await signupAction({ email: data.email });
 
 			if (result.success) {
-				setSuccess(true);
+				// Redirect straight to verification page; onboarding will follow after OTP
+				router.push(
+					`/verify?type=onboarding&target=${encodeURIComponent(data.email)}`,
+				);
 			} else {
 				setServerError(result.error || 'Failed to send verification email');
 			}
 		});
 	};
-
-	if (success) {
-		const email = getValues('email');
-		return (
-			<>
-				<div className="mb-6">
-					<div className="text-peppermint-400 mb-2 font-mono text-sm">
-						$ ./send_verification.sh
-					</div>
-					<div className="text-peppermint-300 font-mono text-sm">
-						Verification email sent successfully!
-					</div>
-				</div>
-				<div className="bg-peppermint-900/30 border-peppermint-500 rounded-md border p-3">
-					<div className="text-peppermint-400 font-mono text-sm">
-						SUCCESS: Verification email sent to {email}
-					</div>
-				</div>
-				<div className="border-peppermint-600 mt-6 rounded-md border border-dashed p-3">
-					<div className="text-peppermint-400 mb-2 font-mono text-xs">
-						NEXT STEPS:
-					</div>
-					<div className="text-peppermint-300 space-y-1 font-mono text-xs">
-						<p>1. Check your email for the verification code</p>
-						<p>2. Enter the code on the verification page</p>
-						<p>3. Complete your onboarding process</p>
-					</div>
-				</div>
-			</>
-		);
-	}
 
 	return (
 		<>

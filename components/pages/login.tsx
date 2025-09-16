@@ -185,23 +185,6 @@ export const LoginPageComponent = () => {
 						</span>
 					)}
 				</Button>
-
-				<div className="border-peppermint-600 mt-6 rounded-md border border-dashed p-3">
-					<div className="text-peppermint-400 mb-2 font-mono text-xs">
-						INFO:
-					</div>
-					<div className="text-peppermint-300 space-y-1 font-mono text-xs">
-						<p>
-							We are currently in private preview stage for the chat. Please{' '}
-							<Link
-								href="/#signup"
-								className="text-peppermint-300 hover:text-peppermint-200 underline transition-colors"
-							>
-								signup to the waitlist here
-							</Link>
-						</p>
-					</div>
-				</div>
 			</form>
 		</>
 	);
