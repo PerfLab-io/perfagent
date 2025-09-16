@@ -124,11 +124,13 @@ export async function canReadOwnAgents(userId: string): Promise<boolean> {
  * Grant a role to a user by assigning them to an existing role
  * @param roleName The name of the role to grant (e.g., 'agent-user')
  * @param userRecord The user record from the login function
+ * @param skipCheck Whether to skip checking if the user already has the role
  * @returns Promise<boolean> True if role was granted successfully
  */
 export async function grantRole(
 	roleName: string,
 	userRecord: Pick<typeof user.$inferSelect, 'id' | 'email'>,
+	skipCheck = false,
 ): Promise<boolean> {
 	try {
 		const roleResult = await db
@@ -146,14 +148,16 @@ export async function grantRole(
 		}
 
 		const targetRole = roleResult[0];
-
-		const existingRoleToUser = await db
-			.select()
-			.from(roleToUser)
-			.where(
-				and(eq(roleToUser.a, targetRole.id), eq(roleToUser.b, userRecord.id)),
-			)
-			.limit(1);
+		let existingRoleToUser: (typeof roleToUser.$inferSelect)[] = [];
+		if (!skipCheck) {
+			existingRoleToUser = await db
+				.select()
+				.from(roleToUser)
+				.where(
+					and(eq(roleToUser.a, targetRole.id), eq(roleToUser.b, userRecord.id)),
+				)
+				.limit(1);
+		}
 
 		if (existingRoleToUser.length === 0) {
 			await db.insert(roleToUser).values({
