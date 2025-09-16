@@ -7,7 +7,7 @@ import { Header } from '@/components/header';
 
 export default function LandingPage() {
 	return (
-		<div className="bg-background text-foreground min-h-screen">
+		<div className="bg-background text-foreground flex min-h-screen flex-col justify-around">
 			<Header />
 
 			{/* Hero section */}
@@ -18,7 +18,7 @@ export default function LandingPage() {
 			{/* Features section */}
 			<section
 				id="features"
-				className="bg-peppermint-50 dark:bg-background py-20"
+				className="bg-peppermint-50 dark:bg-background grow py-20"
 			>
 				<LandingBanner />
 			</section>
