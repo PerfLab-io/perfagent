@@ -57,7 +57,7 @@ export const LoginPageComponent = () => {
 		if (!hasAccess) {
 			setLoginStep('error');
 			setErrorMessage(
-				'You do not yet have access to the system. Please ensure to signup to the waitlist and wait for an invite',
+				'You do not yet have access to the system. Please ensure to signup first',
 			);
 			setIsLoading(false);
 			return;

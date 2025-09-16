@@ -199,7 +199,7 @@ export const OnboardingEmail = ({
 								</Text>
 								<Text className="m-0 mt-2 text-center font-mono text-xs text-[#c3e6d4]">
 									You're receiving this email at {recipientEmail} because you
-									signup to the PerfAgent waitlist and are now granted access.
+									signup to the PerfAgent and are now granted access.
 								</Text>
 								<Text className="m-0 mt-2 text-center font-mono text-xs text-[#c3e6d4]">
 									<Link
