@@ -3,7 +3,6 @@
 import './landing.css';
 import { LowFpsPerformanceViz } from '@/components/landing-hero';
 import { LandingBanner } from '@/components/landing-banner';
-import { SignupNotification } from '@/components/signup-notification';
 import { Header } from '@/components/header';
 
 export default function LandingPage() {
@@ -22,11 +21,6 @@ export default function LandingPage() {
 				className="bg-peppermint-50 dark:bg-background py-20"
 			>
 				<LandingBanner />
-			</section>
-
-			{/* Signup notification section */}
-			<section id="signup">
-				<SignupNotification />
 			</section>
 
 			{/* Simple footer */}

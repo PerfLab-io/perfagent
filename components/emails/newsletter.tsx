@@ -180,7 +180,7 @@ export const NewsletterEmail = ({
 								</Text>
 								<Text className="m-0 mt-2 text-center font-mono text-xs text-[#c3e6d4]">
 									You're receiving this email because you signed up for
-									PerfAgent waitlist.
+									PerfAgent.
 								</Text>
 								<Text className="m-0 mt-2 text-center font-mono text-xs text-[#c3e6d4]">
 									<Link
