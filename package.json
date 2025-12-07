@@ -90,7 +90,7 @@
     "langfuse-vercel": "^3.37.2",
     "lucide-react": "^0.454.0",
     "marked-react": "^3.0.0",
-    "next": "^15.2.3",
+    "next": "15.2.6",
     "next-themes": "latest",
     "postgres": "^3.4.7",
     "react": "^19.0.0",
