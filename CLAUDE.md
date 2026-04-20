@@ -23,7 +23,7 @@ PerfAgent is an AI-powered web performance analysis tool built with Next.js 15, 
 - **Framework**: Next.js 15 with App Router
 - **UI**: React 19, Radix UI, Tailwind CSS, shadcn/ui
 - **State Management**: Zustand stores organized by domain
-- **AI**: Vercel AI SDK, Mastra agents, Langfuse observability
+- **AI**: Vercel AI SDK, Mastra agents
 - **Database**: PostgreSQL with Drizzle ORM
 - **Visualizations**: Recharts, Three.js with React Three Fiber
 - **Performance Analysis**: @perflab/trace_engine

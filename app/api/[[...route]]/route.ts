@@ -6,7 +6,6 @@ import { handle } from 'hono/vercel';
 import { stream } from 'hono/streaming';
 import { zValidator } from '@hono/zod-validator';
 import { mastra } from '@/lib/ai/mastra';
-import { langfuse } from '@/lib/tools/langfuse';
 import { routerOutputSchema } from '@/lib/ai/mastra/agents/router';
 import dedent from 'dedent';
 import { verifySession } from '@/lib/session.server';
@@ -859,12 +858,6 @@ chat.post('/chat', zValidator('json', requestSchema), async (c) => {
 
 		c.header('X-Vercel-AI-Data-Stream', 'v1');
 		c.header('Content-Type', 'text/plain; charset=utf-8');
-
-		try {
-			await langfuse.flushAsync();
-		} catch (e) {
-			console.error(e);
-		}
 
 		return stream(c, (stream) =>
 			stream

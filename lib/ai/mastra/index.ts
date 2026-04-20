@@ -3,8 +3,6 @@ import { createLogger } from '@mastra/core/logger';
 import { cwvInsightsWorkflow } from './workflows/cwvInsights';
 import { mcpWorkflow } from './workflows/mcpWorkflow';
 import { routerAgent } from './agents/router';
-import { LangfuseExporter } from 'langfuse-vercel';
-import { serverEnv } from '@/lib/env/server';
 import { smallAssistant } from './agents/smallAssistant';
 import { researchWorkflow } from './workflows/researchWorkflow';
 import { topicsAgent } from './agents/perfTopics';
@@ -36,16 +34,4 @@ export const mastra = new Mastra({
 		name: 'Mastra',
 		level: 'info',
 	}),
-	telemetry: {
-		serviceName: 'ai', // this must be set to "ai" so that the LangfuseExporter thinks it's an AI SDK trace
-		enabled: true,
-		export: {
-			type: 'custom',
-			exporter: new LangfuseExporter({
-				publicKey: serverEnv.LANGFUSE_PUBLIC_KEY,
-				secretKey: serverEnv.LANGFUSE_SECRET_KEY,
-				baseUrl: serverEnv.LANGFUSE_BASEURL,
-			}),
-		},
-	},
 });
